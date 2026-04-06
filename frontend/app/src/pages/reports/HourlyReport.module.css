@@ -1,0 +1,147 @@
+.root {
+  padding-bottom: 40px;
+}
+
+/* ── Toolbar ──────────────────────────────────────────────────────────────── */
+
+.toolbar {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-card);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.field label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.dateInput {
+  padding: 5px 9px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-family: var(--font);
+  color: var(--text);
+  background: var(--bg);
+}
+
+.dateInput:focus {
+  outline: none;
+  border-color: var(--green);
+}
+
+.statusLoading {
+  font-size: 12px;
+  color: var(--text-muted);
+  align-self: flex-end;
+  padding-bottom: 2px;
+}
+
+.statusError {
+  font-size: 12px;
+  color: var(--error);
+  align-self: flex-end;
+  padding-bottom: 2px;
+}
+
+/* ── Wrap ─────────────────────────────────────────────────────────────────── */
+
+.wrap {
+  padding: 20px;
+  overflow-x: auto;
+}
+
+/* ── Main table ───────────────────────────────────────────────────────────── */
+
+.t {
+  border-collapse: collapse;
+  font-size: 13px;
+  font-family: var(--font);
+}
+
+.t td {
+  border: 1px solid #888;
+  padding: 3px 8px;
+  white-space: nowrap;
+}
+
+/* ── Cell types ───────────────────────────────────────────────────────────── */
+
+/* Yellow header (секции и заголовки столбцов) */
+.yh {
+  background: #FFFF00;
+  font-weight: 700;
+  text-align: center;
+}
+
+/* Sub-header для метрик в часовой таблице */
+.subh {
+  background: #f2f2f2;
+  font-weight: 600;
+  text-align: center;
+  font-size: 11px;
+  line-height: 1.4;
+  vertical-align: bottom;
+}
+
+/* Sub-header для Пополнения (Спуски / Перемещение) */
+.sh2 {
+  background: #f2f2f2;
+  font-weight: 600;
+  text-align: center;
+}
+
+/* Метка строки (левая колонка) */
+.lbl {
+  background: #fff;
+  font-weight: 500;
+}
+
+/* Значение (центр) */
+.v {
+  background: #fff;
+  text-align: center;
+}
+
+/* Название процесса */
+.pn {
+  background: #fff;
+  font-size: 12px;
+}
+
+/* Пустая белая ячейка */
+.e {
+  background: #fff;
+}
+
+/* Невидимая ячейка — правая часть блока Отборки (нет процессов) */
+.inv {
+  background: var(--bg) !important;
+  border-top: none !important;
+  border-right: none !important;
+  border-bottom: none !important;
+  border-left: none !important;
+}
+
+/* Разделитель между Задержкой и За час ТС */
+.sep {
+  height: 3px;
+  background: #e8e8e8;
+  padding: 0 !important;
+  border-left: 1px solid #888 !important;
+  border-right: 1px solid #888 !important;
+  border-top: none !important;
+  border-bottom: none !important;
+}

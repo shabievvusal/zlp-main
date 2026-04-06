@@ -1,0 +1,686 @@
+/* ─── Layout ─── */
+.mainContent {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+/* ─── Loading bar ─── */
+.loadingBar {
+  height: 3px;
+  background: linear-gradient(90deg, var(--green), var(--green-dark));
+  border-radius: 2px;
+  animation: loading 1.2s ease-in-out infinite;
+  margin-bottom: 16px;
+}
+@keyframes loading {
+  0%   { opacity: 1; }
+  50%  { opacity: 0.4; }
+  100% { opacity: 1; }
+}
+
+/* ─── Banner ─── */
+.dataBanner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--green-light);
+  border: 1px solid var(--green-mid);
+  border-radius: var(--radius);
+  padding: 10px 16px;
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+
+/* ─── Toolbar ─── */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.shiftSelectWrap { display: flex; align-items: center; gap: 8px; }
+.shiftSelectWrap label { font-size: 13px; color: var(--text-muted); white-space: nowrap; }
+
+.shiftToggleWrap { display: flex; align-items: center; gap: 8px; }
+.shiftToggleLabel { font-size: 13px; color: var(--text-muted); white-space: nowrap; }
+
+.fetchRangeWrap { display: flex; align-items: center; gap: 6px; }
+.fetchRangeWrap label { font-size: 13px; color: var(--text-muted); white-space: nowrap; }
+.fetchHourInput {
+  width: 52px;
+  padding: 6px 8px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  text-align: center;
+  font-size: 13px;
+  font-family: var(--font);
+  color: var(--text);
+  background: var(--white);
+  -moz-appearance: textfield;
+}
+.fetchHourInput::-webkit-outer-spin-button,
+.fetchHourInput::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.fetchHourInput:focus { border-color: var(--green); outline: none; }
+.mutedText { font-size: 11px; color: var(--text-muted); }
+
+.toolbarRight { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+
+.selectControl {
+  padding: 6px 10px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-family: var(--font);
+  color: var(--text);
+  background: var(--white);
+  outline: none;
+}
+.selectControl:focus { border-color: var(--green); }
+
+/* ─── Stat Cards ─── */
+.statsCards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.statCard {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  text-align: center;
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow .2s;
+}
+.statCard:hover { box-shadow: var(--shadow-md); }
+.statCardGreen { background: var(--green); border-color: var(--green-dark); color: white; }
+
+.statIcon { font-size: 22px; }
+.statValue { font-size: 28px; font-weight: 700; line-height: 1; color: inherit; }
+.statValueSm { font-size: 16px; }
+.statLabel { font-size: 12px; color: var(--text-muted); }
+.statCardGreen .statLabel { color: rgba(255,255,255,.75); }
+
+/* ─── Weight row ─── */
+.statsWeightRow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: -12px 0 16px;
+}
+.statsWeightNote { font-size: 12px; color: var(--text-muted); flex: 1; }
+
+/* ─── Filters ─── */
+.filtersSection {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  margin-bottom: 20px;
+  box-shadow: var(--shadow-sm);
+}
+.filtersLabel {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}
+.companyFilter { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.filterChip {
+  padding: 5px 14px;
+  border: 1.5px solid var(--border);
+  border-radius: 20px;
+  background: var(--white);
+  font-size: 12px;
+  font-family: var(--font);
+  cursor: pointer;
+  transition: all .15s;
+  color: var(--text);
+}
+.filterChip:hover { border-color: var(--green); color: var(--green); }
+.filterChipActive { background: var(--green); border-color: var(--green); color: white; }
+
+/* ─── Weight note row ─── */
+.statsWeightRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: -12px 0 16px;
+}
+.statsWeightNote {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+/* ─── Card ─── */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+
+.cardHeader {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.cardHeaderSub { font-size: 11px; color: var(--text-muted); font-weight: 400; }
+.cardHeaderHourly { flex-wrap: wrap; gap: 8px; }
+
+/* ─── Toggle switch ─── */
+.summaryToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 400;
+  user-select: none;
+}
+.summaryToggle input { position: absolute; opacity: 0; width: 0; height: 0; }
+.summaryToggleSlider {
+  position: relative;
+  display: inline-block;
+  width: 30px;
+  height: 16px;
+  background: var(--border);
+  border-radius: 8px;
+  transition: background 0.2s;
+}
+.summaryToggleSlider::before {
+  content: '';
+  position: absolute;
+  width: 12px; height: 12px;
+  left: 2px; top: 2px;
+  background: white;
+  border-radius: 50%;
+  transition: transform 0.2s;
+}
+.summaryToggleChecked { background: var(--green); }
+.summaryToggleChecked::before { transform: translateX(14px); }
+
+/* ─── Monthly card header controls ─── */
+.monthlyControls { display: flex; align-items: center; gap: 8px; }
+
+/* ─── Hourly controls ─── */
+.hourlyControlsWrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+.hourlyControlsSep { width: 1px; height: 20px; background: var(--border); flex-shrink: 0; }
+.hourlyControlsWrap .formControlSm {
+  padding: 3px 7px;
+  font-size: 12px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  width: 60px;
+  box-sizing: border-box;
+  font-family: var(--font);
+  color: var(--text);
+  background: var(--white);
+  outline: none;
+}
+.hourlyControlsWrap .formControlSm:focus { border-color: var(--green); }
+
+/* ─── HE mode toggle ─── */
+.heModeToggle { display: flex; gap: 4px; }
+.heModeBtn {
+  height: 26px;
+  padding: 0 12px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--white);
+  font-size: 12px;
+  font-family: var(--font);
+  font-weight: 500;
+  cursor: pointer;
+  color: var(--text);
+  transition: background .15s, color .15s, border-color .15s;
+}
+.heModeBtn:hover { background: var(--bg); border-color: var(--green); color: var(--green); }
+.heModeBtnActive {
+  background: var(--green) !important;
+  border-color: var(--green) !important;
+  color: #fff !important;
+}
+
+/* ─── Idle config ─── */
+.heIdlesConfig { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-muted); }
+
+/* ─── Monthly controls (inside card header) ─── */
+.monthlyControls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+/* ─── Stats last update ─── */
+.statsLastUpdate { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+/* ─── formControlSm (used inside hourlyControlsWrap) ─── */
+.formControlSm {
+  padding: 3px 7px;
+  font-size: 12px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  width: 60px;
+  box-sizing: border-box;
+  font-family: var(--font);
+  color: var(--text);
+  background: var(--white);
+  outline: none;
+}
+.formControlSm:focus { border-color: var(--green); }
+
+/* ─── Empty ─── */
+.emptyRow {
+  padding: 20px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* ─── Tables ─── */
+.tableWrap { overflow-x: auto; }
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.table th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  background: var(--bg);
+}
+.table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.table tr:last-child td { border-bottom: none; }
+.table tr:hover td { background: rgba(79,142,247,0.04); }
+
+.tdRight  { text-align: right; }
+.tdCenter { text-align: center; }
+.tdMuted  { color: var(--text-muted); font-size: 12px; }
+.tdBold   { font-weight: 600; }
+
+/* ─── Total row ─── */
+.totalRow td { font-weight: 600; border-top: 2px solid var(--border) !important; }
+
+/* ─── Company summary table ─── */
+.companySummaryTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.companySummaryTable th,
+.companySummaryTable td {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  text-align: center;
+  vertical-align: middle;
+}
+.companySummaryTable thead th {
+  background: var(--bg);
+  font-weight: 600;
+  color: var(--text);
+  font-size: 12px;
+}
+.companySummaryTable tbody td { background: var(--white); }
+.csThCompany,
+.csTdCompany { max-width: 100px; font-weight: 700; text-align: center; }
+.csTdNum,
+.csThNum { text-align: center; vertical-align: middle; }
+.csThHour,
+.csTdHour { min-width: 36px; font-size: 12px; text-align: center; vertical-align: middle; }
+
+/* ─── Company summary formulas ─── */
+.companySummaryFormulas {
+  padding: 12px 20px;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.csFormulaRow { margin-bottom: 6px; }
+.csFormulaRow:last-child { margin-bottom: 0; }
+.csFormulaLabel { font-weight: 500; color: var(--text); }
+.csFormulaText { margin-left: 8px; }
+
+/* ─── Formulas (monthly) ─── */
+.formulas {
+  padding: 8px 16px;
+  font-size: 11px;
+  color: var(--text-muted);
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--border);
+}
+
+/* ─── Progress bar ─── */
+.barWrap { position: relative; height: 20px; display: flex; align-items: center; min-width: 80px; }
+.bar { position: absolute; left: 0; top: 0; height: 100%; background: var(--green-light); border-radius: 3px; min-width: 4px; }
+.barValue { position: relative; font-weight: 600; font-size: 12px; padding-left: 6px; }
+
+/* ─── Hourly chart ─── */
+.hourlyBars {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  padding: 12px 16px 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.hourlyCol {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  min-width: 52px;
+  max-width: 80px;
+  cursor: default;
+}
+
+/* Верхняя метка: итого оп. + чел. */
+.hourlyValues {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 6px;
+  gap: 1px;
+  min-height: 32px;
+  justify-content: flex-end;
+}
+.hourlyOps       { font-size: 11px; font-weight: 700; color: var(--text); line-height: 1.3; white-space: nowrap; }
+.hourlyEmployees { font-size: 10px; color: var(--text-muted); line-height: 1.3; }
+
+/* Сами столбики */
+.hourlyBarWrap {
+  width: 100%;
+  height: 120px;
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.hourlyBarStorage {
+  flex: 1;
+  background: var(--green);
+  border-radius: 3px 3px 0 0;
+  min-height: 3px;
+  transition: height .3s ease;
+  position: relative;
+}
+.hourlyBarStorage:hover { background: var(--green-dark); }
+
+.hourlyBarKdk {
+  flex: 1;
+  background: var(--green-mid);
+  border-radius: 3px 3px 0 0;
+  min-height: 3px;
+  transition: height .3s ease;
+  position: relative;
+}
+.hourlyBarKdk:hover { background: var(--green); }
+
+/* Tooltip при наведении */
+.hourlyBarStorage[title]:hover::after,
+.hourlyBarKdk[title]:hover::after {
+  content: attr(title);
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--text);
+  color: #fff;
+  font-size: 10px;
+  padding: 3px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* Разделитель + метка часа */
+.hourlyFooter {
+  width: 100%;
+  border-top: 1px solid var(--border);
+  margin-top: 0;
+  padding-top: 5px;
+  text-align: center;
+}
+.hourlyLabel { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+
+/* Легенда */
+.hourlyLegend {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 16px 10px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.hourlyLegendItem { display: flex; align-items: center; gap: 5px; }
+.hourlyLegendDot {
+  width: 10px; height: 10px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+/* ─── HE Legend ─── */
+.heLegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+}
+.heLegendItem { display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+.heLegendSwatch {
+  display: inline-block;
+  width: 18px; height: 14px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+/* ─── HE Table ─── */
+.heScrollWrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+.heTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.heTable th,
+.heTable td {
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  text-align: center;
+}
+.heTable thead th {
+  background: #ffffff;
+  font-weight: 600;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.heTdCompany {
+  color: var(--text-muted);
+  font-size: 0.9em;
+  min-width: 80px;
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.heTdName {
+  text-align: left;
+  min-width: 140px;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  position: sticky;
+  left: 0;
+  background: var(--bg);
+  z-index: 1;
+  font-weight: 500;
+}
+.heThName { background: #ffffff; }
+.heThHour { min-width: 46px; }
+.heThTotal,
+.heTdTotal { font-weight: 700; background: #ffffff; min-width: 52px; }
+.heTdVal { font-weight: 500; color: #1d1d1b; vertical-align: middle; text-align: center; }
+.heCellSz { display: block; font-weight: 600; line-height: 1.3; }
+.heCellWeight { display: block; font-size: 10px; font-weight: 400; opacity: .75; line-height: 1.2; border-top: 1px solid rgba(0,0,0,.08); margin-top: 2px; padding-top: 2px; }
+.hePeak { font-size: 10px; opacity: 0.75; border-top: 1px solid currentColor; margin-top: 1px; }
+
+/* ─── HE Idles column ─── */
+.heThIdles,
+.heTdIdles {
+  font-size: 11px;
+  white-space: nowrap;
+  text-align: center;
+  min-width: 200px;
+}
+
+/* ─── Idle timeline ─── */
+.heIdlesTimeline {
+  position: relative;
+  height: 18px;
+  border-radius: 9px;
+  background: #f3f4f6;
+  overflow: hidden;
+}
+.heIdleBlock {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  background: #ef4444;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.heIdleBlockLabel {
+  font-size: 10px;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+  line-height: 1;
+  pointer-events: none;
+}
+
+/* ─── Zones table ─── */
+.zwTable { width: 100%; border-collapse: collapse; font-size: 12px; }
+.zwTh {
+  padding: 6px 8px;
+  font-weight: 600;
+  text-align: center;
+  border: 1px solid rgba(0,0,0,.15);
+  white-space: nowrap;
+}
+.zwThCompany { text-align: left; background: var(--bg); }
+.zwThEmployee { text-align: left; background: var(--bg); }
+.zwThTotal { background: var(--bg); }
+.zwTd {
+  padding: 5px 8px;
+  text-align: center;
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+.zwTdName { text-align: left; font-weight: 500; }
+.zwTdTotal { text-align: center; font-weight: 600; background: var(--bg); border: 1px solid var(--border); }
+.zwCount { display: block; font-weight: 600; line-height: 1.3; }
+.zwWeight { display: block; font-size: 10px; font-weight: 400; color: inherit; opacity: .8; line-height: 1.2; }
+
+/* ─── New employees banner ─── */
+.newEmplBanner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: #fffbeb;
+  border: 1px solid #fcd34d;
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  margin-bottom: 4px;
+}
+.newEmplBannerBody {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.newEmplBannerTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: #92400e;
+}
+.newEmplBannerList {
+  font-size: 13px;
+  color: #78350f;
+  line-height: 1.5;
+}
+.newEmplBannerActions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* ── Mobile ─────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .mainContent { padding: 12px 14px; }
+
+  .statsCards {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .statCard { padding: 14px 12px; }
+
+  /* Таблицы — горизонтальный скролл */
+  .heScrollWrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .tableWrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  .toolbar { gap: 8px; }
+  .toolbarRight { margin-left: 0; width: 100%; }
+
+  .newEmplBannerActions { flex-wrap: wrap; width: 100%; margin-top: 6px; }
+}
+
+@media (max-width: 480px) {
+  .statsCards { grid-template-columns: repeat(2, 1fr); }
+  .statCard { padding: 12px 10px; }
+}

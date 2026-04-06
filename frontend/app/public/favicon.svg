@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Bottom layer -->
+  <rect x="36" y="36" width="56" height="56" rx="10" fill="#2a9d50"/>
+  <!-- White gap -->
+  <rect x="20" y="20" width="56" height="56" rx="10" fill="white"/>
+  <!-- Middle layer -->
+  <rect x="22" y="22" width="52" height="52" rx="9" fill="#30b85c"/>
+  <!-- White gap -->
+  <rect x="6" y="6" width="56" height="56" rx="10" fill="white"/>
+  <!-- Top layer -->
+  <rect x="8" y="8" width="52" height="52" rx="9" fill="#37d168"/>
+</svg>

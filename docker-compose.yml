@@ -1,0 +1,24 @@
+services:
+  node:
+    build: .
+    image: wms-node
+    restart: on-failure
+    ports:
+      - "${PORT:-3009}:3009"
+    env_file: .env
+    environment:
+      - NODE_HOST_PROJECT_PATH=${PWD}
+    volumes:
+      - node-persist:/app/persist
+      - /var/run/docker.sock:/var/run/docker.sock
+      - .:/app/host-project
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:'+process.env.PORT+'/api/status', r => process.exit(r.statusCode===200?0:1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  node-persist:
+    driver: local

@@ -1,0 +1,591 @@
+/* ── Page & Tabs ────────────────────────────────────────────────────────────── */
+.settingsPage {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.tabStrip {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid var(--border);
+  padding: 0 24px;
+  background: var(--bg-card);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.tabStrip::-webkit-scrollbar { display: none; }
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 14px 20px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-muted);
+  white-space: nowrap;
+  transition: color 0.15s, border-color 0.15s;
+  font-family: var(--font);
+}
+.tab:hover { color: var(--text); }
+
+.tabActive {
+  color: var(--green);
+  border-bottom-color: var(--green);
+  font-weight: 600;
+}
+
+.tabIcon { font-size: 16px; }
+
+.tabContent {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 860px;
+}
+
+/* ── Grid & Cards ──────────────────────────────────────────────────────────── */
+.settingsGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 860px;
+}
+
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.cardWide { /* no extra styles needed in flex column layout */ }
+
+.cardHeader {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--bg);
+}
+
+.cardHeaderText { flex: 1; min-width: 0; }
+
+.cardIcon {
+  font-size: 22px;
+  width: 40px; height: 40px;
+  background: var(--green-light);
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+
+.cardTitle { font-size: 14px; font-weight: 600; color: var(--text); }
+.cardSub   { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+.settingsBody { padding: 0; }
+
+/* ── Setting rows ──────────────────────────────────────────────────────────── */
+.settingRow {
+  display: flex;
+}
+
+.settingRowStack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: stretch;
+  padding: 0 20px 8px;
+}
+
+.settingInfo { flex: 1; min-width: 0; }
+.settingLabel { font-size: 13px; font-weight: 500; color: var(--text); margin-bottom: 3px; }
+.settingDesc  { font-size: 12px; color: var(--text-muted); line-height: 1.45; }
+.settingControl { flex-shrink: 0; }
+
+.settingControlFull {
+  width: 100%;
+  max-width: 720px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.settingDivider { border: none; border-top: 1px solid var(--border); margin: 0; }
+
+.settingsActions {
+  padding: 16px 20px;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+  display: flex;
+  gap: 8px;
+}
+
+/* ── Toggle ────────────────────────────────────────────────────────────────── */
+.settingToggle {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+  cursor: pointer;
+}
+.settingToggle input {
+  position: absolute;
+  opacity: 0;
+  width: 0; height: 0;
+}
+.settingToggleSlider {
+  position: absolute;
+  inset: 0;
+  background: var(--border);
+  border-radius: 24px;
+  transition: background 0.2s;
+}
+.settingToggleSlider::before {
+  content: '';
+  position: absolute;
+  width: 18px; height: 18px;
+  left: 3px; top: 3px;
+  background: var(--white);
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+  transition: transform 0.2s;
+}
+.settingToggle input:checked + .settingToggleSlider { background: var(--green); }
+.settingToggle input:checked + .settingToggleSlider::before { transform: translateX(20px); }
+
+/* ── Table ─────────────────────────────────────────────────────────────────── */
+.tableWrap { overflow-x: auto; padding: 0 20px 12px; }
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.table th {
+  text-align: left;
+  padding: 8px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.table td {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.table tr:last-child td { border-bottom: none; }
+.table tr:hover td { background: rgba(79,142,247,0.04); }
+
+.emptyRow {
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+  padding: 20px !important;
+}
+
+.emptyText {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.usersSummary {
+  padding: 8px 20px 4px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ── Telegram chats ────────────────────────────────────────────────────────── */
+.telegramChatsList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: 720px;
+}
+
+.tgChatCard {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.tgChatHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+}
+
+.tgChatIdInput { flex: 1; min-width: 0; }
+
+.tgChatFields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  padding: 14px;
+}
+
+.tgField {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.tgFieldLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.tgEnabledWrap {
+  white-space: nowrap;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.tgCompanies {
+  min-height: 80px;
+  font-size: 13px;
+}
+
+@media (max-width: 560px) {
+  .tgChatFields { grid-template-columns: 1fr; }
+  .tab { padding: 12px 14px; font-size: 13px; }
+  .tabContent { padding: 16px; }
+}
+
+/* ── Employees ─────────────────────────────────────────────────────────────── */
+.emplToolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.emplSearch { flex: 1; min-width: 160px; max-width: 260px; }
+
+.settingsHint {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+.emplNoCompanySection {
+  padding: 16px 20px 8px;
+}
+
+.emplNoCompanyHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.noCompanyViewToggle {
+  margin-left: auto;
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.noCompanyTableWrap {
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.emplNoCompanyBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  background: var(--green);
+  color: #fff;
+  border-radius: 11px;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.emplSubtitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+
+.emplNoCompanyList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.emplNoCompanyList li { margin: 0; }
+
+.btnEmplFio {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0.3rem 0.6rem;
+  border: 1.5px solid var(--border);
+  border-radius: 20px;
+  background: var(--bg-card);
+  color: var(--text);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  font-family: var(--font);
+}
+.btnEmplFio:hover {
+  background: #3b82f6;
+  border-color: #3b82f6;
+  color: #fff;
+}
+
+.emplBubblePart { display: inline-block; }
+.emplBubblePart + .emplBubblePart::before {
+  content: '·';
+  margin: 0 4px;
+  opacity: 0.4;
+}
+
+.emplEditorSection {
+  margin-top: 20px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+.emplEditorToggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 20px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-align: left;
+  font-family: var(--font);
+}
+.emplEditorToggle:hover { color: var(--text); }
+
+.emplEditorToggleOpen { color: var(--text); }
+
+.emplEditorToggleArrow {
+  font-size: 0.75rem;
+  transition: transform 0.2s;
+}
+.emplEditorToggleOpen .emplEditorToggleArrow { transform: rotate(180deg); }
+
+.emplEditorTableWrap {
+  overflow-x: auto;
+  padding: 0 20px 12px;
+}
+
+.emplEditorTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.emplEditorTable th {
+  text-align: left;
+  padding: 6px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  border-bottom: 1px solid var(--border);
+}
+.emplEditorTable td {
+  padding: 3px 4px;
+  border-bottom: 1px solid #f0f0f0;
+  vertical-align: middle;
+}
+
+.emplInput {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1.5px solid transparent;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-family: var(--font);
+  color: var(--text);
+  background: transparent;
+  transition: border-color .2s;
+  outline: none;
+}
+.emplInput:focus {
+  border-color: var(--green);
+  background: var(--white);
+}
+
+.emplSelect {
+  flex: 1;
+  padding: 6px 8px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-family: var(--font);
+  color: var(--text);
+  background: var(--white);
+  outline: none;
+  min-width: 0;
+}
+
+.emplInputCompany {
+  width: 110px;
+  flex-shrink: 0;
+  padding: 6px 8px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-family: var(--font);
+  color: var(--text);
+  background: var(--white);
+  outline: none;
+}
+
+.btnIconDel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px; height: 28px;
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  border-radius: 4px;
+  font-size: 14px;
+  flex-shrink: 0;
+  font-family: var(--font);
+}
+.btnIconDel:hover { background: #FEE2E2; color: var(--error); }
+
+/* ── Modal ─────────────────────────────────────────────────────────────────── */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  z-index: 3000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.modalBox {
+  background: var(--bg-card);
+  border-radius: 14px;
+  width: 100%;
+  max-width: 480px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.18);
+  display: flex;
+  flex-direction: column;
+}
+
+.modalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 600;
+  font-size: 16px;
+  padding: 20px 24px 0;
+}
+
+.modalClose {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 18px;
+  color: var(--text-muted);
+  padding: 2px 6px;
+  border-radius: 6px;
+  font-family: var(--font);
+}
+.modalClose:hover { background: var(--border); color: var(--text); }
+
+.modalBody {
+  padding: 16px 24px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.modalFooter {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  padding: 0 24px 20px;
+}
+
+/* ── Mobile ─────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .tabStrip { padding: 0 12px; }
+  .tab { padding: 12px 14px; font-size: 13px; }
+  .tabContent { padding: 16px 14px; }
+
+  /* Модалка — bottom sheet */
+  .modalOverlay { align-items: flex-end; padding: 0; }
+  .modalBox {
+    max-width: 100%;
+    max-height: 92vh;
+    border-radius: 20px 20px 0 0;
+  }
+  .modalBox::before {
+    content: '';
+    display: block;
+    width: 40px;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    margin: 12px auto -4px;
+  }
+  .modalHeader { padding: 16px 18px 0; }
+  .modalBody { padding: 14px 18px; }
+  .modalFooter {
+    padding: 0 18px calc(16px + env(safe-area-inset-bottom, 0px));
+    flex-direction: column-reverse;
+  }
+  .modalFooter .btn { width: 100%; justify-content: center; }
+
+  .tgChatFields { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 560px) {
+  .tgChatFields { grid-template-columns: 1fr; }
+}

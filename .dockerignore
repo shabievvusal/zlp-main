@@ -1,0 +1,14 @@
+node_modules/
+frontend/app/node_modules/
+frontend/app/dist/
+backend/data/
+backend/vs-sessions.json
+backend/vs-logins.json
+tools/*/bin/
+tools/*/obj/
+.env
+.env.local
+*.log
+.git/
+panel/
+volumes/

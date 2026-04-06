@@ -1,0 +1,183 @@
+/* ── Layout ── */
+.shell { padding: 24px; }
+
+.head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 14px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.headTitle { margin: 0; font-size: 22px; font-weight: 700; }
+.headSub { margin: 4px 0 0; color: var(--text-muted); font-size: 14px; }
+.topActions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* ── Grid ── */
+.grid {
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr) minmax(380px, 1.15fr);
+  gap: 14px;
+}
+@media (max-width: 980px) {
+  .grid { grid-template-columns: 1fr; }
+}
+
+/* ── Cards ── */
+.card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 8px 26px rgba(16,32,48,.08);
+  overflow: hidden;
+}
+.cardHead {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: linear-gradient(160deg, #f8fbfd, #f2f7fb);
+}
+.cardHead h2 { margin: 0; font-size: 16px; }
+.cardHeadSub { font-size: 12px; color: var(--text-muted); }
+.pad { padding: 14px; }
+
+/* ── Tabs ── */
+.tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.tab {
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  font-weight: 600;
+  font-family: var(--font);
+  transition: background .15s;
+}
+.tabActive { background: var(--text); color: #fff; border-color: var(--text); }
+
+/* ── Form ── */
+.row { display: grid; gap: 10px; margin-bottom: 10px; }
+.rowTwo { grid-template-columns: 1fr 1fr; }
+.formLabel { display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 4px; }
+.input, .select, .textarea {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 9px 10px;
+  font-family: var(--font);
+  font-size: 14px;
+  color: var(--text);
+  background: #fff;
+}
+.input:focus, .select:focus, .textarea:focus {
+  outline: none;
+  border-color: #0e5a84;
+  box-shadow: 0 0 0 3px rgba(14,90,132,.14);
+}
+.textarea { min-height: 82px; resize: vertical; }
+
+/* ── Note ── */
+.note {
+  font-size: 12px;
+  color: #9a4d00;
+  background: #fff7ed;
+  border: 1px solid #ffd6ad;
+  border-radius: 10px;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+}
+
+/* ── Buttons ── */
+.btn {
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text);
+  padding: 9px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 13px;
+  font-family: var(--font);
+  white-space: nowrap;
+}
+.btn:hover { filter: brightness(.98); }
+.btnBrand { background: #1f7a45; color: #fff; border-color: #1f7a45; }
+.btnAlt   { background: #0e5a84; color: #fff; border-color: #0e5a84; }
+.btnFull  { width: 100%; margin-top: 4px; }
+
+/* ── Supervisors ── */
+.settingsPanel {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.settingsTitle { margin: 0 0 4px; font-size: 15px; }
+.settingsDesc  { margin: 0 0 10px; font-size: 12px; color: var(--text-muted); }
+.supervisorsList { list-style: none; margin: 0 0 12px; padding: 0; }
+.supervisorItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  margin-bottom: 6px;
+  background: #f5f8fb;
+  border-radius: 8px;
+  font-size: 13px;
+}
+.btnRemove {
+  padding: 2px 8px;
+  font-size: 12px;
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-family: var(--font);
+}
+.btnRemove:hover { color: #c00; border-color: #c00; }
+.addBtnWrap { display: flex; align-items: flex-end; }
+
+/* ── Paper output ── */
+.paperWrap {
+  background: #e6edf4;
+  border-radius: 12px;
+  padding: 14px;
+}
+.output {
+  width: 210mm;
+  max-width: 100%;
+  min-height: 297mm;
+  margin: 0 auto;
+  background: #fff;
+  border: 1px solid #cfd8e3;
+  box-shadow: 0 4px 18px rgba(0,0,0,.08);
+  padding: 20mm 18mm;
+  font-family: "Times New Roman", serif;
+  font-size: 12pt;
+  line-height: 1.45;
+  color: #000;
+}
+@media (max-width: 980px) {
+  .output { min-height: 420px; width: 100%; padding: 16px 14px; }
+}
+
+/* ── Doc styles (inside output) ── */
+.output :global(.doc-center)   { text-align: center; font-weight: 700; }
+.output :global(.doc-sub)      { text-align: center; margin-top: 4px; }
+.output :global(.doc-date)     { text-align: right; margin-top: 10px; margin-bottom: 14px; }
+.output :global(.doc-p)        { text-align: justify; text-indent: 1.25cm; margin: 0 0 8px 0; }
+.output :global(.doc-p.no-indent) { text-indent: 0; }
+.output :global(.doc-list)     { margin: 0 0 10px 0; padding-left: 20px; }
+.output :global(.doc-list li)  { margin-bottom: 4px; }
+.output :global(.doc-sign)     { margin-top: 18px; }
+.output :global(.doc-sign p)   { margin: 4px 0; }
+.output :global(.doc-right)    { text-align: right; margin-bottom: 14px; }
+.output :global(.doc-right p)  { margin: 2px 0; }
+.output :global(.doc-sign-row) { display: flex; justify-content: space-between; margin-top: 18px; gap: 24px; }
+.output :global(.doc-tc-sign)  { flex: 1; }
+.output :global(.doc-tc-sign p){ margin: 4px 0; }
+.output :global(.doc-tc-ack)   { flex: 1; text-align: right; max-width: 50%; }
+.output :global(.doc-tc-ack p) { margin: 2px 0; }

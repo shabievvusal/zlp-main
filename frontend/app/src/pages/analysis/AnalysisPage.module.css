@@ -1,0 +1,335 @@
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  padding: 14px 16px 0;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.field label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  align-self: flex-end;
+  padding-bottom: 6px;
+}
+
+/* ── Breaks ──────────────────────────────────────────────────────────────── */
+
+.breaks {
+  padding: 12px 16px 0;
+  border-top: 1px solid var(--border);
+  margin-top: 14px;
+}
+
+.breaksTitle {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.breaksControls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.breakRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.breaksTemplates {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* ── Ops table ────────────────────────────────────────────────────────────── */
+
+.tableWrap {
+  padding: 14px 16px;
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.table th {
+  text-align: left;
+  padding: 6px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.table td:first-child {
+  font-weight: 600;
+}
+
+.computed {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* ── History / staff pick ─────────────────────────────────────────────────── */
+
+.history {
+  padding: 14px 16px;
+  border-top: 1px solid var(--border);
+  margin-top: 4px;
+}
+
+.historyTitle {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.historyControls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.fieldWide {
+  flex: 1 1 200px;
+}
+
+.pickStatus {
+  font-size: 13px;
+  color: var(--text-muted);
+  align-self: center;
+}
+
+.companiesList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.companyItem {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+/* ── Lunch table ──────────────────────────────────────────────────────────── */
+
+.lunchGrid {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto auto;
+  gap: 6px 10px;
+  align-items: center;
+  font-size: 13px;
+  margin-bottom: 14px;
+}
+
+.lunchHead {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+/* ── Assign tables ────────────────────────────────────────────────────────── */
+
+.assignWrap {
+  margin-top: 12px;
+  overflow-x: auto;
+}
+
+.assignTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.assignTable th {
+  text-align: left;
+  padding: 6px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+}
+
+.assignTable td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+.empty {
+  color: var(--text-muted);
+  font-size: 13px;
+  padding: 8px 0;
+}
+
+.chip {
+  display: inline-block;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-size: 12px;
+  margin: 2px 2px 2px 0;
+}
+
+.chipMuted {
+  composes: chip;
+  opacity: 0.55;
+}
+
+.chipWarn {
+  display: inline-block;
+  background: #fff3cd;
+  border: 1px solid #ffc107;
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-size: 11px;
+  margin: 2px 2px 2px 0;
+  color: #856404;
+}
+
+.statusOk {
+  color: var(--success, #1f7a45);
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.statusWarn {
+  color: var(--danger, #c0392b);
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.statusDetail {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* ── Schedule chart ───────────────────────────────────────────────────────── */
+
+.scheduleChart {
+  margin-top: 8px;
+}
+
+.scheduleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.scheduleOp {
+  width: 160px;
+  font-size: 12px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.scheduleBars {
+  display: flex;
+  gap: 2px;
+  flex-wrap: wrap;
+}
+
+.hour {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 40px;
+}
+
+.hourLabel {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-bottom: 2px;
+}
+
+.hourBar {
+  width: 36px;
+  height: 36px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+}
+
+.hourFill {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--brand, #1f7a45);
+  opacity: 0.6;
+  transition: height 0.2s;
+}
+
+.hourValue {
+  position: relative;
+  z-index: 1;
+  font-size: 10px;
+  font-weight: 600;
+  text-align: center;
+  width: 100%;
+  padding-bottom: 2px;
+}
+
+/* ── Mobile ─────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .toolbar { padding: 12px 14px 0; }
+
+  .lunchGrid {
+    grid-template-columns: 1fr auto auto auto auto;
+    font-size: 12px;
+  }
+
+  /* График расписания — горизонтальный скролл */
+  .scheduleChart { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  .scheduleRow {
+    min-width: 600px;
+  }
+
+  .scheduleOp { width: 120px; font-size: 11px; }
+
+  .tableWrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .assignWrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+}
