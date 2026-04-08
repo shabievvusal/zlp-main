@@ -14,6 +14,8 @@ import DocsPage from './pages/docs/DocsPage.jsx'
 import AnalysisPage from './pages/analysis/AnalysisPage.jsx'
 import ReceivePage from './pages/receive/ReceivePage.jsx'
 import ReportsPage from './pages/reports/ReportsPage.jsx'
+import SuppliesPage from './pages/supplies/SuppliesPage.jsx'
+import SupplyDetailPage from './pages/supplies/SupplyDetailPage.jsx'
 
 function PlaceholderPage({ title }) {
   return (
@@ -64,6 +66,8 @@ function AppRoutes() {
             <Route path="/consolidation" element={<ModuleRoute module="consolidation"><ConsolidationPage /></ModuleRoute>} />
             <Route path="/docs" element={<ModuleRoute module="docs"><DocsPage /></ModuleRoute>} />
             <Route path="/shipments" element={<ModuleRoute module="shipments"><ShipmentsPage /></ModuleRoute>} />
+            <Route path="/supplies" element={<ModuleRoute module="supplies"><SuppliesPage /></ModuleRoute>} />
+            <Route path="/supplies/:taskType/:id" element={<ModuleRoute module="supplies"><SupplyDetailPage /></ModuleRoute>} />
             <Route path="/settings" element={<ModuleRoute module="settings"><SettingsPage /></ModuleRoute>} />
             <Route path="/reports" element={<ModuleRoute module="reports"><ReportsPage /></ModuleRoute>} />
             <Route path="*" element={<Navigate to="/" replace />} />

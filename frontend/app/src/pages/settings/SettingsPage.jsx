@@ -7,7 +7,7 @@ import { normalizeFio, hasMatchInEmplKeys, personKey } from '../../utils/emplUti
 import { formatDateTime } from '../../utils/format.js'
 import {
   Users, Send, Lock, Settings, RefreshCw, FolderOpen, Scale,
-  User, Trash2, X, Upload, Download, Clock, Theater,
+  User, UserCircle, Trash2, X, Upload, Download, Clock, Theater,
 } from 'lucide-react'
 import s from './SettingsPage.module.css'
 
@@ -18,9 +18,9 @@ const VS_MODULE_LABELS = {
   analysis: 'Анализ', consolidation: 'Консолидация', docs: 'Документы',
   settings: 'Настройки', shipments: 'Отгрузка',
   receive: 'Форма отгрузки', consolidation_form: 'Форма консолидации',
-  reports: 'Отчёты',
+  reports: 'Отчёты', supplies: 'Поставки',
 }
-const ALL_MODULES = ['stats', 'data', 'monitor', 'analysis', 'consolidation', 'docs', 'settings', 'shipments', 'receive', 'consolidation_form', 'reports']
+const ALL_MODULES = ['stats', 'data', 'monitor', 'analysis', 'consolidation', 'docs', 'settings', 'shipments', 'receive', 'consolidation_form', 'reports', 'supplies']
 
 const VS_ACTION_LABELS = {
   fetch_data:      'Обновить данные',
@@ -1408,6 +1408,63 @@ function ProductWeightsCard() {
   )
 }
 
+// ─── My modules card ─────────────────────────────────────────────────────────
+
+function MyModulesCard() {
+  const { user, refreshUser } = useAuth()
+  const notify = useNotify()
+  const [selected, setSelected] = useState(() => new Set(user?.modules || []))
+  const [saving, setSaving] = useState(false)
+
+  const toggle = m => setSelected(prev => {
+    const next = new Set(prev)
+    if (next.has(m)) next.delete(m); else next.add(m)
+    return next
+  })
+
+  const handleSave = async () => {
+    const login = user?.login || user?.phone
+    if (!login) return
+    setSaving(true)
+    try {
+      await api.putVsAdminUser(login, { modules: [...selected] })
+      await refreshUser()
+      notify('Разделы обновлены', 'success')
+    } catch (err) {
+      notify('Ошибка: ' + err.message, 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className={s.card}>
+      <div className={s.cardHeader}>
+        <div className={s.cardIcon}><UserCircle size={22} strokeWidth={1.5}/></div>
+        <div className={s.cardHeaderText}>
+          <div className={s.cardTitle}>Мои разделы</div>
+          <div className={s.cardSub}>Выберите разделы, которые отображаются в вашем меню</div>
+        </div>
+      </div>
+      <div className={s.settingsBody}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 24px', padding: '16px 20px' }}>
+          {ALL_MODULES.map(m => (
+            <label key={m} style={{ display: 'flex', alignItems: 'center', gap: 7, fontWeight: 400, fontSize: 13, cursor: 'pointer' }}>
+              <input type="checkbox" checked={selected.has(m)} onChange={() => toggle(m)} />
+              {VS_MODULE_LABELS[m] || m}
+            </label>
+          ))}
+        </div>
+        <div style={{ padding: '0 20px 16px' }}>
+          <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+            {saving ? 'Сохранение...' : 'Сохранить'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function AccessContent() {
   const notify = useNotify()
   const [roles, setRoles] = useState([])
@@ -1423,6 +1480,7 @@ function AccessContent() {
 
   return (
     <>
+      <MyModulesCard />
       <PendingCard onApproved={() => setUsersKey(k => k + 1)} roles={roles} />
       <RolesCard roles={roles} onChanged={handleRolesChanged} />
       <UsersCard key={usersKey} roles={roles} />

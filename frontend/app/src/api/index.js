@@ -806,6 +806,38 @@ export async function getReportMonitoringStats(token, createdAtFrom, createdAtTo
  * types: массив — 'CROSSDOCK' для КДК, ['STORAGE_DC','STORAGE','IMPORT'] для Хранения.
  * Без фильтра по дате. Нам нужен только value.total.
  */
+/**
+ * Поставки — список заданий на приёмку с пагинацией и фильтрами.
+ * params: { pageNumber, pageSize, sortField, sortDirection, dateFrom, dateTo, statuses, types, temperatureModes }
+ */
+export async function getInboundTasks(token, {
+  pageNumber = 1,
+  pageSize = 30,
+  sortField = 'PLANNED_ARRIVAL_DATE',
+  sortDirection = 'DESC',
+  dateFrom,
+  dateTo,
+  completedDateFrom,
+  completedDateTo,
+  statuses,
+  types,
+  temperatureModes,
+} = {}) {
+  const params = new URLSearchParams()
+  params.set('inboundSortFieldName', sortField)
+  params.set('sortDirection', sortDirection)
+  params.set('pageNumber', String(pageNumber))
+  params.set('pageSize', String(pageSize))
+  if (dateFrom)          params.set('plannedArrivalDateFrom', dateFrom)
+  if (dateTo)            params.set('plannedArrivalDateTo', dateTo)
+  if (completedDateFrom) params.set('completedAtDateFrom', completedDateFrom)
+  if (completedDateTo)   params.set('completedAtDateTo', completedDateTo)
+  if (statuses) for (const s of [].concat(statuses)) params.append('status', s)
+  if (types)    for (const t of [].concat(types))    params.append('type', t)
+  if (temperatureModes) for (const m of [].concat(temperatureModes)) params.append('temperatureMode', m)
+  return samokatGet(token, INBOUND_TASKS_URL, params)
+}
+
 export async function getReportInboundInProgress(token, { types }) {
   const params = new URLSearchParams()
   params.append('status', 'AWAITING_GATE')
@@ -888,4 +920,84 @@ export async function getReportInboundCompleted(token, { types, completedAtDateF
   params.set('pageNumber', '1')
   params.set('pageSize', '1')
   return samokatGet(token, INBOUND_TASKS_URL, params)
+}
+
+// ─── Inbound task detail ──────────────────────────────────────────────────────
+
+// Тип → URL-slug
+const INBOUND_TYPE_SLUG = {
+  CROSSDOCK:  'crossdock',
+  IMPORT:     'import',
+  STORAGE:    'storage',
+  STORAGE_DC: 'storage_dc',
+}
+
+export async function getInboundTaskDetail(token, { taskType, id }) {
+  const slug = INBOUND_TYPE_SLUG[taskType] || taskType.toLowerCase().replace('_', '-')
+  const url  = `https://api.samokat.ru/wmsin-wwh/inbound/${slug}/tasks/${id}`
+  const r    = await fetch(url, {
+    headers: {
+      'Accept':        'application/json',
+      'Authorization': `Bearer ${token}`,
+      'Origin':        'https://wwh.samokat.ru',
+      'Referer':       'https://wwh.samokat.ru/',
+      'User-Agent':    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36',
+    },
+  })
+  const text    = await r.text()
+  const trimmed = (text || '').trim().toLowerCase()
+  if (trimmed.startsWith('<!doctype') || trimmed.startsWith('<html')) {
+    throw new Error('Нет доступа к API. Проверьте VPN или войдите заново.')
+  }
+  let data
+  try { data = text ? JSON.parse(text) : null } catch {
+    throw new Error('Ответ не JSON: ' + (text || '').slice(0, 150))
+  }
+  if (!r.ok) throw new Error(`API ${r.status}: ${data?.message || data?.error || r.statusText}`)
+  return data
+}
+
+/**
+ * Изменения остатков для ЕО — возвращает остаток штук в ЕО.
+ * Берём последнюю запись (pageSize=1): sourceQuantity.newQuantity = текущий остаток.
+ * Если записей нет (total=0) — ничего не снималось, возвращаем null (= полный остаток).
+ */
+export async function getEoRemaining(token, sourceHandlingUnitBarcode) {
+  const url  = 'https://api.samokat.ru/wmsops-wwh/stocks/changes/search'
+  const body = JSON.stringify({
+    productId: null, parts: [], operationTypes: [],
+    sourceCellId: null, targetCellId: null,
+    sourceHandlingUnitBarcode,
+    targetHandlingUnitBarcode: null,
+    operationStartedAtFrom: null, operationStartedAtTo: null,
+    operationCompletedAtFrom: null, operationCompletedAtTo: null,
+    executorId: null,
+    pageNumber: 1, pageSize: 1,
+  })
+  const r = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Accept':        'application/json',
+      'Content-Type':  'application/json',
+      'Authorization': `Bearer ${token}`,
+      'Origin':        'https://wwh.samokat.ru',
+      'Referer':       'https://wwh.samokat.ru/',
+      'User-Agent':    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36',
+    },
+    body,
+  })
+  const text    = await r.text()
+  const trimmed = (text || '').trim().toLowerCase()
+  if (trimmed.startsWith('<!doctype') || trimmed.startsWith('<html')) {
+    throw new Error('Нет доступа к API. Проверьте VPN или войдите заново.')
+  }
+  let data
+  try { data = text ? JSON.parse(text) : null } catch {
+    throw new Error('Ответ не JSON: ' + (text || '').slice(0, 150))
+  }
+  if (!r.ok) throw new Error(`API ${r.status}: ${data?.message || data?.error || r.statusText}`)
+  const total = data?.value?.total ?? 0
+  if (total === 0) return null  // ничего не снималось
+  // Последняя запись — текущий остаток в ЕО
+  return data?.value?.items?.[0]?.sourceQuantity?.newQuantity ?? null
 }

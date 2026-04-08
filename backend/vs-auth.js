@@ -16,16 +16,16 @@ const VS_SESSIONS_PATH = path.join(__dirname, 'data', 'vs-sessions.json');
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 дней (скользящий — сбрасывается при каждом запросе)
 const BIND_CODE_TTL_MS = 5 * 60 * 1000; // 5 мин
 
-/** Модули интерфейса: stats, data, monitor, analysis, consolidation, docs, settings, shipments, receive, consolidation_form, reports */
+/** Модули интерфейса: stats, data, monitor, analysis, consolidation, docs, settings, shipments, receive, consolidation_form, reports, supplies */
 const MODULES_BY_ROLE = {
-  admin: ['stats', 'data', 'monitor', 'analysis', 'consolidation', 'docs', 'settings', 'shipments', 'receive', 'consolidation_form', 'reports'],
+  admin: ['stats', 'data', 'monitor', 'analysis', 'consolidation', 'docs', 'settings', 'shipments', 'receive', 'consolidation_form', 'reports', 'supplies'],
   group_leader: ['stats', 'data', 'monitor', 'analysis', 'consolidation', 'docs', 'settings', 'shipments', 'receive', 'consolidation_form', 'reports'],
   supervisor: ['stats', 'data', 'monitor', 'analysis', 'docs', 'shipments', 'reports'],
   manager: ['stats', 'data', 'monitor', 'analysis', 'docs', 'shipments', 'reports'],
-  developer: ['stats', 'data', 'monitor', 'analysis', 'consolidation', 'docs', 'settings', 'shipments', 'receive', 'consolidation_form', 'reports'],
+  developer: ['stats', 'data', 'monitor', 'analysis', 'consolidation', 'docs', 'settings', 'shipments', 'receive', 'consolidation_form', 'reports', 'supplies'],
 };
 
-const ALL_MODULES = ['stats', 'data', 'monitor', 'analysis', 'consolidation', 'docs', 'settings', 'shipments', 'receive', 'consolidation_form', 'reports'];
+const ALL_MODULES = ['stats', 'data', 'monitor', 'analysis', 'consolidation', 'docs', 'settings', 'shipments', 'receive', 'consolidation_form', 'reports', 'supplies'];
 
 /** Действия — управляются отдельно от модулей */
 const ALL_ACTIONS = ['fetch_data', 'recheck_data', 'request_fetch', 'edit_thresholds'];
@@ -341,9 +341,7 @@ function findUserByLogin(login) {
     }
     if (match) {
       const role = resolveRole(u.role);
-      const modules = Array.isArray(u.modules) && u.modules.length > 0
-        ? u.modules.filter(m => ALL_MODULES.includes(m))
-        : getModulesForRole(role);
+      const modules = resolveModules(role, u.modules);
       const actions = Array.isArray(u.actions) ? u.actions.filter(a => ALL_ACTIONS.includes(a)) : getActionsForRole(role);
       return {
         name: u.name || undefined,
@@ -423,6 +421,19 @@ function getModulesForRole(role) {
   return MODULES_BY_ROLE.manager;
 }
 
+// Для привилегированных ролей (admin, developer) явно сохранённые модули дополняются
+// дефолтами роли — чтобы новые модули всегда появлялись у них автоматически.
+const PRIVILEGED_ROLES = ['admin', 'developer'];
+function resolveModules(role, storedModules) {
+  const roleDefaults = getModulesForRole(role);
+  if (!Array.isArray(storedModules) || storedModules.length === 0) return roleDefaults;
+  const filtered = storedModules.filter(m => ALL_MODULES.includes(m));
+  if (PRIVILEGED_ROLES.includes(role)) {
+    return [...new Set([...filtered, ...roleDefaults])];
+  }
+  return filtered;
+}
+
 /** Список пользователей для админа: из vs-users + данные о входах (успешный = получил токен). */
 function getAllUsersForAdmin() {
   const users = loadVsUsers();
@@ -432,9 +443,7 @@ function getAllUsersForAdmin() {
     const login = String(u.login || '').trim();
     if (!login) continue;
     const role = resolveRole(u.role);
-    const modules = Array.isArray(u.modules) && u.modules.length > 0
-      ? u.modules.filter(m => ALL_MODULES.includes(m))
-      : getModulesForRole(role);
+    const modules = resolveModules(role, u.modules);
     // Ключ в logins-файле может быть как в новом (+7XXXXXXXXXX), так и в старом формате
     const loginKey = isLetterLogin(login) ? login : (canonicalPhone(login) || login);
     const rec = logins[loginKey] || logins[login] || {};

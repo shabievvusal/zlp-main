@@ -5,7 +5,7 @@ import styles from './Layout.module.css'
 import {
   BarChart2, Monitor, TrendingUp, Package, FileText,
   Truck, ClipboardList, Settings, LogOut, ChevronLeft,
-  ChevronRight, UserCircle,
+  ChevronRight, UserCircle, PackageSearch,
 } from 'lucide-react'
 
 const NAV_ITEMS = [
@@ -15,6 +15,7 @@ const NAV_ITEMS = [
   { to: '/consolidation',  Icon: Package,       label: 'Консолидация', module: 'consolidation' },
   { to: '/docs',           Icon: FileText,      label: 'Документы',    module: 'docs' },
   { to: '/shipments',      Icon: Truck,         label: 'Отгрузка',     module: 'shipments' },
+  { to: '/supplies',       Icon: PackageSearch, label: 'Поставки',     module: 'supplies' },
   { to: '/reports',        Icon: ClipboardList, label: 'Отчёты',       module: 'reports' },
   { to: '/settings',       Icon: Settings,      label: 'Настройки',    module: 'settings' },
 ]
