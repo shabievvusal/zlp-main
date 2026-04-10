@@ -500,7 +500,7 @@ function buildSummaryFromItems(items, opts = {}) {
     if (!ts) continue;
     const moscow = new Date(new Date(ts).getTime() + MOSCOW_UTC_OFFSET_MS);
     const h = moscow.getUTCHours();
-    if (!byHour.has(h)) byHour.set(h, { hour: h, taskKeys: new Set(), kdkTaskKeys: new Set(), employees: new Set(), komplEmployees: new Set(), kdkEmployees: new Set(), storageEmployees: new Set(), storageOps: 0, kdkOps: 0 });
+    if (!byHour.has(h)) byHour.set(h, { hour: h, taskKeys: new Set(), kdkTaskKeys: new Set(), employees: new Set(), komplEmployees: new Set(), employeeOpCounts: new Map(), storageOps: 0, kdkOps: 0 });
     const hh = byHour.get(h);
     const type = (item.operationType || '').toUpperCase();
     const isKdk = type === 'PICK_BY_LINE';
@@ -515,20 +515,44 @@ function buildSummaryFromItems(items, opts = {}) {
       hh.employees.add(exec);
       const zone = (item.cell || '').split('-')[0].toUpperCase();
       if (!FREEZER_ZONES.has(zone)) hh.komplEmployees.add(exec);
-      if (isKdk)  hh.kdkEmployees.add(exec);
-      if (isStor) hh.storageEmployees.add(exec);
+      // Track per-employee op counts for dominant-operation assignment
+      // kdkNonFreezer = PICK_BY_LINE в не-заморозочных зонах (KDS, KDH)
+      // kdkFreezer    = PICK_BY_LINE в KDM (КДК заморозка) — исключается из обоих счётчиков
+      // storage       = PIECE_SELECTION (все зоны, включая MH)
+      if (isKdk || isStor) {
+        if (!hh.employeeOpCounts.has(exec)) hh.employeeOpCounts.set(exec, { kdkNonFreezer: 0, kdkFreezer: 0, storage: 0, storageFreezer: 0 });
+        const counts = hh.employeeOpCounts.get(exec);
+        if (isStor && zone === 'MH') counts.storageFreezer++;
+        else if (isStor) counts.storage++;
+        else if (isKdk && zone === 'KDM') counts.kdkFreezer++;
+        else if (isKdk) counts.kdkNonFreezer++;
+      }
     }
   }
-  const hourly = [...byHour.values()].map(x => ({
-    hour: x.hour,
-    ops: x.taskKeys.size,
-    employees: x.employees.size,
-    employeesKompl: x.komplEmployees.size,
-    kdkEmployees: x.kdkEmployees.size,
-    storageEmployees: x.storageEmployees.size,
-    storageOps: x.storageOps,
-    kdkOps: x.kdkOps,
-  })).sort((a, b) => a.hour - b.hour);
+  const hourly = [...byHour.values()].map(x => {
+    // Dominant-operation assignment:
+    // kdkNonFreezer dominant → kdkEmployees (Кросс-докинг без заморозки)
+    // storage dominant       → storageEmployees (Хранение)
+    // kdkFreezer dominant    → не входит ни в один счётчик
+    let kdkEmpCount = 0, storageEmpCount = 0;
+    for (const counts of x.employeeOpCounts.values()) {
+      const maxCount = Math.max(counts.kdkNonFreezer, counts.kdkFreezer, counts.storage, counts.storageFreezer);
+      if (maxCount === 0) continue;
+      if (counts.kdkNonFreezer === maxCount) kdkEmpCount++;
+      else if (counts.storage === maxCount) storageEmpCount++;
+      // kdkFreezer или storageFreezer dominant → excluded from both
+    }
+    return {
+      hour: x.hour,
+      ops: x.taskKeys.size,
+      employees: x.employees.size,
+      employeesKompl: x.komplEmployees.size,
+      kdkEmployees: kdkEmpCount,
+      storageEmployees: storageEmpCount,
+      storageOps: x.storageOps,
+      kdkOps: x.kdkOps,
+    };
+  }).sort((a, b) => a.hour - b.hour);
 
   let firstAt = null;
   let lastAt = null;

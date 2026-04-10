@@ -1,71 +1,278 @@
+/* ─── Page ───────────────────────────────────────────────────────────────────── */
+
+.page {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 1100px;
+}
+
+/* ─── Toolbar ─────────────────────────────────────────────────────────────────── */
+
 .toolbar {
   display: flex;
+  align-items: center;
+  gap: 24px;
   flex-wrap: wrap;
-  align-items: flex-end;
+}
+
+.title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+  white-space: nowrap;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
   gap: 12px;
-  padding: 14px 16px 0;
+  flex-wrap: wrap;
 }
 
 .field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.field label {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-muted);
-}
-
-.hint {
-  font-size: 12px;
-  color: var(--text-muted);
-  align-self: flex-end;
-  padding-bottom: 6px;
-}
-
-/* ── Breaks ──────────────────────────────────────────────────────────────── */
-
-.breaks {
-  padding: 12px 16px 0;
-  border-top: 1px solid var(--border);
-  margin-top: 14px;
-}
-
-.breaksTitle {
-  font-size: 13px;
-  font-weight: 600;
-  margin-bottom: 8px;
-}
-
-.breaksControls {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.breakRow {
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
-.breaksTemplates {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 8px;
-  margin-top: 8px;
+.fieldLabel {
+  font-size: 13px;
+  color: var(--text-muted);
+  white-space: nowrap;
 }
 
-/* ── Ops table ────────────────────────────────────────────────────────────── */
+.input {
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-card);
+  color: var(--text);
+  font-size: 13px;
+  outline: none;
+  cursor: pointer;
+}
+
+.input:focus { border-color: var(--accent); }
+
+.refreshBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-card);
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.refreshBtn:hover:not(:disabled) { background: var(--bg-hover); }
+.refreshBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+.spinning { animation: spin 0.8s linear infinite; }
+
+.updatedAt {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ─── Error ───────────────────────────────────────────────────────────────────── */
+
+.error {
+  background: #FEF2F2;
+  border: 1px solid #FECACA;
+  color: #B91C1C;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+}
+
+/* ─── Speed bar ───────────────────────────────────────────────────────────────── */
+
+.speedBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+  flex-wrap: wrap;
+}
+
+.speedBar strong { color: var(--text); }
+
+.speedSep { color: var(--border); margin: 0 2px; }
+
+/* ─── Cards ───────────────────────────────────────────────────────────────────── */
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+@media (max-width: 900px) {
+  .cards { grid-template-columns: 1fr; }
+}
+
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  transition: border-color 0.2s;
+}
+
+.cardOk   { border-color: #86EFAC; border-left: 4px solid #22C55E; }
+.cardWarn { border-color: #FDE68A; border-left: 4px solid #F59E0B; }
+.cardOver { border-color: #FECACA; border-left: 4px solid #EF4444; }
+
+.cardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cardTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.peopleBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+/* ─── Progress bar ────────────────────────────────────────────────────────────── */
+
+.progressWrap {
+  position: relative;
+  height: 22px;
+  background: var(--bg-hover);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--accent, #3B82F6);
+  border-radius: 6px;
+  transition: width 0.4s ease;
+  min-width: 2px;
+}
+
+.progressLabel {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* ─── Stats ───────────────────────────────────────────────────────────────────── */
+
+.statsGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.statRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.statLabel   { font-size: 12px; color: var(--text-muted); }
+.statValue   { font-size: 13px; font-weight: 500; color: var(--text); }
+.statValueBold { font-size: 14px; font-weight: 700; color: var(--text); }
+
+/* ─── Forecast badge ──────────────────────────────────────────────────────────── */
+
+.forecastBadge {
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.badgeOk   { background: #F0FDF4; border: 1px solid #86EFAC; color: #15803D; }
+.badgeWarn { background: #FFFBEB; border: 1px solid #FDE68A; color: #92400E; }
+.badgeOver { background: #FEF2F2; border: 1px solid #FECACA; color: #B91C1C; }
+
+.forecastMain {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.forecastIcon  { font-size: 15px; flex-shrink: 0; }
+.forecastTime  { font-size: 22px; font-weight: 800; letter-spacing: -0.5px; flex-shrink: 0; }
+.forecastHint  { font-size: 12px; opacity: 0.85; }
+
+.forecastPeople {
+  font-size: 13px;
+  padding-top: 4px;
+  border-top: 1px solid currentColor;
+  opacity: 0.8;
+}
+
+.forecastPeople strong { font-weight: 700; }
+
+.forecastLoading {
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 8px 0;
+}
+
+/* ─── Hourly table ────────────────────────────────────────────────────────────── */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sectionTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
 
 .tableWrap {
-  padding: 14px 16px;
   overflow-x: auto;
+  border-radius: 8px;
+  border: 1px solid var(--border);
 }
 
 .table {
@@ -74,262 +281,50 @@
   font-size: 13px;
 }
 
-.table th {
-  text-align: left;
-  padding: 6px 8px;
-  font-size: 12px;
+.th {
+  padding: 8px 12px;
+  text-align: right;
   font-weight: 600;
+  font-size: 12px;
   color: var(--text-muted);
+  background: var(--bg-hover);
   border-bottom: 1px solid var(--border);
   white-space: nowrap;
 }
 
-.table td {
-  padding: 6px 8px;
+.th:first-child { text-align: left; }
+
+.tr:hover { background: var(--bg-hover); }
+
+.td {
+  padding: 7px 12px;
   border-bottom: 1px solid var(--border);
-  white-space: nowrap;
-}
-
-.table td:first-child {
-  font-weight: 600;
-}
-
-.computed {
-  color: var(--text-muted);
+  color: var(--text);
   font-size: 13px;
 }
 
-/* ── History / staff pick ─────────────────────────────────────────────────── */
-
-.history {
-  padding: 14px 16px;
-  border-top: 1px solid var(--border);
-  margin-top: 4px;
-}
-
-.historyTitle {
-  font-size: 14px;
-  font-weight: 600;
-  margin-bottom: 10px;
-}
-
-.historyControls {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 10px;
-  margin-bottom: 14px;
-}
-
-.fieldWide {
-  flex: 1 1 200px;
-}
-
-.pickStatus {
-  font-size: 13px;
-  color: var(--text-muted);
-  align-self: center;
-}
-
-.companiesList {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 4px;
-}
-
-.companyItem {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 13px;
-  cursor: pointer;
-}
-
-/* ── Lunch table ──────────────────────────────────────────────────────────── */
-
-.lunchGrid {
-  display: grid;
-  grid-template-columns: 1fr auto auto auto auto;
-  gap: 6px 10px;
-  align-items: center;
-  font-size: 13px;
-  margin-bottom: 14px;
-}
-
-.lunchHead {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-muted);
-}
-
-/* ── Assign tables ────────────────────────────────────────────────────────── */
-
-.assignWrap {
-  margin-top: 12px;
-  overflow-x: auto;
-}
-
-.assignTable {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-}
-
-.assignTable th {
-  text-align: left;
-  padding: 6px 8px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-muted);
+.tdNum {
+  padding: 7px 12px;
   border-bottom: 1px solid var(--border);
+  color: var(--text);
+  font-size: 13px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
-.assignTable td {
-  padding: 6px 8px;
-  border-bottom: 1px solid var(--border);
-  vertical-align: top;
-}
+.tr:last-child .td,
+.tr:last-child .tdNum { border-bottom: none; }
+
+.avgGood   { color: #15803D; font-weight: 600; }
+.trendUp   { color: #15803D; font-weight: 700; }
+.trendDown { color: #B91C1C; font-weight: 700; }
+.trendFlat { color: var(--text-muted); }
+
+/* ─── Empty ───────────────────────────────────────────────────────────────────── */
 
 .empty {
-  color: var(--text-muted);
-  font-size: 13px;
-  padding: 8px 0;
-}
-
-.chip {
-  display: inline-block;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 2px 6px;
-  font-size: 12px;
-  margin: 2px 2px 2px 0;
-}
-
-.chipMuted {
-  composes: chip;
-  opacity: 0.55;
-}
-
-.chipWarn {
-  display: inline-block;
-  background: #fff3cd;
-  border: 1px solid #ffc107;
-  border-radius: 6px;
-  padding: 2px 6px;
-  font-size: 11px;
-  margin: 2px 2px 2px 0;
-  color: #856404;
-}
-
-.statusOk {
-  color: var(--success, #1f7a45);
-  font-weight: 600;
-  font-size: 13px;
-}
-
-.statusWarn {
-  color: var(--danger, #c0392b);
-  font-weight: 600;
-  font-size: 13px;
-}
-
-.statusDetail {
-  font-size: 11px;
-  color: var(--text-muted);
-  margin-top: 2px;
-}
-
-/* ── Schedule chart ───────────────────────────────────────────────────────── */
-
-.scheduleChart {
-  margin-top: 8px;
-}
-
-.scheduleRow {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 6px;
-}
-
-.scheduleOp {
-  width: 160px;
-  font-size: 12px;
-  font-weight: 600;
-  flex-shrink: 0;
-}
-
-.scheduleBars {
-  display: flex;
-  gap: 2px;
-  flex-wrap: wrap;
-}
-
-.hour {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 40px;
-}
-
-.hourLabel {
-  font-size: 10px;
-  color: var(--text-muted);
-  margin-bottom: 2px;
-}
-
-.hourBar {
-  width: 36px;
-  height: 36px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  position: relative;
-  overflow: hidden;
-  display: flex;
-  align-items: flex-end;
-}
-
-.hourFill {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: var(--brand, #1f7a45);
-  opacity: 0.6;
-  transition: height 0.2s;
-}
-
-.hourValue {
-  position: relative;
-  z-index: 1;
-  font-size: 10px;
-  font-weight: 600;
   text-align: center;
-  width: 100%;
-  padding-bottom: 2px;
-}
-
-/* ── Mobile ─────────────────────────────────────────────── */
-@media (max-width: 768px) {
-  .toolbar { padding: 12px 14px 0; }
-
-  .lunchGrid {
-    grid-template-columns: 1fr auto auto auto auto;
-    font-size: 12px;
-  }
-
-  /* График расписания — горизонтальный скролл */
-  .scheduleChart { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-
-  .scheduleRow {
-    min-width: 600px;
-  }
-
-  .scheduleOp { width: 120px; font-size: 11px; }
-
-  .tableWrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-  .assignWrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  padding: 48px;
+  color: var(--text-muted);
+  font-size: 14px;
 }

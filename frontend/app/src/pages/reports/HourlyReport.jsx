@@ -36,73 +36,30 @@ function fmtPct(done, total) {
   return Math.round(done / total * 100) + '%'
 }
 
-// ─── Mock data (replace with API) ────────────────────────────────────────────
+// ─── Manual fields persistence ───────────────────────────────────────────────
 
-const MOCK = {
-  picking: {
-    kdk:     { tasks: 17237, done: 3423,  rest: 13814 },
-    storage: { tasks: 38409, done: 21821, rest: 16588 },
-  },
-  // Hourly rows: time + КДК выполнено + Хранение выполнено + Сотрудников в час + Итого выполнено + Сред СЗ
-  hourly: [
-    { time: '00:00 - 9:00', kdk: null, stor: 12526, sotrud: null, done: 12526, avg: 0  },
-    { time: '10:00',        kdk: 19,   stor: 3053,  sotrud: 65,   done: 3072,  avg: 47 },
-    { time: '11:00',        kdk: 1460, stor: 2460,  sotrud: 82,   done: 3920,  avg: 60 },
-    { time: '12:00',        kdk: 1944, stor: 3782,  sotrud: 82,   done: 5726,  avg: 70 },
-    { time: '13:00',        kdk: null, stor: null,  sotrud: null, done: 0,     avg: 0  },
-    { time: '14:00',        kdk: null, stor: null,  sotrud: null, done: 0,     avg: 0  },
-    { time: '15:00',        kdk: null, stor: null,  sotrud: null, done: 0,     avg: 0  },
-    { time: '16:00',        kdk: null, stor: null,  sotrud: null, done: 0,     avg: 0  },
-    { time: '17:00',        kdk: null, stor: null,  sotrud: null, done: 0,     avg: 0  },
-    { time: '18:00',        kdk: null, stor: null,  sotrud: null, done: 0,     avg: 0  },
-    { time: '19:00',        kdk: null, stor: null,  sotrud: null, done: 0,     avg: 0  },
-    { time: '20:00',        kdk: null, stor: null,  sotrud: null, done: 0,     avg: 0  },
-    { time: '21:00',        kdk: null, stor: null,  sotrud: null, done: 0,     avg: 0  },
-  ],
-  // 21 процессов — выровнены по строкам таблицы:
-  // 0–12: строки почасовой (00:00 - 21:00)
-  // 13: Пополнение header
-  // 14: Пополнение sub-header
-  // 15–17: Пополнение данные
-  // 18: Отгрузка header
-  // 19: Отгрузка — план
-  // 20: Отгрузка — подготовлено
-  processes: [
-    { name: 'Комплектация',         cnt: 82,  cnt2: null },
-    { name: 'Паллеты',              cnt: 2,   cnt2: null },
-    { name: 'Уборка',               cnt: 3,   cnt2: null },
-    { name: 'ВП',                   cnt: 6,   cnt2: null },
-    { name: 'Спуски',               cnt: 0,   cnt2: null },
-    { name: 'Приёмка',              cnt: 9,   cnt2: null },
-    { name: 'Размиксовка',          cnt: 5,   cnt2: null },
-    { name: 'Заморозка',            cnt: 8,   cnt2: null },
-    { name: 'Бригадиры',            cnt: 2,   cnt2: null },
-    { name: 'Обед',                 cnt: 0,   cnt2: null },
-    { name: 'Полки',                cnt: 0,   cnt2: null },
-    { name: 'Работают с 8:00',      cnt: 0,   cnt2: null },
-    { name: 'Замотка РК',           cnt: 0,   cnt2: null },
-    { name: 'Отгрузка ТС',          cnt: 4,   cnt2: null },
-    { name: 'Обучение новых сотр.', cnt: 0,   cnt2: null },
-    { name: 'Консолидация',         cnt: 0,   cnt2: null },
-    { name: 'Пресс',                cnt: 0,   cnt2: null },
-    { name: 'Проверка РК',          cnt: 0,   cnt2: null },
-    { name: 'Переупаковка',         cnt: 0,   cnt2: null },
-    { name: 'Коробки',              cnt: 2,   cnt2: 0    },
-    { name: 'Итого',                cnt: 123, cnt2: 123  },
-  ],
-  replenishment: {
-    descents: { tasks: 254, done: 254, rest: 0 },
-    moves:    { tasks: 254, done: 254, rest: 0 },
-  },
-  shipment: {
-    plan: 84, prepared: 84, shipped: 79, inProgress: 3, delay: 0,
-    perHourTC: 2, perHourRK: 37, deliveredRK: 220, totalRK: 526,
-  },
-  reception: {
-    kdk:     { plan: 59, received: 24, receiving: 13, waiting: 0 },
-    storage: { plan: 68, received: 36, receiving: 22, waiting: 0 },
-  },
+const MANUAL_DEFAULTS = {
+  shiftTotal: '',
+  shipPlan: '', shipPrepared: '', shipShipped: '', shipInProgress: '', shipDelay: '',
+  rkTotal: '',
+  rcpKdkPlan: '', rcpStorPlan: '',
 }
+
+function loadManual(dateStr) {
+  try { return { ...MANUAL_DEFAULTS, ...JSON.parse(localStorage.getItem(`hr_manual_${dateStr}`) ?? '{}') } }
+  catch { return { ...MANUAL_DEFAULTS } }
+}
+
+// ─── Process persistence ──────────────────────────────────────────────────────
+
+const DEFAULT_PROC_NAMES = ['Кросс-докинг', 'Хранение']
+const FIXED_PROC_NAMES  = new Set(['Кросс-докинг', 'Хранение'])
+
+function loadProcData(dateStr) {
+  try { return JSON.parse(localStorage.getItem(`hr_proc_${dateStr}`) ?? '{}') }
+  catch { return {} }
+}
+
 
 // ─── Разбор ответа мониторинга в структуру picking ───────────────────────────
 
@@ -122,6 +79,29 @@ function parseMonitoringStats(data) {
 
 const LS_ACCESS_KEY = 'wms_access_token'
 
+/** Подсчёт статистики РК из массива маршрутов.
+ *  Возвращает { perHourTC, perHourRK, deliveredRK } где:
+ *  - perHourTC/perHourRK — за последний час, в котором были приёмки с rk > 0
+ *  - deliveredRK — итого за все часы */
+function calcRkStats(routes) {
+  const byHour = new Map()
+  for (const route of routes) {
+    const recv = route.receiving
+    if (!recv?.at) continue
+    const totalRk = (recv.items || []).reduce((s, it) => s + (Number(it.rk) || 0), 0)
+    if (totalRk === 0) continue
+    const h = new Date(new Date(recv.at).getTime() + 3 * 3600 * 1000).getUTCHours()
+    const cur = byHour.get(h) || { tc: 0, rk: 0 }
+    cur.tc++
+    cur.rk += totalRk
+    byHour.set(h, cur)
+  }
+  const deliveredRK = [...byHour.values()].reduce((s, v) => s + v.rk, 0)
+  const hours = [...byHour.keys()].sort((a, b) => a - b)
+  const last = hours.length ? byHour.get(hours[hours.length - 1]) : null
+  return { perHourTC: last?.tc ?? 0, perHourRK: last?.rk ?? 0, deliveredRK }
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function HourlyReport() {
@@ -130,11 +110,65 @@ export default function HourlyReport() {
   const [reception, setReception] = useState(null)
   const [repl, setRepl]           = useState(null)
   const [hourlyData, setHourlyData] = useState(null)
+  const [rkStats, setRkStats]     = useState(null)
+  const [upToHour, setUpToHour]   = useState('')   // '' = все доступные часы
   const [loading, setLoading]     = useState(false)
   const [error, setError]         = useState(null)
 
-  // Остальные блоки пока из мока
-  const { processes: procs, shipment: ship } = MOCK
+  // ── Процессы: имена глобально, счётчики по дате ──────────────────────────
+  const [procNames, setProcNames] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('hr_proc_names') ?? 'null')
+      if (!saved) return DEFAULT_PROC_NAMES
+      // Фиксированные имена всегда идут первыми, даже если были удалены из localStorage
+      const extra = saved.filter(n => !FIXED_PROC_NAMES.has(n))
+      return [...DEFAULT_PROC_NAMES, ...extra]
+    } catch { return DEFAULT_PROC_NAMES }
+  })
+  const [procData, setProcData] = useState(() => loadProcData(todayStr()))
+  const [newProcName, setNewProcName] = useState('')
+
+  useEffect(() => {
+    localStorage.setItem('hr_proc_names', JSON.stringify(procNames))
+  }, [procNames])
+
+  useEffect(() => {
+    localStorage.setItem(`hr_proc_${date}`, JSON.stringify(procData))
+  }, [procData, date])
+
+  // При смене даты — загружаем счётчики для той даты
+  useEffect(() => { setProcData(loadProcData(date)) }, [date])
+
+  // ── Ручные поля: отгрузка, РК, план приёмки ──────────────────────────────
+  const [manual, setManual] = useState(() => loadManual(todayStr()))
+  useEffect(() => {
+    localStorage.setItem(`hr_manual_${date}`, JSON.stringify(manual))
+  }, [manual, date])
+  useEffect(() => { setManual(loadManual(date)) }, [date])
+
+  function setM(field, val) { setManual(prev => ({ ...prev, [field]: val })) }
+  function mi(field) {  // input props для числового ручного поля
+    return {
+      type: 'number', min: '0', className: s.procInput,
+      value: manual[field], onChange: e => setM(field, e.target.value), placeholder: '—',
+    }
+  }
+
+  const procs = procNames.map(name => ({ name, cnt: procData[name] ?? '' }))
+
+  function setProcCnt(name, val) {
+    setProcData(prev => ({ ...prev, [name]: val }))
+  }
+  function addProc() {
+    const name = newProcName.trim()
+    if (!name || procNames.includes(name)) return
+    setProcNames(prev => [...prev, name])
+    setNewProcName('')
+  }
+  function removeProc(name) {
+    if (FIXED_PROC_NAMES.has(name)) return
+    setProcNames(prev => prev.filter(n => n !== name))
+  }
 
   const getToken = () => localStorage.getItem(LS_ACCESS_KEY)
 
@@ -148,7 +182,7 @@ export default function HourlyReport() {
       const { from: monFrom, to: monTo } = shiftWindow(dateStr)
       const { from: rcpFrom, to: rcpTo } = inboundWindow(dateStr)
 
-      const [monData, kdkDoneData, storDoneData, kdkInProgData, storInProgData, movData, movRestData, movPickData, movPickRestData, summaryData] = await Promise.all([
+      const [monData, kdkDoneData, storDoneData, kdkInProgData, storInProgData, movData, movRestData, movPickData, movPickRestData, summaryData, rkRoutesData] = await Promise.all([
         api.getReportMonitoringStats(token, monFrom, monTo),
         api.getReportInboundCompleted(token,        { types: 'CROSSDOCK',                         completedAtDateFrom: rcpFrom, completedAtDateTo: rcpTo }),
         api.getReportInboundCompleted(token,        { types: ['STORAGE_DC', 'STORAGE', 'IMPORT'], completedAtDateFrom: rcpFrom, completedAtDateTo: rcpTo }),
@@ -159,28 +193,32 @@ export default function HourlyReport() {
         api.getReportMoveToPickingCount(token,      { dateFrom: rcpFrom, dateTo: rcpTo }),
         api.getReportMoveToPickingRest(token,       { dateFrom: rcpFrom, dateTo: rcpTo }),
         api.getDateSummaryFull(dateStr),
+        api.getRkRoutes({ dateFrom: dateStr, dateTo: dateStr }).catch(() => []),
       ])
 
       const parsed = parseMonitoringStats(monData)
       if (parsed) setPicking(parsed)
 
       setReception(prev => ({
-        kdk:     { ...(prev?.kdk     ?? MOCK.reception.kdk),
+        kdk:     { plan: prev?.kdk?.plan     ?? 0, waiting: prev?.kdk?.waiting     ?? 0,
                    received:  kdkDoneData?.value?.total   ?? 0,
                    receiving: kdkInProgData?.value?.total ?? 0 },
-        storage: { ...(prev?.storage ?? MOCK.reception.storage),
+        storage: { plan: prev?.storage?.plan ?? 0, waiting: prev?.storage?.waiting ?? 0,
                    received:  storDoneData?.value?.total  ?? 0,
                    receiving: storInProgData?.value?.total ?? 0 },
       }))
 
-      // Пополнение — спуски и перемещения (выполнено + остаток)
-      const movDone     = movData?.value?.total         ?? 0
+      // Пополнение
+      // Спуски: Задачи = total спусков, Выполнено = задачи − остаток, Остаток = новые/в работе
+      // Перемещение: Задачи = то же число спусков (1:1), Выполнено = total перемещений − остаток,
+      //              Остаток = остаток спусков + остаток перемещений
+      const movTotal    = movData?.value?.total         ?? 0
       const movRest     = movRestData?.value?.total     ?? 0
-      const movPickDone = movPickData?.value?.total     ?? 0
-      const movPickRest = movPickRestData?.value?.total ?? 0
+      const movPickTotal = movPickData?.value?.total    ?? 0
+      const movPickRest  = movPickRestData?.value?.total ?? 0
       setRepl({
-        descents: { done: movDone,     rest: movRest,     tasks: movDone     + movRest     },
-        moves:    { done: movPickDone, rest: movPickRest, tasks: movPickDone + movPickRest },
+        descents: { tasks: movTotal,  done: movTotal - movRest,         rest: movRest },
+        moves:    { tasks: movTotal,  done: movPickTotal - movPickRest, rest: movRest + movPickRest },
       })
 
       // Почасовые строки из нашей статистики
@@ -201,12 +239,12 @@ export default function HourlyReport() {
           blkEmpl  = Math.max(blkEmpl, hd.employeesKompl ?? hd.employees)
         }
 
-        // Индивидуальные строки 10:00..21:00.
-        // Строка "H:00" показывает бэкенд-час H-1 (сдвиг +1 для совпадения с WMS)
-        const INDIVIDUAL_HOURS = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]
+        // Индивидуальные строки 10:00–20:00 (не трогаем, только реальные данные).
+        // Строка "H:00" показывает бэкенд-час H-1 (сдвиг +1 для совпадения с WMS).
+        const INDIVIDUAL_HOURS = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
         const rows = INDIVIDUAL_HOURS.map(h => {
           const hd = byHour.get(h - 1)
-          if (!hd || hd.ops === 0) return { time: `${String(h).padStart(2,'0')}:00`, kdk: null, stor: null, sotrud: null, done: 0, avg: 0 }
+          if (!hd || hd.ops === 0) return { time: `${String(h).padStart(2,'0')}:00`, kdk: null, stor: null, sotrud: null, done: 0, avg: 0, kdkEmp: null, storageEmp: null }
           const kdk  = hd.kdkOps
           const stor = hd.ops - hd.kdkOps
           const done = hd.ops
@@ -218,52 +256,62 @@ export default function HourlyReport() {
             sotrud: empl > 0 ? empl : null,
             done,
             avg:    empl > 0 ? Math.round(done / empl) : 0,
+            kdkEmp:     (hd.kdkEmployees     ?? 0) > 0 ? hd.kdkEmployees     : null,
+            storageEmp: (hd.storageEmployees ?? 0) > 0 ? hd.storageEmployees : null,
           }
         })
 
-        // Reconciliation: подгоняем последний активный час под WMS-итог
-        // чтобы сумма строк точно совпадала с выполнено/остаток из WMS
+        // Reconciliation: 21:00 — только если уже наступило (MSK ≥ 21:00) или просматриваем прошлое
+        const moscowHourNow = new Date(Date.now() + 3 * 60 * 60 * 1000).getUTCHours()
+        const isPastDate    = dateStr < todayStr()
+        const show21        = isPastDate || moscowHourNow >= 21
+
         const wmsKdk  = parsed?.kdk.done  ?? 0
         const wmsStor = parsed?.storage.done ?? 0
-        if (wmsKdk > 0 || wmsStor > 0) {
-          let sumKdk  = blkKdk
-          let sumStor = blkStor
-          for (const r of rows) { sumKdk += r.kdk ?? 0; sumStor += r.stor ?? 0 }
-          const diffKdk  = wmsKdk  - sumKdk
-          const diffStor = wmsStor - sumStor
-          if (diffKdk !== 0 || diffStor !== 0) {
-            // Последний час с ненулевыми данными
-            let lastIdx = -1
-            for (let i = rows.length - 1; i >= 0; i--) {
-              if ((rows[i].kdk ?? 0) !== 0 || (rows[i].stor ?? 0) !== 0 || rows[i].done > 0) { lastIdx = i; break }
-            }
-            if (lastIdx >= 0) {
-              const r = rows[lastIdx]
-              const newKdk  = (r.kdk  ?? 0) + diffKdk
-              const newStor = (r.stor ?? 0) + diffStor
-              const newDone = newKdk + newStor
-              const empl    = r.sotrud ?? 0
-              rows[lastIdx] = {
-                ...r,
-                kdk:  newKdk,
-                stor: newStor,
-                done: newDone,
-                avg:  empl > 0 ? Math.round(newDone / empl) : 0,
-              }
-            }
-          }
+        let sumKdk = blkKdk, sumStor = blkStor
+        for (const r of rows) { sumKdk += r.kdk ?? 0; sumStor += r.stor ?? 0 }
+        const adjKdk  = wmsKdk  - sumKdk
+        const adjStor = wmsStor - sumStor
+        if (show21 && (adjKdk > 0 || adjStor > 0)) {
+          const hd21 = byHour.get(20)
+          const empl = hd21 ? (hd21.employeesKompl ?? hd21.employees ?? 0) : 0
+          const newKdk  = adjKdk  > 0 ? adjKdk  : null
+          const newStor = adjStor > 0 ? adjStor : null
+          const newDone = (adjKdk > 0 ? adjKdk : 0) + (adjStor > 0 ? adjStor : 0)
+          rows.push({
+            time:       '21:00',
+            kdk:        newKdk,
+            stor:       newStor,
+            sotrud:     empl > 0 ? empl : null,
+            done:       newDone,
+            avg:        empl > 0 && newDone > 0 ? Math.round(newDone / empl) : 0,
+            kdkEmp:     hd21 && (hd21.kdkEmployees     ?? 0) > 0 ? hd21.kdkEmployees     : null,
+            storageEmp: hd21 && (hd21.storageEmployees ?? 0) > 0 ? hd21.storageEmployees : null,
+          })
         }
 
+        // Block row: sum kdk/storage employees across block hours
+        let blkKdkEmp = 0, blkStorageEmp = 0
+        for (const h of BLOCK_HOURS) {
+          const hd = byHour.get(h)
+          if (!hd) continue
+          blkKdkEmp     += hd.kdkEmployees     ?? 0
+          blkStorageEmp += hd.storageEmployees ?? 0
+        }
         const blockRow = {
-          time:   '00:00 - 9:00',
-          kdk:    blkKdk  > 0 ? blkKdk  : null,
-          stor:   blkStor > 0 ? blkStor : null,
-          sotrud: blkEmpl > 0 ? blkEmpl : null,
-          done:   blkDone,
-          avg:    0,
+          time:       '00:00 - 9:00',
+          kdk:        blkKdk  > 0 ? blkKdk  : null,
+          stor:       blkStor > 0 ? blkStor : null,
+          sotrud:     blkEmpl > 0 ? blkEmpl : null,
+          done:       blkDone,
+          avg:        0,
+          kdkEmp:     blkKdkEmp     > 0 ? blkKdkEmp     : null,
+          storageEmp: blkStorageEmp > 0 ? blkStorageEmp : null,
         }
         setHourlyData([blockRow, ...rows])
       }
+
+      if (Array.isArray(rkRoutesData)) setRkStats(calcRkStats(rkRoutesData))
     } catch (e) {
       setError(e.message)
     } finally {
@@ -274,14 +322,13 @@ export default function HourlyReport() {
   useEffect(() => { fetchAll(date) }, [date, fetchAll])
 
   // Отборка — итоги
-  const pick = picking ?? MOCK.picking
-  const kdkT = pick.kdk.tasks,   kdkD = pick.kdk.done,   kdkR = pick.kdk.rest
-  const storT = pick.storage.tasks, storD = pick.storage.done, storR = pick.storage.rest
+  const kdkT = picking?.kdk.tasks   ?? 0, kdkD = picking?.kdk.done   ?? 0, kdkR = picking?.kdk.rest   ?? 0
+  const storT = picking?.storage.tasks ?? 0, storD = picking?.storage.done ?? 0, storR = picking?.storage.rest ?? 0
   const totT = kdkT + storT, totD = kdkD + storD, totR = kdkR + storR
 
   // Приёмка — итоги
-  const rcpt = reception ?? MOCK.reception
-  const rk = rcpt.kdk, rs = rcpt.storage
+  const rk = reception?.kdk     ?? { plan: 0, received: 0, receiving: 0, waiting: 0 }
+  const rs = reception?.storage ?? { plan: 0, received: 0, receiving: 0, waiting: 0 }
   const rt = {
     plan:      rk.plan      + rs.plan,
     received:  rk.received  + rs.received,
@@ -289,15 +336,26 @@ export default function HourlyReport() {
     waiting:   rk.waiting   + rs.waiting,
   }
 
-  // Пополнение — реальные или мок
-  const replData = repl ?? MOCK.replenishment
+  // Пополнение
+  const replData = repl ?? { descents: { tasks: 0, done: 0, rest: 0 }, moves: { tasks: 0, done: 0, rest: 0 } }
 
-  // Почасовые строки — реальные или мок
-  const hourly = hourlyData ?? MOCK.hourly
+  // Почасовые строки — скрываем пустые + обрезаем по upToHour
+  const hourly = hourlyData
+    ? hourlyData.filter(row => row.done > 0 && (!upToHour || row.time <= upToHour))
+    : []
 
-  // Хелпер для процессов
-  const p = (i) => procs[i] || { name: '', cnt: null, cnt2: null }
-  const c2 = (i) => p(i).cnt2 !== null && p(i).cnt2 !== undefined ? fmt(p(i).cnt2) : ''
+  // Часы для селекта — только те, где есть данные
+  const availableHours = hourlyData ? hourlyData.filter(r => r.done > 0).map(r => r.time) : []
+
+  // Кол-во людей в КДК/Хранении — последний час с данными в текущем фильтре
+  const shiftKdkEmp     = [...hourly].reverse().find(r => r.kdkEmp     !== null)?.kdkEmp     ?? null
+  const shiftStorageEmp = [...hourly].reverse().find(r => r.storageEmp !== null)?.storageEmp ?? null
+
+  // Итого задействовано по процессам
+  const totalAllocated = (shiftKdkEmp ?? 0)
+    + (shiftStorageEmp ?? 0)
+    + procs.filter(p => !FIXED_PROC_NAMES.has(p.name)).reduce((s, p) => s + (Number(p.cnt) || 0), 0)
+  const unallocated = manual.shiftTotal !== '' ? (Number(manual.shiftTotal) || 0) - totalAllocated : null
 
   return (
     <div className={s.root}>
@@ -312,6 +370,15 @@ export default function HourlyReport() {
             className={s.dateInput}
           />
         </div>
+        {availableHours.length > 0 && (
+          <div className={s.field}>
+            <label>До</label>
+            <select value={upToHour} onChange={e => setUpToHour(e.target.value)} className={s.dateInput}>
+              <option value=''>Все</option>
+              {availableHours.map(h => <option key={h} value={h}>{h}</option>)}
+            </select>
+          </div>
+        )}
         {loading && <span className={s.statusLoading}>Загрузка...</span>}
         {error   && <span className={s.statusError}>{error}</span>}
         {!loading && (
@@ -321,7 +388,8 @@ export default function HourlyReport() {
         )}
       </div>
 
-      {/* Основная таблица */}
+      {/* Основная таблица + панель ввода */}
+      <div className={s.pageBody}>
       <div className={s.wrap}>
         <table className={s.t}>
           {/*
@@ -395,110 +463,169 @@ export default function HourlyReport() {
             </tr>
 
             {/* ══════════════ ПОЧАСОВЫЕ ДАННЫЕ ════════════════════════ */}
-            {hourly.map((row, i) => (
-              <tr key={row.time}>
-                <td className={s.lbl}>{row.time}</td>
-                <td className={s.v}>{fmt(row.kdk)}</td>
-                <td className={s.v}>{fmt(row.stor)}</td>
-                <td className={s.v}>{fmt(row.sotrud)}</td>
-                <td className={s.v}>{row.done !== null ? (row.done === 0 ? '0' : fmt(row.done)) : ''}</td>
-                <td className={s.v}>{row.avg  !== null ? (row.avg  === 0 ? '0' : fmt(row.avg))  : ''}</td>
-                <td className={s.pn}>{p(i).name}</td>
-                <td className={s.v}>{fmt(p(i).cnt)}</td>
-                <td className={s.v}>{c2(i)}</td>
-              </tr>
-            ))}
+            {hourly.map((row, i) => {
+              const proc = procs[i]
+              const isKdk     = proc?.name === 'Кросс-докинг'
+              const isStorage = proc?.name === 'Хранение'
+              const isFixed   = isKdk || isStorage
+              // Auto value from stats (or manual if no stats data for that row)
+              // Для фиксированных процессов — агрегат по всей смене (не привязан к конкретному часу)
+              const autoVal = isKdk ? shiftKdkEmp : isStorage ? shiftStorageEmp : null
+              return (
+                <tr key={row.time}>
+                  <td className={s.lbl}>{row.time}</td>
+                  <td className={s.v}>{fmt(row.kdk)}</td>
+                  <td className={s.v}>{fmt(row.stor)}</td>
+                  <td className={s.v}>{fmt(row.sotrud)}</td>
+                  <td className={s.v}>{row.done !== null ? (row.done === 0 ? '0' : fmt(row.done)) : ''}</td>
+                  <td className={s.v}>{row.avg  !== null ? (row.avg  === 0 ? '0' : fmt(row.avg))  : ''}</td>
+                  {proc ? (
+                    <>
+                      <td className={s.pn}>
+                        <span className={s.procName}>{proc.name}</span>
+                        {!isFixed && (
+                          <button type="button" className={s.procRemove} onClick={() => removeProc(proc.name)} title="Удалить">×</button>
+                        )}
+                      </td>
+                      <td className={s.v} colSpan={2}>
+                        {isFixed ? (
+                          <span>{autoVal !== null ? fmt(autoVal) : '—'}</span>
+                        ) : (
+                          <input
+                            type="number"
+                            min="0"
+                            className={s.procInput}
+                            value={proc.cnt}
+                            onChange={e => setProcCnt(proc.name, e.target.value)}
+                            placeholder="—"
+                          />
+                        )}
+                      </td>
+                    </>
+                  ) : (
+                    <td className={s.e} colSpan={3} />
+                  )}
+                </tr>
+              )
+            })}
+
+            {/* Дополнительные процессы, которых больше чем почасовых строк */}
+            {procs.slice(hourly.length).map(proc => {
+              const isFixed = FIXED_PROC_NAMES.has(proc.name)
+              const autoVal = proc.name === 'Кросс-докинг' ? shiftKdkEmp : proc.name === 'Хранение' ? shiftStorageEmp : null
+              return (
+                <tr key={proc.name}>
+                  <td className={s.e} colSpan={6} />
+                  <td className={s.pn}>
+                    <span className={s.procName}>{proc.name}</span>
+                    {!isFixed && (
+                      <button type="button" className={s.procRemove} onClick={() => removeProc(proc.name)} title="Удалить">×</button>
+                    )}
+                  </td>
+                  <td className={s.v} colSpan={2}>
+                    {isFixed ? (
+                      <span>{autoVal !== null ? fmt(autoVal) : '—'}</span>
+                    ) : (
+                      <input
+                        type="number"
+                        min="0"
+                        className={s.procInput}
+                        value={proc.cnt}
+                        onChange={e => setProcCnt(proc.name, e.target.value)}
+                        placeholder="—"
+                      />
+                    )}
+                  </td>
+                </tr>
+              )
+            })}
+
+            {/* Итого по процессам */}
+            <tr>
+              <td className={s.e} colSpan={6} />
+              <td className={s.subh}>Итого</td>
+              <td className={s.v} colSpan={2} style={{ fontWeight: 600 }}>{fmt(totalAllocated)}</td>
+            </tr>
+
+            {/* Добавить процесс */}
+            <tr>
+              <td className={s.e} colSpan={6} />
+              <td className={s.e} colSpan={3}>
+                <div className={s.addProcRow}>
+                  <input
+                    type="text"
+                    className={s.addProcInput}
+                    placeholder="Новый процесс..."
+                    value={newProcName}
+                    onChange={e => setNewProcName(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && addProc()}
+                  />
+                  <button type="button" className={s.addProcBtn} onClick={addProc}>+</button>
+                </div>
+              </td>
+            </tr>
 
             {/* ══════════════ ПОПОЛНЕНИЕ ══════════════════════════════ */}
             <tr>
               <td className={s.yh} colSpan={6}>Пополнение</td>
-              <td className={s.pn}>{p(13).name}</td>
-              <td className={s.v}>{fmt(p(13).cnt)}</td>
-              <td className={s.v}>{c2(13)}</td>
+              <td className={s.e} colSpan={3} />
             </tr>
             <tr>
               <td className={s.e} />
               <td className={s.sh2} colSpan={2}>Спуски</td>
               <td className={s.sh2} colSpan={3}>Перемещение</td>
-              <td className={s.pn}>{p(14).name}</td>
-              <td className={s.v}>{fmt(p(14).cnt)}</td>
-              <td className={s.v}>{c2(14)}</td>
+              <td className={s.e} colSpan={3} />
             </tr>
             {[
-              ['Задачи',    replData.descents.tasks, replData.moves.tasks, 15],
-              ['Выполнено', replData.descents.done,  replData.moves.done,  16],
-              ['Остаток',   replData.descents.rest,  replData.moves.rest,  17],
-            ].map(([lbl, v1, v2, pi]) => (
+              ['Задачи',    replData.descents.tasks, replData.moves.tasks],
+              ['Выполнено', replData.descents.done,  replData.moves.done ],
+              ['Остаток',   replData.descents.rest,  replData.moves.rest ],
+            ].map(([lbl, v1, v2]) => (
               <tr key={lbl}>
                 <td className={s.lbl}>{lbl}</td>
                 <td className={s.v} colSpan={2}>{fmt(v1)}</td>
                 <td className={s.v} colSpan={3}>{fmt(v2)}</td>
-                <td className={s.pn}>{p(pi).name}</td>
-                <td className={s.v}>{fmt(p(pi).cnt)}</td>
-                <td className={s.v}>{c2(pi)}</td>
+                <td className={s.e} colSpan={3} />
               </tr>
             ))}
 
             {/* ══════════════ ОТГРУЗКА ════════════════════════════════ */}
+            {/* ══════════════ ОТГРУЗКА ════════════════════════════════ */}
             <tr>
               <td className={s.yh} colSpan={6}>Отгрузка</td>
-              <td className={s.pn}>{p(18).name}</td>
-              <td className={s.v}>{fmt(p(18).cnt)}</td>
-              <td className={s.v}>{c2(18)}</td>
-            </tr>
-            <tr>
-              <td className={s.lbl}>План</td>
-              <td className={s.v} colSpan={5}>{fmt(ship.plan)}</td>
-              <td className={s.pn}>{p(19).name}</td>
-              <td className={s.v}>{fmt(p(19).cnt)}</td>
-              <td className={s.v}>{c2(19)}</td>
-            </tr>
-            <tr>
-              <td className={s.lbl}>Подготовлено ТС</td>
-              <td className={s.v} colSpan={5}>{fmt(ship.prepared)}</td>
-              <td className={s.pn}>{p(20).name}</td>
-              <td className={s.v}>{fmt(p(20).cnt)}</td>
-              <td className={s.v}>{c2(20)}</td>
-            </tr>
-            <tr>
-              <td className={s.lbl}>Отгружено</td>
-              <td className={s.v} colSpan={5}>{fmt(ship.shipped)}</td>
               <td className={s.e} colSpan={3} />
             </tr>
+            {[
+              ['План',            manual.shipPlan],
+              ['Подготовлено ТС', manual.shipPrepared],
+              ['Отгружено',       manual.shipShipped],
+              ['Отгружается',     manual.shipInProgress],
+              ['Задержка',        manual.shipDelay],
+            ].map(([lbl, val]) => (
+              <tr key={lbl}>
+                <td className={s.lbl}>{lbl}</td>
+                <td className={s.v} colSpan={5}>{fmt(val)}</td>
+                <td className={s.e} colSpan={3} />
+              </tr>
+            ))}
+
+            {/* ══════════════ РОЛЛКЕЙДЖИ ══════════════════════════════ */}
             <tr>
-              <td className={s.lbl}>Отгружается</td>
-              <td className={s.v} colSpan={5}>{fmt(ship.inProgress)}</td>
+              <td className={s.yh} colSpan={6}>Роллкейджи</td>
               <td className={s.e} colSpan={3} />
             </tr>
-            <tr>
-              <td className={s.lbl}>Задержка</td>
-              <td className={s.v} colSpan={5}>{fmt(ship.delay)}</td>
-              <td className={s.e} colSpan={3} />
-            </tr>
-            {/* Разделитель */}
-            <tr>
-              <td className={s.sep} colSpan={9} />
-            </tr>
-            <tr>
-              <td className={s.lbl}>За час ТС</td>
-              <td className={s.v} colSpan={5}>{fmt(ship.perHourTC)}</td>
-              <td className={s.e} colSpan={3} />
-            </tr>
-            <tr>
-              <td className={s.lbl}>За час РК</td>
-              <td className={s.v} colSpan={5}>{fmt(ship.perHourRK)}</td>
-              <td className={s.e} colSpan={3} />
-            </tr>
-            <tr>
-              <td className={s.lbl}>Сдано РК</td>
-              <td className={s.v} colSpan={5}>{fmt(ship.deliveredRK)}</td>
-              <td className={s.e} colSpan={3} />
-            </tr>
-            <tr>
-              <td className={s.lbl}>Общее кол-во. РК</td>
-              <td className={s.v} colSpan={5}>{fmt(ship.totalRK)}</td>
-              <td className={s.e} colSpan={3} />
-            </tr>
+            {[
+              ['За час ТС',       rkStats?.perHourTC  ?? null],
+              ['За час РК',       rkStats?.perHourRK  ?? null],
+              ['Сдано РК',        rkStats?.deliveredRK ?? null],
+              ['Общее кол-во РК', (rkStats?.deliveredRK ?? 0) + (Number(manual.rkTotal) || 0) || null],
+            ].map(([lbl, val]) => (
+              <tr key={lbl}>
+                <td className={s.lbl}>{lbl}</td>
+                <td className={s.v} colSpan={5}>{fmt(val)}</td>
+                <td className={s.e} colSpan={3} />
+              </tr>
+            ))}
 
             {/* ══════════════ ПРИЁМКА ══════════════════════════════════ */}
             <tr>
@@ -510,11 +637,16 @@ export default function HourlyReport() {
               <td className={s.yh}>Хранение</td>
               <td className={s.yh} colSpan={6}>Итог</td>
             </tr>
+            <tr>
+              <td className={s.lbl}>План</td>
+              <td className={s.v}>{fmt(manual.rcpKdkPlan)}</td>
+              <td className={s.v}>{fmt(manual.rcpStorPlan)}</td>
+              <td className={s.v} colSpan={6}>{fmt((Number(manual.rcpKdkPlan) || 0) + (Number(manual.rcpStorPlan) || 0)) || '—'}</td>
+            </tr>
             {[
-              ['План',         rk.plan,      rs.plan,      rt.plan      ],
-              ['Принято',      rk.received,  rs.received,  rt.received  ],
-              ['Принимается',  rk.receiving, rs.receiving, rt.receiving ],
-              ['Ожидаем',      rk.waiting,   rs.waiting,   rt.waiting   ],
+              ['Принято',     rk.received,  rs.received,  rt.received  ],
+              ['Принимается', rk.receiving, rs.receiving, rt.receiving ],
+              ['Ожидаем',     rk.waiting,   rs.waiting,   rt.waiting   ],
             ].map(([lbl, v1, v2, vt]) => (
               <tr key={lbl}>
                 <td className={s.lbl}>{lbl}</td>
@@ -526,6 +658,66 @@ export default function HourlyReport() {
 
           </tbody>
         </table>
+      </div>
+
+      {/* ── Панель ручного ввода справа ── */}
+      <div className={s.inputPanel}>
+        <div className={s.inputSection}>
+          <div className={s.inputSectionTitle}>Смена</div>
+          <div className={s.inputRow}>
+            <span className={s.inputLbl}>Всего</span>
+            <input {...mi('shiftTotal')} className={s.panelInput} />
+          </div>
+          <div className={s.inputRow}>
+            <span className={s.inputLbl}>Задействовано</span>
+            <span className={s.panelValue}>{fmt(totalAllocated) || '—'}</span>
+          </div>
+          <div className={s.inputRow}>
+            <span className={s.inputLbl}>Не задействовано</span>
+            <span className={s.panelValue} style={unallocated !== null && unallocated < 0 ? { color: '#d32f2f', fontWeight: 700 } : {}}>
+              {unallocated !== null ? fmt(unallocated) || '0' : '—'}
+            </span>
+          </div>
+        </div>
+
+        <div className={s.inputSection}>
+          <div className={s.inputSectionTitle}>Отгрузка</div>
+          {[
+            ['План',            'shipPlan'],
+            ['Подготовлено ТС', 'shipPrepared'],
+            ['Отгружено',       'shipShipped'],
+            ['Отгружается',     'shipInProgress'],
+            ['Задержка',        'shipDelay'],
+          ].map(([lbl, field]) => (
+            <div key={field} className={s.inputRow}>
+              <span className={s.inputLbl}>{lbl}</span>
+              <input {...mi(field)} className={s.panelInput} />
+            </div>
+          ))}
+        </div>
+
+        <div className={s.inputSection}>
+          <div className={s.inputSectionTitle}>Роллкейджи</div>
+          <div className={s.inputRow}>
+            <span className={s.inputLbl}>Общее кол-во РК</span>
+            <input {...mi('rkTotal')} className={s.panelInput} />
+          </div>
+        </div>
+
+        <div className={s.inputSection}>
+          <div className={s.inputSectionTitle}>Приёмка — план</div>
+          {[
+            ['КДК',     'rcpKdkPlan'],
+            ['Хранение','rcpStorPlan'],
+          ].map(([lbl, field]) => (
+            <div key={field} className={s.inputRow}>
+              <span className={s.inputLbl}>{lbl}</span>
+              <input {...mi(field)} className={s.panelInput} />
+            </div>
+          ))}
+        </div>
+      </div>
+
       </div>
     </div>
   )

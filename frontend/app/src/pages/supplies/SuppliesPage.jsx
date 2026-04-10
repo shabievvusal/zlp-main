@@ -480,6 +480,16 @@ function DatePickerDropdown({ label, placeholder, dateRange, onChange, onRemove 
   )
 }
 
+// ─── Page-level cache — переживает навигацию (не сбрасывается при размонтировании) ──
+
+const _cache = {
+  allRows: null, serverRows: [], total: 0,
+  filtersKey: null, serverKey: null,
+  page: 1, sort: { key: 'plannedArrivalDate', dir: 'desc' },
+  search: '', plannedRange: null, completedRange: null,
+  statuses: [], types: [], temps: [],
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function SuppliesPage() {
@@ -488,28 +498,41 @@ export default function SuppliesPage() {
 
   // serverRows — текущая страница при серверной сортировке
   // allRows    — ВСЕ строки при клиентской сортировке (null = ещё не загружено)
-  const [serverRows, setServerRows]         = useState([])
-  const [allRows, setAllRows]               = useState(null)
-  const [total, setTotal]                   = useState(0)
+  const [serverRows, setServerRows]         = useState(() => _cache.serverRows)
+  const [allRows, setAllRows]               = useState(() => _cache.allRows)
+  const [total, setTotal]                   = useState(() => _cache.total)
   const [loading, setLoading]               = useState(false)
   const [error, setError]                   = useState(null)
-  const [page, setPage]                     = useState(1)
-  const [sort, setSort]                     = useState({ key: 'plannedArrivalDate', dir: 'desc' })
-  const [search, setSearch]                 = useState('')
-  const [plannedRange, setPlannedRange]     = useState(todayPlannedRange)
-  const [completedRange, setCompletedRange] = useState(null)
-  const [statuses, setStatuses]             = useState([])
-  const [types, setTypes]                   = useState([])
-  const [temps, setTemps]                   = useState([])
+  const [page, setPage]                     = useState(() => _cache.page)
+  const [sort, setSort]                     = useState(() => _cache.sort)
+  const [search, setSearch]                 = useState(() => _cache.search)
+  const [plannedRange, setPlannedRange]     = useState(() => _cache.plannedRange ?? todayPlannedRange())
+  const [completedRange, setCompletedRange] = useState(() => _cache.completedRange)
+  const [statuses, setStatuses]             = useState(() => _cache.statuses)
+  const [types, setTypes]                   = useState(() => _cache.types)
+  const [temps, setTemps]                   = useState(() => _cache.temps)
 
   // { rowId: 'loading' | { status: 'waiting'|'in_progress'|'done', pct: number } }
   const [pickStatusMap, setPickStatusMap] = useState({})
 
   const abortRef       = useRef(null)
-  // Запоминаем, для каких фильтров загружен allRows (чтобы не перезагружать зря)
-  const allRowsKeyRef  = useRef(null)
+  // Запоминаем, для каких фильтров загружен allRows — инициализируем из кэша
+  const allRowsKeyRef  = useRef(_cache.filtersKey)
+  const serverKeyRef   = useRef(_cache.serverKey)
   // ID поставок, для которых уже запущен fetch статуса комплектации
   const fetchedPickRef = useRef(new Set())
+
+  // Синхронизируем UI-состояние в кэш при каждом изменении
+  useEffect(() => {
+    _cache.page           = page
+    _cache.sort           = sort
+    _cache.search         = search
+    _cache.plannedRange   = plannedRange
+    _cache.completedRange = completedRange
+    _cache.statuses       = statuses
+    _cache.types          = types
+    _cache.temps          = temps
+  }, [page, sort, search, plannedRange, completedRange, statuses, types, temps])
 
   const getBaseParams = (planned, completed, sts, tps, tmps) => {
     const p = {
@@ -562,8 +585,8 @@ export default function SuppliesPage() {
           for (const r of rest) items = items.concat(r?.value?.items ?? [])
         }
 
-        setAllRows(items)
-        setTotal(totalCount)
+        setAllRows(items);        _cache.allRows = items
+        setTotal(totalCount);     _cache.total   = totalCount
       } else {
         // ── Одна страница, серверная сортировка ──
         const data = await getInboundTasks(token, {
@@ -573,8 +596,10 @@ export default function SuppliesPage() {
           sortField:     API_SORT_FIELD[srt.key] || 'PLANNED_ARRIVAL_DATE',
           sortDirection: srt.dir.toUpperCase(),
         })
-        setServerRows(data?.value?.items || [])
-        setTotal(data?.value?.total ?? 0)
+        const rows = data?.value?.items || []
+        const tot  = data?.value?.total ?? 0
+        setServerRows(rows); _cache.serverRows = rows
+        setTotal(tot);       _cache.total      = tot
       }
     } catch (err) {
       if (err.name !== 'AbortError') setError(err.message)
@@ -594,9 +619,15 @@ export default function SuppliesPage() {
       // (смена search / sort.dir / page не вызывает повторный fetch)
       if (allRowsKeyRef.current === filtersKey) return
       allRowsKeyRef.current = filtersKey
+      _cache.filtersKey = filtersKey
       setPage(1)
       load(true, 1, sort, plannedRange, completedRange, statuses, types, temps)
     } else {
+      // Серверная сортировка: не перезагружаем если данные уже есть для этих параметров
+      const serverKey = JSON.stringify({ filtersKey, page, sKey: sort.key, sDir: sort.dir })
+      if (serverKeyRef.current === serverKey) return
+      serverKeyRef.current = serverKey
+      _cache.serverKey = serverKey
       load(false, page, sort, plannedRange, completedRange, statuses, types, temps)
     }
   }, [page, sort.key, sort.dir, plannedRange, completedRange, statuses, types, temps, search, load])
@@ -797,13 +828,20 @@ export default function SuppliesPage() {
             type="button"
             className={s.refreshBtn}
             onClick={() => {
-              allRowsKeyRef.current = null   // сброс кэша → принудительная перезагрузка
-              const isClient = !SERVER_SORT_COLS.has(sort.key)
+              // Сброс кэша → принудительная перезагрузка
+              allRowsKeyRef.current = null;  _cache.filtersKey = null
+              serverKeyRef.current  = null;  _cache.serverKey  = null
+              const hasSearch  = !!search.trim()
+              const isClient   = !SERVER_SORT_COLS.has(sort.key) || hasSearch
               const filtersKey = JSON.stringify({ plannedRange, completedRange, statuses, types, temps })
               if (isClient) {
                 allRowsKeyRef.current = filtersKey
+                _cache.filtersKey = filtersKey
                 load(true, 1, sort, plannedRange, completedRange, statuses, types, temps)
               } else {
+                const serverKey = JSON.stringify({ filtersKey, page, sKey: sort.key, sDir: sort.dir })
+                serverKeyRef.current = serverKey
+                _cache.serverKey = serverKey
                 load(false, page, sort, plannedRange, completedRange, statuses, types, temps)
               }
             }}

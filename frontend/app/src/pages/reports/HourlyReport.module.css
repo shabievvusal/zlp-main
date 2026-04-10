@@ -135,6 +135,77 @@
   border-left: none !important;
 }
 
+/* ── Process cells ────────────────────────────────────────────────────────── */
+
+.procName {
+  font-size: 12px;
+  margin-right: 4px;
+}
+
+.procRemove {
+  background: none;
+  border: none;
+  color: #aaa;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+  vertical-align: middle;
+}
+
+.procRemove:hover { color: #e00; }
+
+.procInput {
+  width: 60px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  padding: 1px 4px;
+  font-size: 12px;
+  text-align: center;
+  background: #fffde7;
+  font-family: var(--font);
+}
+
+.procInput:focus { outline: none; border-color: #888; }
+
+/* Строка добавления нового процесса */
+.addProcRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 0;
+}
+
+.addProcInput {
+  flex: 1;
+  min-width: 0;
+  border: 1px dashed #bbb;
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-size: 11px;
+  background: #fafafa;
+  font-family: var(--font);
+}
+
+.addProcInput:focus { outline: none; border-color: #888; border-style: solid; }
+
+.addProcBtn {
+  width: 20px;
+  height: 20px;
+  border: 1px solid #bbb;
+  border-radius: 3px;
+  background: #f5f5f5;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.addProcBtn:hover { background: #e8f5e9; border-color: #4caf50; color: #2e7d32; }
+
 /* Разделитель между Задержкой и За час ТС */
 .sep {
   height: 3px;
@@ -144,4 +215,102 @@
   border-right: 1px solid #888 !important;
   border-top: none !important;
   border-bottom: none !important;
+}
+
+/* Ячейка с заметками (правая часть Отгрузка/Роллкейджи) */
+.notesCell {
+  padding: 4px !important;
+  vertical-align: top;
+  border-left: 2px solid #aaa !important;
+}
+
+.notesArea {
+  width: 100%;
+  height: 100%;
+  min-height: 180px;
+  resize: none;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-size: 12px;
+  font-family: inherit;
+  line-height: 1.5;
+  background: #fffde7;
+  box-sizing: border-box;
+}
+
+.notesArea:focus {
+  outline: none;
+  border-color: #f5a623;
+  box-shadow: 0 0 0 2px rgba(245,166,35,.2);
+}
+
+/* ── Макет: таблица + панель ввода рядом ─────────────────────────────────── */
+.pageBody {
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+}
+
+/* ── Панель ручного ввода ────────────────────────────────────────────────── */
+.inputPanel {
+  flex-shrink: 0;
+  width: 220px;
+  border-left: 2px solid #e0e0e0;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.inputSection {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.inputSectionTitle {
+  font-weight: 600;
+  font-size: 12px;
+  background: #ffeb3b;
+  padding: 3px 6px;
+  border-radius: 3px;
+  margin-bottom: 2px;
+}
+
+.inputRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.inputLbl {
+  flex: 1;
+  font-size: 12px;
+  color: #444;
+  white-space: nowrap;
+}
+
+.panelInput {
+  width: 72px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  padding: 2px 5px;
+  font-size: 12px;
+  text-align: right;
+  background: #fffde7;
+}
+
+.panelInput:focus {
+  outline: none;
+  border-color: #f5a623;
+}
+
+.panelValue {
+  width: 72px;
+  display: inline-block;
+  text-align: right;
+  font-size: 12px;
+  color: #333;
+  padding: 2px 5px;
 }
