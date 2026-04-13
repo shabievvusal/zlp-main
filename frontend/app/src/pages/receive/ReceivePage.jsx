@@ -284,7 +284,7 @@ function StepData({ opType, route, onDone, byName }) {
       <div className={s.fieldLabel}>Рохли</div>
       <div className={s.cfzList}>
         <div className={s.cfzRow}>
-          <span className={s.cfzAddr}>{opType === 'ship' ? 'Отдано водителю' : 'Возврат от водителя'}</span>
+          <span className={s.cfzAddr}>{opType === 'ship' ? 'Отдано водителю рохлей' : 'Возврат рохлей от водителя'}</span>
           {opType === 'receive' && route.shipment?.rokhlya != null && (
             <span className={s.cfzShipped}>выдано: {route.shipment.rokhlya}</span>
           )}
