@@ -193,7 +193,7 @@ export default function HourlyReport() {
         api.getReportMoveToPickingCount(token,      { dateFrom: rcpFrom, dateTo: rcpTo }),
         api.getReportMoveToPickingRest(token,       { dateFrom: rcpFrom, dateTo: rcpTo }),
         api.getDateSummaryFull(dateStr),
-        api.getRkRoutes({ dateFrom: dateStr, dateTo: dateStr }).catch(() => []),
+        api.getRkRoutes({ receivedDateFrom: dateStr, receivedDateTo: dateStr }).catch(() => []),
       ])
 
       const parsed = parseMonitoringStats(monData)

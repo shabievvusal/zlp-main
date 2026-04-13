@@ -430,11 +430,13 @@ export async function deleteRkRoutesBulk(ids) {
   return r.json()
 }
 
-export async function getRkRoutes({ q, dateFrom, dateTo, status } = {}) {
+export async function getRkRoutes({ q, dateFrom, dateTo, receivedDateFrom, receivedDateTo, status } = {}) {
   const params = new URLSearchParams()
   if (q) params.set('q', q)
   if (dateFrom) params.set('dateFrom', dateFrom)
   if (dateTo) params.set('dateTo', dateTo)
+  if (receivedDateFrom) params.set('receivedDateFrom', receivedDateFrom)
+  if (receivedDateTo)   params.set('receivedDateTo', receivedDateTo)
   if (status) params.set('status', status)
   const r = await fetch(`/api/rk/routes?${params}`, { credentials })
   if (!r.ok) throw new Error((await r.json()).error || 'Ошибка загрузки маршрутов')
@@ -955,6 +957,17 @@ export async function getInboundTaskDetail(token, { taskType, id }) {
   }
   if (!r.ok) throw new Error(`API ${r.status}: ${data?.message || data?.error || r.statusText}`)
   return data
+}
+
+/** Скорости по артикулам из нашей базы операций (C# тул).
+ *  dateFrom/dateTo: YYYY-MM-DD, opType/zone — опционально */
+export async function getArticleSpeeds({ dateFrom, dateTo, opType, zone } = {}) {
+  const params = new URLSearchParams({ dateFrom, dateTo })
+  if (opType) params.set('opType', opType)
+  if (zone)   params.set('zone',   zone)
+  const r = await fetch(`/api/analysis/article-speeds?${params}`, { credentials: 'include' })
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `Ошибка ${r.status}`)
+  return r.json()
 }
 
 /**

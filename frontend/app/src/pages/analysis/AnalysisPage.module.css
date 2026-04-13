@@ -95,23 +95,6 @@
   font-size: 13px;
 }
 
-/* ─── Speed bar ───────────────────────────────────────────────────────────────── */
-
-.speedBar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  font-size: 13px;
-  color: var(--text-muted);
-  flex-wrap: wrap;
-}
-
-.speedBar strong { color: var(--text); }
-
 .speedSep { color: var(--border); margin: 0 2px; }
 
 /* ─── Cards ───────────────────────────────────────────────────────────────────── */
@@ -328,3 +311,166 @@
   color: var(--text-muted);
   font-size: 14px;
 }
+
+/* ─── Adjust panel ────────────────────────────────────────────────────────────── */
+
+.adjustPanel {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.adjustPanelHead {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.adjustPanelTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.adjustAutoNote {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.adjustAutoNote strong { color: var(--text); }
+
+.adjustGrid {
+  display: grid;
+  grid-template-columns: 110px 1fr 1fr;
+  align-items: center;
+  gap: 8px 16px;
+}
+
+.adjustGrid5 {
+  display: grid;
+  grid-template-columns: 110px repeat(4, 1fr);
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.adjustZoneHead {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.adjustZoneSub {
+  font-size: 10px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+
+.adjustRowLabel {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.adjustVal {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.adjustCell {
+  display: flex;
+}
+
+.adjustInput {
+  width: 90px;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-hover);
+  color: var(--text);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.adjustInput:focus { border-color: var(--accent); background: var(--bg-card); }
+.adjustInput::placeholder { color: var(--text-muted); }
+
+/* ─── Pick forecast ───────────────────────────────────────────────────────────── */
+
+.pickLoading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+  padding: 4px 0;
+}
+
+.pickHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.pickSup  { color: var(--text-muted); }
+
+.pickZone {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--bg-hover);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+
+.pickBadgeOk   { font-size: 12px; font-weight: 600; color: #15803D; }
+.pickBadgeWarn { font-size: 12px; font-weight: 600; color: #92400E; }
+.pickBadgeOver { font-size: 12px; font-weight: 600; color: #B91C1C; }
+
+.pickSummary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.pickSummary strong { color: var(--text); }
+
+.pickTimeOk   { color: #15803D; font-size: 15px; }
+.pickTimeWarn { color: #92400E; font-size: 15px; }
+.pickTimeOver { color: #B91C1C; font-size: 15px; }
+
+.pickNoSpeed  { color: #B45309; font-size: 12px; }
+
+.speedFallback { color: #92400E; }
+
+.thR { text-align: right !important; }

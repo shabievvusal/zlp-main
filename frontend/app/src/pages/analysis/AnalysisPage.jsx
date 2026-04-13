@@ -6,6 +6,9 @@ import s from './AnalysisPage.module.css'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+const TEMP_TO_ZONE = { ORDINARY: 'KDS', MEDIUM_COLD: 'KDH', LOW_COLD: 'KDM' }
+
+
 function todayStr() {
   return new Date().toISOString().slice(0, 10)
 }
@@ -29,7 +32,48 @@ function fmtTime(date) {
   return `${h}:${m}`
 }
 
-// Разбираем ответ monitoring stats → { kdk, storage }
+function mskFrom(d) { return new Date(`${d}T00:00:00+03:00`).toISOString() }
+function mskTo(d)   { return new Date(`${d}T23:59:59.999+03:00`).toISOString() }
+
+function pieceQty(val) {
+  if (val == null) return 0
+  if (typeof val === 'number') return val
+  return val.pieceProducts ?? val.weightProducts ?? 0
+}
+
+function buildSpeedMap(results) {
+  const map = new Map()
+  for (const r of (results || [])) {
+    if (r.qtyPerPersonHour > 0 && r.nomenclatureCode) {
+      const key  = `${r.nomenclatureCode}:${r.zone}`
+      const prev = map.get(key)
+      if (!prev || r.totalOps > prev.totalOps) map.set(key, r)
+    }
+  }
+  return map
+}
+
+function calcForecastPH(personHours, people, shiftEnd) {
+  if (!personHours || !people || people <= 0 || !shiftEnd) return null
+  const projFinish = new Date(Date.now() + personHours / people * 3_600_000)
+  const minDiff    = Math.round((shiftEnd - projFinish) / 60_000)
+  const status     = minDiff >= 30 ? 'ok' : minDiff >= 0 ? 'warn' : 'over'
+  return { projFinish, status, minDiff }
+}
+
+function calcForecastTasks(rest, people, speed, shiftEnd) {
+  if (!rest || !people || !speed || people <= 0 || speed <= 0 || !shiftEnd) return null
+  const projFinish = new Date(Date.now() + rest / (people * speed) * 3_600_000)
+  const minDiff    = Math.round((shiftEnd - projFinish) / 60_000)
+  const status     = minDiff >= 30 ? 'ok' : minDiff >= 0 ? 'warn' : 'over'
+  return { projFinish, status, minDiff }
+}
+
+function loadOverrides() {
+  try { const v = localStorage.getItem('analysis_overrides'); return v ? JSON.parse(v) : {} } catch { return {} }
+}
+function saveOverrides(val) { try { localStorage.setItem('analysis_overrides', JSON.stringify(val)) } catch {} }
+
 function parseMonitoringStats(data) {
   const v = data?.value
   if (!v) return null
@@ -38,24 +82,20 @@ function parseMonitoringStats(data) {
     done:  block?.completedTasks?.tasksCount ?? 0,
     rest:  block?.remainingTasks?.tasksCount ?? 0,
   })
-  return {
-    kdk:     pick(v.pickByLineStats),
-    storage: pick(v.pieceSelectionStats),
-  }
+  return { kdk: pick(v.pickByLineStats), storage: pick(v.pieceSelectionStats) }
 }
 
-// Считаем людей по операциям из live-данных мониторинга
 function parseLivePeople(data) {
   const v = data?.value || data || {}
   const sections = [
-    { key: 'pickByLineHandlingUnitsInProgress',    type: 'kdk' },
+    { key: 'pickByLineHandlingUnitsInProgress',    type: 'kdk'     },
     { key: 'pieceSelectionHandlingUnitsInProgress', type: 'storage' },
   ]
   const counts = { kdk: 0, storage: 0 }
-  const seen = new Set()
+  const seen   = new Set()
   for (const { key, type } of sections) {
     for (const entry of (v[key] || [])) {
-      const u = entry.user || {}
+      const u   = entry.user || {}
       const fio = [u.lastName, u.firstName].filter(Boolean).join(' ')
       if (!fio) continue
       const uid = fio + type
@@ -67,26 +107,12 @@ function parseLivePeople(data) {
   return counts
 }
 
-// Средняя скорость по последним lastN ненулевым часам
 function calcAvgSpeed(rows, lastN = 3) {
   if (!rows?.length) return null
   const nonZero = rows.filter(r => r.avg > 0 && r.sotrud > 0)
   const recent  = nonZero.slice(-lastN)
   if (!recent.length) return null
   return Math.round(recent.reduce((s, r) => s + r.avg, 0) / recent.length)
-}
-
-// Прогноз завершения и нужное кол-во людей
-function calcForecast(rest, people, avgSpeed, shiftEnd) {
-  if (!rest || !people || !avgSpeed || people <= 0 || avgSpeed <= 0 || !shiftEnd) return null
-  const now          = new Date()
-  const hoursNeeded  = rest / (people * avgSpeed)
-  const projFinish   = new Date(now.getTime() + hoursNeeded * 3_600_000)
-  const hoursLeft    = (shiftEnd - now) / 3_600_000
-  const reqPeople    = hoursLeft > 0 ? Math.ceil(rest / (avgSpeed * hoursLeft)) : null
-  const minDiff      = Math.round((shiftEnd - projFinish) / 60_000)
-  const status       = minDiff >= 30 ? 'ok' : minDiff >= 0 ? 'warn' : 'over'
-  return { projFinish, reqPeople, status, minDiff }
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -112,15 +138,14 @@ function StatRow({ label, value, bold }) {
 
 function ForecastBadge({ forecast, shiftEndTime }) {
   if (!forecast) return null
-  const { status, projFinish, minDiff, reqPeople } = forecast
-  const cls = status === 'ok' ? s.badgeOk : status === 'warn' ? s.badgeWarn : s.badgeOver
+  const { status, projFinish, minDiff } = forecast
+  const cls  = status === 'ok' ? s.badgeOk : status === 'warn' ? s.badgeWarn : s.badgeOver
   const icon = status === 'ok' ? '✓' : status === 'warn' ? '⚠' : '✕'
   const hint = status === 'ok'
     ? `Запас ${Math.abs(minDiff)} мин до ${shiftEndTime}`
     : status === 'warn'
     ? `Буфер ${minDiff} мин до ${shiftEndTime}`
     : `Опоздание ~${Math.abs(minDiff)} мин`
-
   return (
     <div className={`${s.forecastBadge} ${cls}`}>
       <div className={s.forecastMain}>
@@ -128,20 +153,16 @@ function ForecastBadge({ forecast, shiftEndTime }) {
         <span className={s.forecastTime}>{fmtTime(projFinish)}</span>
         <span className={s.forecastHint}>{hint}</span>
       </div>
-      {reqPeople != null && (
-        <div className={s.forecastPeople}>
-          Нужно людей: <strong>{reqPeople}</strong>
-        </div>
-      )}
     </div>
   )
 }
 
-function OperationCard({ title, data, people, forecast, shiftEndTime, loading }) {
-  const done  = data?.done  ?? 0
-  const total = data?.tasks ?? 0
-  const rest  = data?.rest  ?? 0
-  const pct   = total > 0 ? Math.round(done / total * 100) : 0
+function ZoneCard({ zoneKey, label, rest, restUnit, personHours, people, speed, shiftEnd, shiftEndTime, loading, onPeople, onSpeed, speedPlaceholder }) {
+  const forecast = personHours != null
+    ? calcForecastPH(personHours, people, shiftEnd)
+    : (rest != null && speed)
+      ? calcForecastTasks(rest, people, speed, shiftEnd)
+      : null
 
   const borderCls = !forecast ? ''
     : forecast.status === 'ok'   ? s.cardOk
@@ -151,25 +172,40 @@ function OperationCard({ title, data, people, forecast, shiftEndTime, loading })
   return (
     <div className={`${s.card} ${borderCls}`}>
       <div className={s.cardHeader}>
-        <span className={s.cardTitle}>{title}</span>
-        {people != null && (
-          <span className={s.peopleBadge}>
-            {people} чел.
-          </span>
-        )}
+        <span className={s.cardTitle}>{zoneKey}</span>
+        {people > 0 && <span className={s.peopleBadge}>{people} чел.</span>}
       </div>
+      <div className={s.zoneSubLabel}>{label}</div>
 
-      <ProgressBar done={done} total={total} />
+      {rest != null && (
+        <StatRow label="Остаток" value={`${fmt(Math.round(rest))} ${restUnit ?? 'СЗ'}`} bold />
+      )}
+      {personHours != null && personHours > 0 && (
+        <StatRow label="Часов работы" value={personHours.toFixed(1)} />
+      )}
 
-      <div className={s.statsGrid}>
-        <StatRow label="Всего задач"  value={fmt(total)} />
-        <StatRow label="Выполнено"    value={fmt(done)}  />
-        <StatRow label="Остаток"      value={fmt(rest)}  bold />
-        <StatRow label="Готово"       value={pct + '%'}  />
+      <div className={s.zoneInputs}>
+        <label className={s.zoneInputField}>
+          <span className={s.zoneInputLabel}>Людей</span>
+          <input type="number" min="1" className={s.adjustInput}
+            placeholder="—" value={people || ''}
+            onChange={e => onPeople(e.target.value)} />
+        </label>
+        <label className={s.zoneInputField}>
+          <span className={s.zoneInputLabel}>СЗ/ч</span>
+          <input type="number" min="1" className={s.adjustInput}
+            placeholder={speedPlaceholder ?? '—'} value={speed || ''}
+            onChange={e => onSpeed(e.target.value)} />
+        </label>
       </div>
 
       {!loading && <ForecastBadge forecast={forecast} shiftEndTime={shiftEndTime} />}
-      {loading && <div className={s.forecastLoading}>Расчёт...</div>}
+      {!loading && !forecast && people > 0 && rest == null && personHours == null && (
+        <div className={s.forecastLoading}>Нет данных об остатке</div>
+      )}
+      {!loading && !people && (
+        <div className={s.forecastLoading}>Укажите кол-во людей</div>
+      )}
     </div>
   )
 }
@@ -179,25 +215,36 @@ function OperationCard({ title, data, people, forecast, shiftEndTime, loading })
 export default function AnalysisPage() {
   const { getToken, isTokenValid, forceRefresh } = useAuth()
 
-  const [date, setDate]               = useState(todayStr)
+  const [date, setDate]                 = useState(todayStr)
   const [shiftEndTime, setShiftEndTime] = useState('21:00')
-  const [loading, setLoading]         = useState(false)
-  const [error, setError]             = useState(null)
-  const [lastUpdated, setLastUpdated] = useState(null)
+  const [loading, setLoading]           = useState(false)
+  const [error, setError]               = useState(null)
+  const [lastUpdated, setLastUpdated]   = useState(null)
 
-  const [picking, setPicking]       = useState(null)  // { kdk, storage }
-  const [people, setPeople]         = useState(null)  // { kdk: N, storage: N }
+  const [picking,    setPicking]    = useState(null)
+  const [people,     setPeople]     = useState(null)
   const [hourlyRows, setHourlyRows] = useState(null)
+  const [overrides,  setOverrides]  = useState(loadOverrides)
 
+  const [speedsMap,        setSpeedsMap]        = useState(new Map())
+  const [pickFcast,        setPickFcast]        = useState(null)
+  const [loadingPickFcast, setLoadingPickFcast] = useState(false)
 
-  // Время конца смены как объект Date (сегодня)
+  function updateOverride(key, val) {
+    const next = { ...overrides }
+    if (val === '') { delete next[key] }
+    else { const n = Number(val); if (!isNaN(n) && n > 0) next[key] = n; else delete next[key] }
+    setOverrides(next)
+    saveOverrides(next)
+  }
+
   const shiftEnd = useMemo(() => {
     const [h, m] = shiftEndTime.split(':').map(Number)
-    const d = new Date()
-    d.setHours(h, m, 0, 0)
+    const d = new Date(); d.setHours(h, m, 0, 0)
     return d
   }, [shiftEndTime])
 
+  // ─── Основной fetch ────────────────────────────────────────────────────────
   const fetchAll = useCallback(async (dateStr) => {
     let token = getToken()
     if (!token || !isTokenValid()) {
@@ -205,8 +252,7 @@ export default function AnalysisPage() {
       if (!ok) { setError('Нет токена WMS. Войдите заново.'); return }
       token = getToken()
     }
-    setLoading(true)
-    setError(null)
+    setLoading(true); setError(null)
     try {
       const { from, to } = shiftWindow(dateStr)
       const [monData, liveData, summaryData] = await Promise.all([
@@ -214,19 +260,12 @@ export default function AnalysisPage() {
         api.getLiveMonitorViaBrowser(token).catch(() => null),
         api.getDateSummaryFull(dateStr),
       ])
-
-      // Задачи КДК / Хранение
       const parsed = parseMonitoringStats(monData)
       if (parsed) setPicking(parsed)
-
-      // Люди по операциям
       if (liveData) setPeople(parseLivePeople(liveData))
-
-      // Почасовые строки (бэкенд-час H → отображается как H+1:00)
       if (Array.isArray(summaryData?.hourly)) {
         const byHour = new Map()
         for (const h of summaryData.hourly) byHour.set(h.hour, h)
-
         const HOURS = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]
         const rows = HOURS.map(h => {
           const hd = byHour.get(h - 1)
@@ -243,33 +282,155 @@ export default function AnalysisPage() {
             avg:    empl > 0 ? Math.round(hd.ops / empl) : 0,
           }
         }).filter(Boolean)
-
         setHourlyRows(rows)
       }
-
       setLastUpdated(new Date())
-    } catch (e) {
-      setError(e.message)
-    } finally {
-      setLoading(false)
-    }
+    } catch (e) { setError(e.message) }
+    finally { setLoading(false) }
   }, [getToken, isTokenValid, forceRefresh])
 
   useEffect(() => { fetchAll(date) }, [date, fetchAll])
 
-  // Расчёты
-  const avgSpeed  = calcAvgSpeed(hourlyRows)
-  const kdkFcast  = picking && people?.kdk  != null && avgSpeed
-    ? calcForecast(picking.kdk.rest,     people.kdk,     avgSpeed, shiftEnd)
-    : null
-  const storFcast = picking && people?.storage != null && avgSpeed
-    ? calcForecast(picking.storage.rest, people.storage, avgSpeed, shiftEnd)
-    : null
+  // ─── Авто-загрузка скоростей артикулов ────────────────────────────────────
+  useEffect(() => {
+    const dateTo = date
+    const d = new Date(date); d.setDate(d.getDate() - 14)
+    const dateFrom = d.toISOString().slice(0, 10)
+    api.getArticleSpeeds({ dateFrom, dateTo, opType: 'PICK_BY_LINE' })
+      .then(res => setSpeedsMap(buildSpeedMap(res?.results)))
+      .catch(() => {})
+  }, [date])
 
+  // ─── Авто-загрузка данных комплектации ─────────────────────────────────────
+  useEffect(() => {
+    let cancelled = false
+    setPickFcast(null); setLoadingPickFcast(true)
+    async function run() {
+      try {
+        let token = getToken()
+        if (!token || !isTokenValid()) {
+          const ok = await forceRefresh(); if (!ok) return
+          token = getToken()
+        }
+        const res = await api.getInboundTasks(token, {
+          types: ['CROSSDOCK'],
+          statuses: ['COMPLETED_AS_PLANNED', 'COMPLETED_WITH_DISCREPANCY'],
+          completedDateFrom: mskFrom(date), completedDateTo: mskTo(date),
+          pageSize: 20,
+        })
+        const supplies = res?.value?.items ?? []
+        if (!supplies.length || cancelled) return
+
+        const details = await Promise.all(
+          supplies.map(sup => api.getInboundTaskDetail(token, { taskType: 'CROSSDOCK', id: sup.id }))
+        )
+        if (cancelled) return
+
+        const allProducts = []
+        const barcodes = []; const seenBar = new Set()
+        supplies.forEach((sup, i) => {
+          const zone     = TEMP_TO_ZONE[sup.temperatureMode] || 'KDS'
+          const products = details[i]?.value?.products ?? details[i]?.products ?? []
+          for (const prod of products) {
+            allProducts.push({ ...prod, zone, supplyNum: sup.taskNumber })
+            for (const part of (prod.parts ?? [])) {
+              for (const hu of (part.handlingUnits ?? [])) {
+                if (hu.handlingUnitBarcode && !seenBar.has(hu.handlingUnitBarcode)) {
+                  seenBar.add(hu.handlingUnitBarcode)
+                  barcodes.push(hu.handlingUnitBarcode)
+                }
+              }
+            }
+          }
+        })
+
+        const remainings = await Promise.all(barcodes.map(b => api.getEoRemaining(token, b)))
+        if (cancelled) return
+        const remMap = {}
+        barcodes.forEach((b, i) => { remMap[b] = remainings[i] })
+
+        const rows = allProducts.map(prod => {
+          const totalQty = pieceQty(prod.actualQuantity) || pieceQty(prod.plannedQuantity)
+          let remainingQty = 0
+          for (const part of (prod.parts ?? [])) {
+            for (const hu of (part.handlingUnits ?? [])) {
+              const rem = remMap[hu.handlingUnitBarcode]
+              remainingQty += (rem === null || rem === undefined) ? pieceQty(hu.actualQuantity) : rem
+            }
+          }
+          return {
+            id: prod.id, name: prod.name || '', code: prod.nomenclatureCode || '',
+            zone: prod.zone, supplyNum: prod.supplyNum,
+            totalQty, remainingQty: Math.max(0, remainingQty),
+          }
+        })
+
+        if (!cancelled) setPickFcast({ supplyCount: supplies.length, rows })
+      } catch { /* не критично */ }
+      finally { if (!cancelled) setLoadingPickFcast(false) }
+    }
+    run()
+    return () => { cancelled = true }
+  }, [date, getToken, isTokenValid, forceRefresh])
+
+  // ─── Расчёты ───────────────────────────────────────────────────────────────
+
+  const avgSpeed = calcAvgSpeed(hourlyRows)
+
+  // Получить значение из overrides или null
+  const ov = (key) => overrides[key] ?? null
+
+  // Данные комплектации по зонам (только KDS и KDH — из поставок)
+  const pickByZone = useMemo(() => {
+    if (!pickFcast) return {}
+    const result = {}
+    for (const z of ['KDS', 'KDH']) {
+      const rows = pickFcast.rows.filter(r => r.zone === z)
+      const remaining = rows.reduce((a, r) => a + r.remainingQty, 0)
+      const totalQty  = rows.reduce((a, r) => a + r.totalQty, 0)
+      const speedRows = rows.map(r => {
+        const record = speedsMap.get(`${r.code}:${r.zone}`)
+        const speed  = record?.qtyPerPersonHour || ov(`${z}_speed`) || null
+        const ph     = speed > 0 && r.remainingQty > 0 ? r.remainingQty / speed : null
+        return { ...r, speed, personHours: ph }
+      })
+      const personHours = speedRows.reduce((a, r) => a + (r.personHours ?? 0), 0)
+      result[z] = { remaining, totalQty, personHours, rows: speedRows }
+    }
+    return result
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pickFcast, speedsMap, overrides])
+
+  // Хранение: пропорциональный сплит SH/HH по людям
+  const storageRest = picking?.storage.rest ?? 0
+  const shPeople    = ov('SH_people') ?? 0
+  const hhPeople    = ov('HH_people') ?? 0
+  const storTotal   = shPeople + hhPeople
+  const shRest      = storTotal > 0 ? Math.round(storageRest * shPeople / storTotal) : (shPeople > 0 ? storageRest : null)
+  const hhRest      = storTotal > 0 ? storageRest - (shRest ?? 0) : (hhPeople > 0 ? storageRest : null)
+
+  // Итого задач
   const totTasks = (picking?.kdk.tasks ?? 0) + (picking?.storage.tasks ?? 0)
   const totDone  = (picking?.kdk.done  ?? 0) + (picking?.storage.done  ?? 0)
   const totRest  = (picking?.kdk.rest  ?? 0) + (picking?.storage.rest  ?? 0)
   const totPct   = totTasks > 0 ? Math.round(totDone / totTasks * 100) : 0
+
+  // Pick forecast таблица (для секции комплектации)
+  const pickFcastRows = useMemo(() => {
+    if (!pickFcast) return null
+    return pickFcast.rows
+      .map(r => {
+        const record = speedsMap.get(`${r.code}:${r.zone}`)
+        const speed  = record?.qtyPerPersonHour || ov(`${r.zone}_speed`) || null
+        const ph     = speed > 0 && r.remainingQty > 0 ? r.remainingQty / speed : null
+        return { ...r, speed, personHours: ph, fromFallback: !record && speed != null }
+      })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pickFcast, speedsMap, overrides])
+
+  const pickTotalRemaining = pickFcastRows?.reduce((a, r) => a + r.remainingQty, 0) ?? 0
+  const pickTotalQty       = pickFcastRows?.reduce((a, r) => a + r.totalQty, 0) ?? 0
+  const pickPct            = pickTotalQty > 0 ? Math.round((pickTotalQty - pickTotalRemaining) / pickTotalQty * 100) : 0
 
   return (
     <div className={s.page}>
@@ -280,75 +441,80 @@ export default function AnalysisPage() {
         <div className={s.controls}>
           <label className={s.field}>
             <span className={s.fieldLabel}>Дата</span>
-            <input
-              type="date"
-              value={date}
-              onChange={e => setDate(e.target.value)}
-              className={s.input}
-            />
+            <input type="date" value={date} onChange={e => setDate(e.target.value)} className={s.input} />
           </label>
           <label className={s.field}>
             <span className={s.fieldLabel}>Конец смены</span>
-            <input
-              type="time"
-              value={shiftEndTime}
-              onChange={e => setShiftEndTime(e.target.value)}
-              className={s.input}
-            />
+            <input type="time" value={shiftEndTime} onChange={e => setShiftEndTime(e.target.value)} className={s.input} />
           </label>
-          <button
-            className={s.refreshBtn}
-            onClick={() => fetchAll(date)}
-            disabled={loading}
-          >
+          <button className={s.refreshBtn} onClick={() => fetchAll(date)} disabled={loading}>
             <RefreshCw size={14} className={loading ? s.spinning : ''} />
             Обновить
           </button>
           {lastUpdated && !loading && (
-            <span className={s.updatedAt}>
-              Обновлено в {fmtTime(lastUpdated)}
-            </span>
+            <span className={s.updatedAt}>Обновлено в {fmtTime(lastUpdated)}</span>
+          )}
+          {avgSpeed != null && (
+            <span className={s.autoSpeed}>Авто скорость: <strong>{avgSpeed} СЗ/чел/час</strong></span>
           )}
         </div>
       </div>
 
       {error && <div className={s.error}>{error}</div>}
 
-      {/* ── Speed / people info ── */}
-      {avgSpeed != null && (
-        <div className={s.speedBar}>
-          <span>Средняя скорость (последние 3 часа):</span>
-          <strong>{avgSpeed} СЗ / чел / час</strong>
-          {people != null && (
-            <>
-              <span className={s.speedSep}>·</span>
-              <span>КДК: <strong>{people.kdk} чел</strong></span>
-              <span className={s.speedSep}>·</span>
-              <span>Хранение: <strong>{people.storage} чел</strong></span>
-            </>
-          )}
-        </div>
-      )}
+      {/* ── Зональные карточки ── */}
+      <div className={s.zoneCards}>
 
-      {/* ── Operation cards ── */}
-      <div className={s.cards}>
-
-        <OperationCard
-          title="Кроссдокинг"
-          data={picking?.kdk}
-          people={people?.kdk}
-          forecast={kdkFcast}
-          shiftEndTime={shiftEndTime}
-          loading={loading}
+        <ZoneCard
+          zoneKey="KDS" label="Сухой КДК"
+          rest={pickByZone.KDS?.remaining}
+          restUnit="ед."
+          personHours={pickByZone.KDS?.personHours || null}
+          people={ov('KDS_people') ?? (loadingPickFcast ? null : null)}
+          speed={ov('KDS_speed')}
+          speedPlaceholder={avgSpeed}
+          shiftEnd={shiftEnd} shiftEndTime={shiftEndTime} loading={loading || loadingPickFcast}
+          onPeople={v => updateOverride('KDS_people', v)}
+          onSpeed={v  => updateOverride('KDS_speed', v)}
         />
 
-        <OperationCard
-          title="Хранение"
-          data={picking?.storage}
-          people={people?.storage}
-          forecast={storFcast}
-          shiftEndTime={shiftEndTime}
-          loading={loading}
+        <ZoneCard
+          zoneKey="KDH" label="Холодный КДК"
+          rest={pickByZone.KDH?.remaining}
+          restUnit="ед."
+          personHours={pickByZone.KDH?.personHours || null}
+          people={ov('KDH_people')}
+          speed={ov('KDH_speed')}
+          speedPlaceholder={avgSpeed}
+          shiftEnd={shiftEnd} shiftEndTime={shiftEndTime} loading={loading || loadingPickFcast}
+          onPeople={v => updateOverride('KDH_people', v)}
+          onSpeed={v  => updateOverride('KDH_speed', v)}
+        />
+
+        <ZoneCard
+          zoneKey="SH" label="Сухое хранение"
+          rest={shRest}
+          restUnit="СЗ"
+          personHours={null}
+          people={ov('SH_people')}
+          speed={ov('SH_speed')}
+          speedPlaceholder={avgSpeed}
+          shiftEnd={shiftEnd} shiftEndTime={shiftEndTime} loading={loading}
+          onPeople={v => updateOverride('SH_people', v)}
+          onSpeed={v  => updateOverride('SH_speed', v)}
+        />
+
+        <ZoneCard
+          zoneKey="HH" label="Холодное хранение"
+          rest={hhRest}
+          restUnit="СЗ"
+          personHours={null}
+          people={ov('HH_people')}
+          speed={ov('HH_speed')}
+          speedPlaceholder={avgSpeed}
+          shiftEnd={shiftEnd} shiftEndTime={shiftEndTime} loading={loading}
+          onPeople={v => updateOverride('HH_people', v)}
+          onSpeed={v  => updateOverride('HH_speed', v)}
         />
 
         {/* Итого */}
@@ -366,6 +532,67 @@ export default function AnalysisPage() {
         </div>
 
       </div>
+
+      {/* ── Прогноз комплектации КДК ── */}
+      {(loadingPickFcast || pickFcast) && (
+        <div className={s.section}>
+          <div className={s.sectionTitle}>
+            Комплектация КДК
+            {pickFcast && (
+              <span className={s.pickMeta}>
+                · {pickFcast.supplyCount} {pickFcast.supplyCount === 1 ? 'поставка' : pickFcast.supplyCount < 5 ? 'поставки' : 'поставок'}
+                · {pickPct}% скомплектовано
+              </span>
+            )}
+          </div>
+
+          {loadingPickFcast && !pickFcast && (
+            <div className={s.pickLoading}>
+              <RefreshCw size={13} className={s.spinning} /> Загрузка данных комплектации...
+            </div>
+          )}
+
+          {pickFcastRows && (
+            <div className={s.tableWrap}>
+              <table className={s.table}>
+                <thead>
+                  <tr>
+                    <th className={s.th}>Зона</th>
+                    <th className={s.th}>Артикул</th>
+                    <th className={s.th}>Название</th>
+                    <th className={`${s.th} ${s.thR}`}>Принято</th>
+                    <th className={`${s.th} ${s.thR}`}>Осталось</th>
+                    <th className={`${s.th} ${s.thR}`}>Скорость</th>
+                    <th className={`${s.th} ${s.thR}`}>Часов работы</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pickFcastRows
+                    .filter(r => r.remainingQty > 0)
+                    .sort((a, b) => (b.personHours ?? 0) - (a.personHours ?? 0))
+                    .map(row => (
+                      <tr key={row.id} className={s.tr}>
+                        <td className={s.td}>
+                          <span className={s.zoneBadge}>{row.zone}</span>
+                        </td>
+                        <td className={s.td}>{row.code || '—'}</td>
+                        <td className={s.td}>{row.name || '—'}</td>
+                        <td className={s.tdNum}>{fmt(row.totalQty)}</td>
+                        <td className={s.tdNum}><strong>{fmt(Math.round(row.remainingQty))}</strong></td>
+                        <td className={s.tdNum}>
+                          {row.speed != null
+                            ? <span className={row.fromFallback ? s.speedFallback : ''}>{row.speed}</span>
+                            : <span className={s.pickNoSpeed}>—</span>}
+                        </td>
+                        <td className={s.tdNum}>{row.personHours != null ? row.personHours.toFixed(2) : '—'}</td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── Hourly table ── */}
       {hourlyRows && hourlyRows.length > 0 && (
@@ -386,8 +613,8 @@ export default function AnalysisPage() {
               </thead>
               <tbody>
                 {hourlyRows.map((row, i) => {
-                  const prev    = hourlyRows[i - 1]
-                  const trend   = prev && prev.avg > 0 && row.avg > 0
+                  const prev     = hourlyRows[i - 1]
+                  const trend    = prev && prev.avg > 0 && row.avg > 0
                     ? row.avg > prev.avg ? '↑' : row.avg < prev.avg ? '↓' : '→'
                     : ''
                   const trendCls = trend === '↑' ? s.trendUp : trend === '↓' ? s.trendDown : s.trendFlat
@@ -412,7 +639,6 @@ export default function AnalysisPage() {
         </div>
       )}
 
-      {/* Пустое состояние */}
       {!loading && !picking && !error && (
         <div className={s.empty}>Нет данных за выбранную дату</div>
       )}

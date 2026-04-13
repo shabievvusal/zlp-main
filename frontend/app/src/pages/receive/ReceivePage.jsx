@@ -272,11 +272,11 @@ function StepData({ opType, route, onDone, byName }) {
         <>
           <div className={s.field}>
             <label>Температура ДО отгрузки (°C)</label>
-            <input className={s.inp} type="number" placeholder="-18" inputMode="decimal" value={tempBefore} onChange={e => setTempBefore(e.target.value)} />
+            <input className={s.inp} type="text" placeholder="-18" value={tempBefore} onChange={e => setTempBefore(e.target.value)} />
           </div>
           <div className={s.field}>
             <label>Температура ПОСЛЕ отгрузки (°C)</label>
-            <input className={s.inp} type="number" placeholder="-18" inputMode="decimal" value={tempAfter} onChange={e => setTempAfter(e.target.value)} />
+            <input className={s.inp} type="text" placeholder="-18" value={tempAfter} onChange={e => setTempAfter(e.target.value)} />
           </div>
         </>
       )}

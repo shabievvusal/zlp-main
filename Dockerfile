@@ -29,6 +29,9 @@ RUN dotnet publish SaveFetchedData/SaveFetchedData.csproj \
         --self-contained false && \
     dotnet publish WeightScan/WeightScan.csproj \
         -c Release -o /out/WeightScan \
+        --self-contained false && \
+    dotnet publish ArticleSpeeds/ArticleSpeeds.csproj \
+        -c Release -o /out/ArticleSpeeds \
         --self-contained false
 
 
@@ -83,6 +86,7 @@ COPY --from=frontend-builder /build/dist ./frontend/app/dist/
 COPY --from=dotnet-builder /out/SaveFetchedData      ./tools/SaveFetchedData/bin/Release/net9.0/
 COPY --from=dotnet-builder /out/MissingWeightRebuild ./tools/MissingWeightRebuild/bin/Release/net9.0/
 COPY --from=dotnet-builder /out/WeightScan           ./tools/WeightScan/bin/Release/net9.0/
+COPY --from=dotnet-builder /out/ArticleSpeeds        ./tools/ArticleSpeeds/bin/Release/net9.0/
 
 
 # ───────────────────────────────────────────────────────────────

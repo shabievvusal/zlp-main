@@ -230,7 +230,7 @@ function withTotals(route) {
 
 // ─── Запросы ──────────────────────────────────────────────────────────────────
 
-function getRoutes({ q, dateFrom, dateTo, status } = {}) {
+function getRoutes({ q, dateFrom, dateTo, receivedDateFrom, receivedDateTo, status } = {}) {
   const data = load();
   let routes = Object.values(data).map(withTotals);
 
@@ -240,6 +240,17 @@ function getRoutes({ q, dateFrom, dateTo, status } = {}) {
 
   if (dateFrom) routes = routes.filter(r => r.date >= dateFrom);
   if (dateTo)   routes = routes.filter(r => r.date <= dateTo);
+
+  // Фильтр по дате приёмки (МСК) — маршрут может быть от вчера, принят сегодня
+  if (receivedDateFrom || receivedDateTo) {
+    routes = routes.filter(r => {
+      if (!r.receiving?.at) return false;
+      const mskDate = new Date(new Date(r.receiving.at).getTime() + 3 * 3600 * 1000).toISOString().slice(0, 10);
+      if (receivedDateFrom && mskDate < receivedDateFrom) return false;
+      if (receivedDateTo   && mskDate > receivedDateTo)   return false;
+      return true;
+    });
+  }
 
   if (q) {
     const ql = q.toLowerCase();

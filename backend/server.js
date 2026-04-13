@@ -740,6 +740,14 @@ function getDotnetSaveFetchedCmd() {
   return null;
 }
 
+function getDotnetArticleSpeedsCmd() {
+  const toolDll = path.join(__dirname, '..', 'tools', 'ArticleSpeeds', 'bin', 'Release', 'net9.0', 'ArticleSpeeds.dll');
+  if (fs.existsSync(toolDll)) return { exe: 'dotnet', args: [toolDll] };
+  const toolProj = path.join(__dirname, '..', 'tools', 'ArticleSpeeds', 'ArticleSpeeds.csproj');
+  if (fs.existsSync(toolProj)) return { exe: 'dotnet', args: ['run', '--project', toolProj, '--'] };
+  return null;
+}
+
 function readEmplCsvText() {
   const buf = fs.readFileSync(EMPL_CSV_PATH);
   // UTF-8 BOM (EF BB BF) — сохранено через /api/employees
@@ -1712,6 +1720,28 @@ app.get('/api/analysis/employee-rates', vsSessionOptional, (req, res) => {
   }
 });
 
+// GET /api/analysis/article-speeds?dateFrom=YYYY-MM-DD&dateTo=YYYY-MM-DD[&opType=PICK_BY_LINE|PIECE_SELECTION_PICKING][&zone=KDS|KDH|SH|HH]
+app.get('/api/analysis/article-speeds', vsSessionOptional, async (req, res) => {
+  try {
+    const dateFrom = String(req.query.dateFrom || '').slice(0, 10);
+    const dateTo   = String(req.query.dateTo   || '').slice(0, 10);
+    if (!dateFrom || !dateTo) return res.status(400).json({ error: 'Нужны dateFrom и dateTo' });
+
+    const cmd = getDotnetArticleSpeedsCmd();
+    if (!cmd) return res.status(500).json({ error: 'ArticleSpeeds tool не найден' });
+
+    const cmdArgs = [...cmd.args, '--data-dir', DATA_DIR, '--date-from', dateFrom, '--date-to', dateTo];
+    if (req.query.opType) cmdArgs.push('--op-type', String(req.query.opType));
+    if (req.query.zone)   cmdArgs.push('--zone',    String(req.query.zone));
+
+    const { stdout } = await execFileAsync(cmd.exe, cmdArgs, { maxBuffer: 32 * 1024 * 1024 });
+    const result = JSON.parse(stdout);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/api/shifts/current', (req, res) => {
   res.json({ shiftKey: storage.getCurrentShiftKey() });
 });
@@ -2519,11 +2549,11 @@ app.delete('/api/rk/routes', vsSessionRequired, (req, res) => {
 
 // ─── Отгрузка РК (маршрутная модель) ─────────────────────────────────────────
 
-// GET /api/rk/routes?q=&dateFrom=&dateTo=&status=
+// GET /api/rk/routes?q=&dateFrom=&dateTo=&receivedDateFrom=&receivedDateTo=&status=
 app.get('/api/rk/routes', vsSessionRequired, (req, res) => {
   try {
-    const { q, dateFrom, dateTo, status } = req.query;
-    res.json(rkStorage.getRoutes({ q, dateFrom, dateTo, status }));
+    const { q, dateFrom, dateTo, receivedDateFrom, receivedDateTo, status } = req.query;
+    res.json(rkStorage.getRoutes({ q, dateFrom, dateTo, receivedDateFrom, receivedDateTo, status }));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

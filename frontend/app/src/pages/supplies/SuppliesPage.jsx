@@ -135,17 +135,19 @@ function todayLocalDate() {
 }
 
 function dateToApiFrom(d) {
+  // 00:00 МСК (UTC+3) = 21:00 UTC предыдущего дня
   const y   = d.getFullYear()
   const m   = String(d.getMonth() + 1).padStart(2, '0')
   const day = String(d.getDate()).padStart(2, '0')
-  return `${y}-${m}-${day}T00:00:00.000Z`
+  return new Date(`${y}-${m}-${day}T00:00:00+03:00`).toISOString()
 }
 
 function dateToApiTo(d) {
+  // 23:59:59.999 МСК (UTC+3) = 20:59:59.999 UTC
   const y   = d.getFullYear()
   const m   = String(d.getMonth() + 1).padStart(2, '0')
   const day = String(d.getDate()).padStart(2, '0')
-  return `${y}-${m}-${day}T23:59:59.999Z`
+  return new Date(`${y}-${m}-${day}T23:59:59.999+03:00`).toISOString()
 }
 
 function todayPlannedRange() {
