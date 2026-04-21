@@ -61,6 +61,12 @@ export default function TvPage() {
   const slideTotalRef  = useRef(MIN_SLIDE_SEC)
   const refreshRef     = useRef(null)
   const violationTimerRef = useRef(null)
+  const typewriterRef    = useRef(null)
+  const damageRafRef     = useRef(null)
+
+  const [typewriterText,    setTypewriterText]    = useState('')
+  const [typewriterDone,    setTypewriterDone]    = useState(false)
+  const [damageDisplay,     setDamageDisplay]     = useState(0)
 
   // ── Enrich FIO ─────────────────────────────────────────────────────────────
   const enrich = (name) => {
@@ -144,6 +150,52 @@ export default function TvPage() {
   useEffect(() => {
     getViolations().then(setViolations).catch(() => {})
   }, [])
+
+  // ── Текстовые эффекты для слайда нарушений ──────────────────────────────────
+  useEffect(() => {
+    clearInterval(typewriterRef.current)
+    cancelAnimationFrame(damageRafRef.current)
+
+    if (TABS[tabIdx]?.id !== 'violations') return
+
+    const v = violations[violationIdx]
+    if (!v) return
+
+    setTypewriterText('')
+    setTypewriterDone(false)
+    setDamageDisplay(0)
+
+    // Печатная машинка
+    const title = v.title || ''
+    let charIdx = 0
+    typewriterRef.current = setInterval(() => {
+      charIdx++
+      setTypewriterText(title.slice(0, charIdx))
+      if (charIdx >= title.length) {
+        clearInterval(typewriterRef.current)
+        setTypewriterDone(true)
+      }
+    }, 55)
+
+    // Счётчик ущерба 0 → target за 1.5с (ease-out cubic)
+    if (v.damage != null) {
+      const target = Number(v.damage)
+      const start  = performance.now()
+      const dur    = 3000
+      const step   = (ts) => {
+        const p = Math.min((ts - start) / dur, 1)
+        const eased = 1 - Math.pow(1 - p, 3)
+        setDamageDisplay(Math.round(eased * target))
+        if (p < 1) damageRafRef.current = requestAnimationFrame(step)
+      }
+      damageRafRef.current = requestAnimationFrame(step)
+    }
+
+    return () => {
+      clearInterval(typewriterRef.current)
+      cancelAnimationFrame(damageRafRef.current)
+    }
+  }, [tabIdx, violationIdx, violations])
 
   // ── Предварительный замер ширины всех слайдов ───────────────────────────────
   // Запускается когда приходят новые данные. Рендеринг происходит в скрытом слое.
@@ -451,7 +503,7 @@ export default function TvPage() {
               : (() => {
                   const v = violations[violationIdx] || violations[0]
                   return (
-                    <div className={s.violationSlide}>
+                    <div key={violationIdx} className={s.violationSlide}>
                       <div className={s.violationVideoWrap}>
                         <video
                           key={v.id}
@@ -464,11 +516,15 @@ export default function TvPage() {
                         />
                       </div>
                       <div className={s.violationInfo}>
-                        <div className={s.violationTitle}>{v.title}</div>
+                        <div className={s.violationTitle}>
+                          <span className={s.violationWarningIcon}>⚠</span>
+                          {typewriterText}
+                          {!typewriterDone && <span className={s.cursor} />}
+                        </div>
                         <div className={s.violationRight}>
                           {v.damage != null && (
                             <div className={s.violationDamage}>
-                              {Number(v.damage).toLocaleString('ru-RU')} ₽
+                              {damageDisplay.toLocaleString('ru-RU')} ₽
                             </div>
                           )}
                           {violations.length > 1 && (

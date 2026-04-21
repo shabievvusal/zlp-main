@@ -221,6 +221,21 @@
   object-fit: contain;
 }
 
+@keyframes slideUpPanel {
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+@keyframes warningFlash {
+  0%, 100% { opacity: 1;   color: #ffcc00; }
+  50%       { opacity: 0.2; color: #ff6b6b; }
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0; }
+}
+
 .violationInfo {
   flex-shrink: 0;
   padding: 20px 32px 24px;
@@ -229,6 +244,26 @@
   align-items: center;
   justify-content: space-between;
   gap: 24px;
+  animation: slideUpPanel 0.55s cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+
+.violationWarningIcon {
+  display: inline-block;
+  margin-right: 12px;
+  font-size: 28px;
+  vertical-align: middle;
+  animation: warningFlash 0.9s ease-in-out infinite;
+}
+
+.cursor {
+  display: inline-block;
+  width: 3px;
+  height: 1.1em;
+  background: #fff;
+  margin-left: 3px;
+  vertical-align: text-bottom;
+  border-radius: 1px;
+  animation: blink 0.8s step-start infinite;
 }
 
 .violationTitle {
