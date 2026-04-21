@@ -12,6 +12,8 @@ services:
       - node-persist:/app/persist
       - /var/run/docker.sock:/var/run/docker.sock
       - .:/app/host-project
+      - ./backend/server.js:/app/backend/server.js
+      - ./backend/vs-auth.js:/app/backend/vs-auth.js
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:'+process.env.PORT+'/api/status', r => process.exit(r.statusCode===200?0:1))"]
       interval: 30s

@@ -1014,3 +1014,18 @@ export async function getEoRemaining(token, sourceHandlingUnitBarcode) {
   // Последняя запись — текущий остаток в ЕО
   return data?.value?.items?.[0]?.sourceQuantity?.newQuantity ?? null
 }
+
+
+// ─── Нарушения ───────────────────────────────────────────────────────────────
+
+export async function getViolations() {
+  return req('/api/violations')
+}
+
+export async function createViolation(formData) {
+  return req('/api/violations', { method: 'POST', body: formData })
+}
+
+export async function deleteViolation(id) {
+  return req(`/api/violations/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}

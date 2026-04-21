@@ -15,6 +15,10 @@ export default defineConfig({
         target: `http://127.0.0.1:${process.env.PORT || 3000}`,
         changeOrigin: true,
       },
+      '/violation-videos': {
+        target: `http://127.0.0.1:${process.env.PORT || 3000}`,
+        changeOrigin: true,
+      },
     },
   },
 })

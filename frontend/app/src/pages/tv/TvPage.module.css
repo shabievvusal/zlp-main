@@ -137,8 +137,8 @@
 /* ── Body ─────────────────────────────────────────────── */
 .body {
   flex: 1;
-  overflow-y: auto;
-  overflow-x: auto;
+  overflow: hidden;
+  position: relative; /* нужен чтобы клонированные thead позиционировались внутри */
 }
 
 /* ── Content wrapper для ТВ ──────────────────────────── */
@@ -168,12 +168,14 @@
   overflow: visible !important;
 }
 
-.body :global(thead th) {
-  position: sticky;
-  top: 0;
+.body :global(thead) {
+  position: relative;
   z-index: 5;
+}
+
+.body :global(thead th) {
   background: var(--bg-card);
-  box-shadow: 0 1px 0 var(--border);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.06);
 }
 
 
@@ -187,4 +189,83 @@
   text-align: center;
   color: var(--text-muted);
   font-size: 16px;
+}
+
+/* ── Violation slide ─────────────────────────────────── */
+.violationSlide {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: calc(100dvh - 60px - 24px); /* 60px header, 24px zoom padding */
+  background: #111;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.violationVideoWrap {
+  flex: 1;
+  min-height: 0;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.violationVideo {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  display: block;
+  object-fit: contain;
+}
+
+.violationInfo {
+  flex-shrink: 0;
+  padding: 20px 32px 24px;
+  background: #1a1a1a;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.violationTitle {
+  font-size: 26px;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.3;
+}
+
+.violationRight {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.violationDamage {
+  font-size: 28px;
+  font-weight: 800;
+  color: #ff6b6b;
+  white-space: nowrap;
+}
+
+.violationDots {
+  display: flex;
+  gap: 6px;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.25);
+  transition: background 0.3s;
+}
+
+.dotActive {
+  background: #fff;
 }

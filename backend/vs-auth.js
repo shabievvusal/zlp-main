@@ -16,16 +16,16 @@ const VS_SESSIONS_PATH = path.join(__dirname, 'data', 'vs-sessions.json');
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 дней (скользящий — сбрасывается при каждом запросе)
 const BIND_CODE_TTL_MS = 5 * 60 * 1000; // 5 мин
 
-/** Модули интерфейса: stats, data, monitor, analysis, consolidation, docs, settings, shipments, receive, consolidation_form, reports, supplies */
+/** Модули интерфейса: stats, data, monitor, analysis, consolidation, docs, settings, shipments, receive, consolidation_form, reports, supplies, violations */
 const MODULES_BY_ROLE = {
-  admin: ['stats', 'data', 'monitor', 'analysis', 'consolidation', 'docs', 'settings', 'shipments', 'receive', 'consolidation_form', 'reports', 'supplies'],
+  admin: ['stats', 'data', 'monitor', 'analysis', 'consolidation', 'docs', 'settings', 'shipments', 'receive', 'consolidation_form', 'reports', 'supplies', 'violations'],
   group_leader: ['stats', 'data', 'monitor', 'analysis', 'consolidation', 'docs', 'settings', 'shipments', 'receive', 'consolidation_form', 'reports'],
   supervisor: ['stats', 'data', 'monitor', 'analysis', 'docs', 'shipments', 'reports'],
   manager: ['stats', 'data', 'monitor', 'analysis', 'docs', 'shipments', 'reports'],
-  developer: ['stats', 'data', 'monitor', 'analysis', 'consolidation', 'docs', 'settings', 'shipments', 'receive', 'consolidation_form', 'reports', 'supplies'],
+  developer: ['stats', 'data', 'monitor', 'analysis', 'consolidation', 'docs', 'settings', 'shipments', 'receive', 'consolidation_form', 'reports', 'supplies', 'violations'],
 };
 
-const ALL_MODULES = ['stats', 'data', 'monitor', 'analysis', 'consolidation', 'docs', 'settings', 'shipments', 'receive', 'consolidation_form', 'reports', 'supplies'];
+const ALL_MODULES = ['stats', 'data', 'monitor', 'analysis', 'consolidation', 'docs', 'settings', 'shipments', 'receive', 'consolidation_form', 'reports', 'supplies', 'violations'];
 
 /** Действия — управляются отдельно от модулей */
 const ALL_ACTIONS = ['fetch_data', 'recheck_data', 'request_fetch', 'edit_thresholds'];

@@ -10,6 +10,7 @@ import {
 import { normalizeFio, personKey } from '../../utils/emplUtils.js'
 import CompanySummaryTable from '../stats/CompanySummaryTable.jsx'
 import HourlyEmployeeTable from '../stats/HourlyEmployeeTable.jsx'
+import { getViolations } from '../../api/index.js'
 import s from './TvPage.module.css'
 
 const REFRESH_SEC   = 180  // 3 минуты до обновления данных
@@ -18,9 +19,10 @@ const PAUSE_SEC     = 5    // пауза внизу перед сменой сл
 const MIN_SLIDE_SEC = 12   // минимум если контент без скролла
 
 const TABS = [
-  { id: 'summary',  label: 'Сводка по компаниям' },
-  { id: 'stats',    label: 'По СЗ' },
-  { id: 'idles',    label: 'Простои' },
+  { id: 'summary',    label: 'Сводка по компаниям' },
+  { id: 'stats',      label: 'По СЗ' },
+  { id: 'idles',      label: 'Простои' },
+  { id: 'violations', label: 'Нарушения' },
 ]
 
 function useClock() {
@@ -40,22 +42,25 @@ export default function TvPage() {
     loading, status,
   } = useApp()
 
-  const [tabIdx, setTabIdx]       = useState(0)
-  const [slideLeft, setSlideLeft] = useState(MIN_SLIDE_SEC)
-  const [refresh, setRefresh]     = useState(REFRESH_SEC)
+  const [tabIdx, setTabIdx]           = useState(0)
+  const [slideLeft, setSlideLeft]     = useState(MIN_SLIDE_SEC)
+  const [refresh, setRefresh]         = useState(REFRESH_SEC)
+  const [violations, setViolations]   = useState([])
+  const [violationIdx, setViolationIdx] = useState(0)
   const now = useClock()
 
   const bodyRef        = useRef(null)
   const zoomRef        = useRef(null)
   const measureRefs    = useRef({ summary: null, stats: null, idles: null })
-  const zoomMapRef     = useRef({})          // предрасчитанный zoom для каждого таба
-  const needsRefreshRef = useRef(false)      // флаг: 3 минуты истекли, ждём конца цикла
-  const scrollRafRef   = useRef(null)
-  const scrollStartRef = useRef(null)
+  const zoomMapRef     = useRef({})
+  const needsRefreshRef = useRef(false)
+  const scrollAnimRef  = useRef(null)
+  const headClonesRef  = useRef([])
   const slideTimerRef  = useRef(null)
   const slideCountRef  = useRef(null)
   const slideTotalRef  = useRef(MIN_SLIDE_SEC)
   const refreshRef     = useRef(null)
+  const violationTimerRef = useRef(null)
 
   // ── Enrich FIO ─────────────────────────────────────────────────────────────
   const enrich = (name) => {
@@ -135,6 +140,11 @@ export default function TvPage() {
     return result
   }, [isSummaryOnly, dateSummary, items])
 
+  // ── Загрузка нарушений ──────────────────────────────────────────────────────
+  useEffect(() => {
+    getViolations().then(setViolations).catch(() => {})
+  }, [])
+
   // ── Предварительный замер ширины всех слайдов ───────────────────────────────
   // Запускается когда приходят новые данные. Рендеринг происходит в скрытом слое.
   useEffect(() => {
@@ -159,58 +169,145 @@ export default function TvPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companySummary, heDataAll])
 
-  // ── Применить предрасчитанный zoom мгновенно при смене вкладки ─────────────
+  // ── Применить zoom + плавный fade-in при смене вкладки ────────────────────
   useLayoutEffect(() => {
-    if (!zoomRef.current) return
-    const scale = zoomMapRef.current[TABS[tabIdx].id] ?? 1
-    zoomRef.current.style.zoom = String(scale)
+    const zoomEl = zoomRef.current
+    if (!zoomEl) return
+    // Вкладка нарушений — полноэкранное видео, zoom не нужен
+    const scale = TABS[tabIdx].id === 'violations' ? 1 : (zoomMapRef.current[TABS[tabIdx].id] ?? 1)
+    zoomEl.style.zoom = String(scale)
+    // Плавное появление нового слайда (WAAPI opacity — GPU, не блокирует поток)
+    zoomEl.animate(
+      [{ opacity: 0 }, { opacity: 1 }],
+      { duration: 300, easing: 'cubic-bezier(0.23, 1, 0.32, 1)', fill: 'forwards' }
+    )
   }, [tabIdx])
 
   // ── Слайдшоу: скролл + таймер слайда ───────────────────────────────────────
   useEffect(() => {
-    const el = bodyRef.current
-    if (el) el.scrollTop = 0
-
-    if (scrollRafRef.current)  cancelAnimationFrame(scrollRafRef.current)
+    scrollAnimRef.current?.cancel()
+    scrollAnimRef.current = null
+    headClonesRef.current.forEach(({ wrapper, thead }) => {
+      wrapper.parentNode?.removeChild(wrapper)
+      thead.style.visibility = ''
+    })
+    headClonesRef.current = []
     clearTimeout(slideTimerRef.current)
     clearInterval(slideCountRef.current)
-    scrollStartRef.current = null
+    clearTimeout(violationTimerRef.current)
+    setViolationIdx(0)
 
     const initTimer = setTimeout(() => {
-      const el = bodyRef.current
-      if (!el) return
+      const bodyEl = bodyRef.current
+      const zoomEl = zoomRef.current
+      if (!bodyEl || !zoomEl) return
 
-      const maxScroll = el.scrollHeight - el.clientHeight
-      const scrollDuration = maxScroll > 0 ? maxScroll / SCROLL_PPS : 0
+      const isViolationsTab = TABS[tabIdx]?.id === 'violations'
+
+      if (isViolationsTab) {
+        const advanceViolation = () => {
+          if (violationIdx < violations.length - 1) {
+            setViolationIdx(i => i + 1)
+          } else {
+            setViolationIdx(0)
+            setTabIdx(i => {
+              const next = (i + 1) % TABS.length
+              if (next === 0 && needsRefreshRef.current) { window.location.reload(); return i }
+              return next
+            })
+          }
+        }
+
+        const startViolationTimer = (dur) => {
+          const total = Math.max(isFinite(dur) && dur > 0 ? dur : MIN_SLIDE_SEC, MIN_SLIDE_SEC)
+          slideTotalRef.current = total
+          setSlideLeft(Math.ceil(total))
+          clearInterval(slideCountRef.current)
+          slideCountRef.current = setInterval(() => {
+            setSlideLeft(s => Math.max(0, s - 1))
+          }, 1000)
+          clearTimeout(slideTimerRef.current)
+          slideTimerRef.current = setTimeout(advanceViolation, total * 1000)
+        }
+
+        // Ждём метаданные видео — поллим каждые 100 мс, максимум 5 с
+        let pollCount = 0
+        const pollDuration = () => {
+          const videoEl = zoomEl.querySelector('video')
+          const dur = videoEl?.duration
+          if (isFinite(dur) && dur > 0) {
+            startViolationTimer(dur)
+          } else if (pollCount++ < 50) {
+            violationTimerRef.current = setTimeout(pollDuration, 100)
+          } else {
+            startViolationTimer(MIN_SLIDE_SEC)
+          }
+        }
+        violationTimerRef.current = setTimeout(pollDuration, 200)
+        return
+      }
+
+      const contentH   = zoomEl.getBoundingClientRect().height
+      const containerH = bodyEl.clientHeight
+      const distance   = Math.max(0, contentH - containerH)
+
+      const scrollDuration = distance > 0 ? distance / SCROLL_PPS : 0
       const total = Math.max(MIN_SLIDE_SEC, scrollDuration + PAUSE_SEC)
 
       slideTotalRef.current = total
       setSlideLeft(Math.ceil(total))
-
       slideCountRef.current = setInterval(() => {
         setSlideLeft(s => Math.max(0, s - 1))
       }, 1000)
 
-      if (maxScroll > 0) {
-        const animate = ts => {
-          if (!scrollStartRef.current) scrollStartRef.current = ts
-          const elapsed = (ts - scrollStartRef.current) / 1000
-          const progress = Math.min(elapsed / scrollDuration, 1)
-          const el = bodyRef.current
-          if (el) el.scrollTop = progress * maxScroll
-          if (progress < 1) scrollRafRef.current = requestAnimationFrame(animate)
-        }
-        scrollRafRef.current = requestAnimationFrame(animate)
+      if (distance > 0) {
+        const bodyRect = bodyEl.getBoundingClientRect()
+        const zoom = parseFloat(zoomEl.style.zoom) || 1
+
+        zoomEl.querySelectorAll('table').forEach(table => {
+          const thead = table.querySelector('thead')
+          if (!thead) return
+
+          const tableRect = table.getBoundingClientRect()
+          const leftOffset = tableRect.left - bodyRect.left
+
+          const wrapper = document.createElement('div')
+          wrapper.style.cssText = `position:absolute;top:0;left:${leftOffset}px;width:${tableRect.width}px;z-index:10;overflow:hidden;pointer-events:none`
+
+          const cloneTable = document.createElement('table')
+          cloneTable.className = table.className
+          cloneTable.style.zoom = String(zoom)
+          cloneTable.style.width = `${tableRect.width / zoom}px`
+          cloneTable.style.tableLayout = 'fixed'
+
+          const clonedThead = thead.cloneNode(true)
+          Array.from(thead.querySelectorAll('th')).forEach((th, i) => {
+            const cloneTh = clonedThead.querySelectorAll('th')[i]
+            if (!cloneTh) return
+            const w = Math.round(th.getBoundingClientRect().width / zoom)
+            cloneTh.style.width = `${w}px`
+            cloneTh.style.minWidth = `${w}px`
+            cloneTh.style.maxWidth = `${w}px`
+          })
+
+          cloneTable.appendChild(clonedThead)
+          wrapper.appendChild(cloneTable)
+          bodyEl.appendChild(wrapper)
+
+          thead.style.visibility = 'hidden'
+          headClonesRef.current.push({ wrapper, thead })
+        })
+
+        scrollAnimRef.current = zoomEl.animate(
+          [{ transform: 'translateY(0px)' }, { transform: `translateY(-${distance}px)` }],
+          { duration: scrollDuration * 1000, easing: 'linear', fill: 'forwards' }
+        )
       }
 
       slideTimerRef.current = setTimeout(() => {
         setTabIdx(i => {
           const next = (i + 1) % TABS.length
-          // Обновляем данные только когда цикл завершён (вернулись к первому слайду)
-          if (next === 0 && needsRefreshRef.current) {
-            window.location.reload()
-            return i
-          }
+          if (next === 0 && needsRefreshRef.current) { window.location.reload(); return i }
           return next
         })
       }, total * 1000)
@@ -220,9 +317,15 @@ export default function TvPage() {
       clearTimeout(initTimer)
       clearTimeout(slideTimerRef.current)
       clearInterval(slideCountRef.current)
-      if (scrollRafRef.current) cancelAnimationFrame(scrollRafRef.current)
+      clearTimeout(violationTimerRef.current)
+      scrollAnimRef.current?.cancel()
+      headClonesRef.current.forEach(({ wrapper, thead }) => {
+        wrapper.parentNode?.removeChild(wrapper)
+        thead.style.visibility = ''
+      })
+      headClonesRef.current = []
     }
-  }, [tabIdx])
+  }, [tabIdx, violationIdx, violations])
 
   // ── Обратный отсчёт до обновления данных ────────────────────────────────────
   // Reload не делаем здесь — ждём конца цикла слайдов
@@ -340,6 +443,46 @@ export default function TvPage() {
             heDataAll
               ? <HourlyEmployeeTable allRows={heDataAll.allRows} hours={heDataAll.hours} mode="idles" {...sharedHourlyProps} />
               : <div className={s.empty}>{loading ? 'Загрузка...' : 'Нет данных'}</div>
+          )}
+
+          {tab === 'violations' && (
+            violations.length === 0
+              ? <div className={s.empty}>Нарушений нет</div>
+              : (() => {
+                  const v = violations[violationIdx] || violations[0]
+                  return (
+                    <div className={s.violationSlide}>
+                      <div className={s.violationVideoWrap}>
+                        <video
+                          key={v.id}
+                          className={s.violationVideo}
+                          src={`/violation-videos/${v.videoFile}`}
+                          autoPlay
+                          muted
+                          loop
+                          playsInline
+                        />
+                      </div>
+                      <div className={s.violationInfo}>
+                        <div className={s.violationTitle}>{v.title}</div>
+                        <div className={s.violationRight}>
+                          {v.damage != null && (
+                            <div className={s.violationDamage}>
+                              {Number(v.damage).toLocaleString('ru-RU')} ₽
+                            </div>
+                          )}
+                          {violations.length > 1 && (
+                            <div className={s.violationDots}>
+                              {violations.map((_, i) => (
+                                <span key={i} className={`${s.dot} ${i === violationIdx ? s.dotActive : ''}`} />
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })()
           )}
         </div>
       </main>

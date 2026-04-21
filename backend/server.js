@@ -2864,15 +2864,6 @@ app.get('/api/rk/cfz', vsSessionRequired, (req, res) => {
   }
 });
 
-// ─── React SPA ────────────────────────────────────────────────────────────────
-
-const DIST_DIR = path.join(__dirname, '..', 'frontend', 'app', 'dist');
-
-app.use(express.static(DIST_DIR));
-app.get('*', (req, res) => {
-  res.sendFile(path.join(DIST_DIR, 'index.html'));
-});
-
 // ─── Опрос Telegram для привязки менеджеров (код в личку боту) ───────────────
 
 let telegramPollingOffset = 0;
@@ -2907,6 +2898,90 @@ async function telegramBindingPollOnce() {
 function startTelegramBindingPolling() {
   setInterval(telegramBindingPollOnce, 3000);
 }
+
+// ─── Нарушения (Violations) ─────────────────────────────────────────────────
+const VIOLATIONS_DIR   = path.join(__dirname, 'data', 'violation-videos');
+const VIOLATIONS_PATH  = path.join(__dirname, 'data', 'violations.json');
+if (!fs.existsSync(VIOLATIONS_DIR)) fs.mkdirSync(VIOLATIONS_DIR, { recursive: true });
+
+const uploadViolation = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, VIOLATIONS_DIR),
+    filename:    (_req, file, cb) => {
+      const ext = path.extname(file.originalname) || '.mp4';
+      cb(null, `${Date.now()}_${Math.random().toString(36).slice(2)}${ext}`);
+    },
+  }),
+  limits: { fileSize: 500 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype.startsWith('video/')) cb(null, true);
+    else cb(new Error('Только видео-файлы'));
+  },
+});
+
+function loadViolations() {
+  try { return JSON.parse(fs.readFileSync(VIOLATIONS_PATH, 'utf8')); }
+  catch { return []; }
+}
+function saveViolations(data) {
+  fs.writeFileSync(VIOLATIONS_PATH, JSON.stringify(data, null, 2));
+}
+
+// Раздача видео
+app.get('/violation-videos/:filename', (req, res) => {
+  const file = path.join(VIOLATIONS_DIR, path.basename(req.params.filename));
+  if (!fs.existsSync(file)) return res.status(404).json({ error: 'Файл не найден' });
+  res.sendFile(file);
+});
+
+// GET /api/violations
+app.get('/api/violations', (_req, res) => {
+  res.json(loadViolations());
+});
+
+// POST /api/violations — создать нарушение
+app.post('/api/violations', vsSessionRequired, uploadViolation.single('video'), (req, res) => {
+  try {
+    const { title, damage } = req.body;
+    if (!title || !req.file) return res.status(400).json({ error: 'Нужны название и видео' });
+    const violations = loadViolations();
+    const item = {
+      id:        `${Date.now()}_${Math.random().toString(36).slice(2)}`,
+      title:     String(title).trim(),
+      damage:    damage ? Number(damage) : null,
+      videoFile: req.file.filename,
+      createdAt: new Date().toISOString(),
+    };
+    violations.unshift(item);
+    saveViolations(violations);
+    res.json(item);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// DELETE /api/violations/:id
+app.delete('/api/violations/:id', vsSessionRequired, (req, res) => {
+  try {
+    const violations = loadViolations();
+    const idx = violations.findIndex(v => v.id === req.params.id);
+    if (idx === -1) return res.status(404).json({ error: 'Не найдено' });
+    const [removed] = violations.splice(idx, 1);
+    saveViolations(violations);
+    const file = path.join(VIOLATIONS_DIR, removed.videoFile);
+    if (fs.existsSync(file)) fs.unlinkSync(file);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── React SPA (после всех API-маршрутов) ────────────────────────────────────
+const DIST_DIR = path.join(__dirname, '..', 'frontend', 'app', 'dist');
+app.use(express.static(DIST_DIR));
+app.get('*', (_req, res) => {
+  res.sendFile(path.join(DIST_DIR, 'index.html'));
+});
 
 app.listen(PORT, '0.0.0.0', () => {
   scheduler.ensureDataDir();

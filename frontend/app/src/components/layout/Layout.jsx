@@ -5,19 +5,20 @@ import styles from './Layout.module.css'
 import {
   BarChart2, Monitor, TrendingUp, Package, FileText,
   Truck, ClipboardList, Settings, LogOut, ChevronLeft,
-  ChevronRight, UserCircle, PackageSearch,
+  ChevronRight, UserCircle, PackageSearch, AlertTriangle,
 } from 'lucide-react'
 
 const NAV_ITEMS = [
-  { to: '/',               Icon: BarChart2,     label: 'Статистика',   module: 'stats' },
-  { to: '/monitor',        Icon: Monitor,       label: 'Мониторинг',   module: 'monitor' },
-  { to: '/analysis',       Icon: TrendingUp,    label: 'Анализ',       module: 'analysis' },
-  { to: '/consolidation',  Icon: Package,       label: 'Консолидация', module: 'consolidation' },
-  { to: '/docs',           Icon: FileText,      label: 'Документы',    module: 'docs' },
-  { to: '/shipments',      Icon: Truck,         label: 'Отгрузка',     module: 'shipments' },
-  { to: '/supplies',       Icon: PackageSearch, label: 'Поставки',     module: 'supplies' },
-  { to: '/reports',        Icon: ClipboardList, label: 'Отчёты',       module: 'reports' },
-  { to: '/settings',       Icon: Settings,      label: 'Настройки',    module: 'settings' },
+  { to: '/',               Icon: BarChart2,      label: 'Статистика',   module: 'stats' },
+  { to: '/monitor',        Icon: Monitor,        label: 'Мониторинг',   module: 'monitor' },
+  { to: '/analysis',       Icon: TrendingUp,     label: 'Анализ',       module: 'analysis' },
+  { to: '/consolidation',  Icon: Package,        label: 'Консолидация', module: 'consolidation' },
+  { to: '/docs',           Icon: FileText,       label: 'Документы',    module: 'docs' },
+  { to: '/shipments',      Icon: Truck,          label: 'Отгрузка',     module: 'shipments' },
+  { to: '/supplies',       Icon: PackageSearch,  label: 'Поставки',     module: 'supplies' },
+  { to: '/reports',        Icon: ClipboardList,  label: 'Отчёты',       module: 'reports' },
+  { to: '/violations',     Icon: AlertTriangle,  label: 'Нарушения',    module: 'violations' },
+  { to: '/settings',       Icon: Settings,       label: 'Настройки',    module: 'settings' },
 ]
 
 const LS_KEY = 'sidebar_collapsed'

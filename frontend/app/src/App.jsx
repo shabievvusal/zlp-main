@@ -17,6 +17,7 @@ import ReportsPage from './pages/reports/ReportsPage.jsx'
 import TvPage from './pages/tv/TvPage.jsx'
 import SuppliesPage from './pages/supplies/SuppliesPage.jsx'
 import SupplyDetailPage from './pages/supplies/SupplyDetailPage.jsx'
+import ViolationsPage from './pages/violations/ViolationsPage.jsx'
 
 function PlaceholderPage({ title }) {
   return (
@@ -71,6 +72,7 @@ function AppRoutes() {
             <Route path="/supplies/:taskType/:id" element={<ModuleRoute module="supplies"><SupplyDetailPage /></ModuleRoute>} />
             <Route path="/settings" element={<ModuleRoute module="settings"><SettingsPage /></ModuleRoute>} />
             <Route path="/reports" element={<ModuleRoute module="reports"><ReportsPage /></ModuleRoute>} />
+            <Route path="/violations" element={<ModuleRoute module="violations"><ViolationsPage /></ModuleRoute>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
           <Route path="/tv" element={<TvPage />} />
