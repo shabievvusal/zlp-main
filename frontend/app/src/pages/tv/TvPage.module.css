@@ -1,0 +1,190 @@
+/* ── Base ─────────────────────────────────────────────── */
+.page {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  background: var(--bg);
+  overflow: hidden;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+/* ── Header ──────────────────────────────────────────── */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 20px;
+  height: 60px;
+  background: var(--bg-card);
+  border-bottom: 1.5px solid var(--border);
+  flex-shrink: 0;
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
+}
+
+/* ── Logo ─────────────────────────────────────────────── */
+.logoText {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--green);
+  letter-spacing: 1px;
+  flex-shrink: 0;
+}
+
+/* ── Tabs ─────────────────────────────────────────────── */
+.tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.tab {
+  padding: 8px 20px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+
+.tab:hover {
+  background: var(--bg);
+  color: var(--text);
+}
+
+.tabActive {
+  background: var(--green-light);
+  color: var(--green-dark);
+  font-weight: 700;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Полоска обратного отсчёта внутри активной вкладки */
+.tabProgress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  background: var(--green);
+  transition: width 1s linear;
+  border-radius: 0 2px 0 0;
+}
+
+/* ── Right side info ──────────────────────────────────── */
+.updatedAt {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.loadingDot {
+  font-size: 14px;
+  color: var(--green);
+  animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1 }
+  50%       { opacity: 0.3 }
+}
+
+.countdown {
+  font-size: 13px;
+  color: var(--text-muted);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 10px;
+  white-space: nowrap;
+}
+
+.clock {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+}
+
+.clockTime {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: 0.5px;
+  line-height: 1;
+}
+
+.clockDate {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* ── Body ─────────────────────────────────────────────── */
+.body {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: auto;
+}
+
+/* ── Content wrapper для ТВ ──────────────────────────── */
+/*
+  zoom выставляется динамически через JS (style.zoom) после замера ширины контента,
+  чтобы таблица всегда помещалась по ширине экрана ТВ.
+*/
+.zoom {
+  padding: 12px 16px;
+  min-height: 100%;
+  transform-origin: top left;
+}
+
+/* ── Sticky table headers ─────────────────────────────── */
+/*
+  heScrollWrap / tableWrap имеют overflow-x:auto, что по спецификации CSS
+  принудительно делает overflow-y:auto — это создаёт внутренний scroll container
+  и ломает position:sticky (заголовки прилипают к нему, а не к .body).
+  Перебиваем оба overflow в visible, чтобы sticky работало относительно .body.
+  То же самое нужно в measureLayer — иначе scrollWidth считается по контейнеру,
+  а не по реальной ширине таблицы.
+*/
+.body :global([class*="ScrollWrap"]),
+.body :global([class*="tableWrap"]),
+.measureLayer :global([class*="ScrollWrap"]),
+.measureLayer :global([class*="tableWrap"]) {
+  overflow: visible !important;
+}
+
+.body :global(thead th) {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--bg-card);
+  box-shadow: 0 1px 0 var(--border);
+}
+
+
+/* ── Скрытый слой для предварительного замера ширины ─── */
+/* Нужен отдельный класс, чтобы применять overflow:visible к вложенным таблицам */
+.measureLayer { display: block; }
+
+/* ── Empty / loading ─────────────────────────────────── */
+.empty {
+  padding: 48px 16px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 16px;
+}

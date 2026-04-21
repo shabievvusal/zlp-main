@@ -180,6 +180,8 @@ function StepData({ opType, route, onDone, byName }) {
   const [cfzValues, setCfzValues] = useState(() => Object.fromEntries(cfz.map(a => [a.address, String(existingMap[a.address] ?? '')])))
   const existingPalletsMap = Object.fromEntries((existingItems || []).map(i => [i.address, i.pallets ?? '']))
   const [palletsValues, setPalletsValues] = useState(() => Object.fromEntries(cfz.map(a => [a.address, String(existingPalletsMap[a.address] ?? '')])))
+  const existingBoxesMap = Object.fromEntries((existingItems || []).map(i => [i.address, i.boxes ?? '']))
+  const [boxesValues, setBoxesValues] = useState(() => Object.fromEntries(cfz.map(a => [a.address, String(existingBoxesMap[a.address] ?? '')])))
   const [photos, setPhotos] = useState([]) // { file, url }
   const [status, setStatus] = useState(null) // { type: 'success'|'error', msg }
   const [saving, setSaving] = useState(false)
@@ -202,6 +204,7 @@ function StepData({ opType, route, onDone, byName }) {
       address: a.address,
       rk: parseNum(cfzValues[a.address]),
       pallets: parseNum(palletsValues[a.address]),
+      boxes: parseNum(boxesValues[a.address]),
     }))
 
     setSaving(true)
@@ -307,10 +310,15 @@ function StepData({ opType, route, onDone, byName }) {
           const shipItem = route.shipment?.items?.find(x => x.address === a.address)
           const shippedRk = opType === 'receive' ? (shipItem?.rk ?? null) : null
           const shippedPallets = opType === 'receive' ? (shipItem?.pallets ?? null) : null
+          const shippedBoxes = opType === 'receive' ? (shipItem?.boxes ?? null) : null
           return (
             <div key={a.address} className={s.cfzRow}>
               <span className={s.cfzAddr}>{a.address}</span>
-              {shippedRk != null && <span className={s.cfzShipped}>отгр. {shippedRk} РК{shippedPallets ? ` / ${shippedPallets} пал.` : ''}</span>}
+              {shippedRk != null && (
+                <span className={s.cfzShipped}>
+                  отгр. {shippedRk} РК{shippedPallets ? ` / ${shippedPallets} пал.` : ''}{shippedBoxes ? ` / ${shippedBoxes} ящ.` : ''}
+                </span>
+              )}
               <input
                 className={s.cfzInput}
                 type="number"
@@ -328,6 +336,15 @@ function StepData({ opType, route, onDone, byName }) {
                 placeholder="пал."
                 value={palletsValues[a.address] ?? ''}
                 onChange={e => setPalletsValues(prev => ({ ...prev, [a.address]: e.target.value }))}
+              />
+              <input
+                className={s.cfzInputSm}
+                type="number"
+                inputMode="numeric"
+                min="0"
+                placeholder="ящ."
+                value={boxesValues[a.address] ?? ''}
+                onChange={e => setBoxesValues(prev => ({ ...prev, [a.address]: e.target.value }))}
               />
             </div>
           )

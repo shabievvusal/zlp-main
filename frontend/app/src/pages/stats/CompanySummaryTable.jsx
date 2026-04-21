@@ -12,7 +12,7 @@ export function CompanySummaryToggle({ showHours, onChange }) {
   )
 }
 
-export default function CompanySummaryTable({ rows, hoursDisplay, showHours }) {
+export default function CompanySummaryTable({ rows, hoursDisplay, showHours, compact = false }) {
   const [sortCol, setSortCol] = useState('totalTasks')
   const [sortDir, setSortDir] = useState('desc')
 

@@ -79,6 +79,7 @@ export default function HourlyEmployeeTable({
   allRows, hours, mode = 'sz',
   idlesByEmployee = {}, weightByEmployee = {},
   allowedIdleMinutes = 0, shiftFilter = 'day', selectedDate = null,
+  compact = false,
 }) {
   const [sortCol, setSortCol] = useState('total')
   const [sortDir, setSortDir] = useState('desc')

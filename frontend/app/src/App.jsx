@@ -14,6 +14,7 @@ import DocsPage from './pages/docs/DocsPage.jsx'
 import AnalysisPage from './pages/analysis/AnalysisPage.jsx'
 import ReceivePage from './pages/receive/ReceivePage.jsx'
 import ReportsPage from './pages/reports/ReportsPage.jsx'
+import TvPage from './pages/tv/TvPage.jsx'
 import SuppliesPage from './pages/supplies/SuppliesPage.jsx'
 import SupplyDetailPage from './pages/supplies/SupplyDetailPage.jsx'
 
@@ -72,6 +73,7 @@ function AppRoutes() {
             <Route path="/reports" element={<ModuleRoute module="reports"><ReportsPage /></ModuleRoute>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
+          <Route path="/tv" element={<TvPage />} />
         </Routes>
       </AppProvider>
     </NotifyProvider>
