@@ -37,6 +37,7 @@ async function migrateDir(dir, s3Prefix, label) {
   });
 
   console.log(`\n[${label}] Найдено файлов: ${files.length}`);
+  const startTime = Date.now();
 
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
@@ -46,12 +47,22 @@ async function migrateDir(dir, s3Prefix, label) {
     try {
       await uploadFile(localPath, s3Key);
       ok++;
-      if ((i + 1) % 50 === 0 || i + 1 === files.length) {
-        console.log(`  ${i + 1}/${files.length} — загружено`);
-      }
     } catch (err) {
       fail++;
       console.error(`  [ERROR] ${file}: ${err.message}`);
+    }
+
+    if ((i + 1) % 50 === 0 || i + 1 === files.length) {
+      const done = i + 1;
+      const left = files.length - done;
+      const elapsed = (Date.now() - startTime) / 1000;
+      const speed = done / elapsed;
+      const etaSec = left / speed;
+      const eta = etaSec > 60
+        ? `${Math.round(etaSec / 60)} мин`
+        : `${Math.round(etaSec)} сек`;
+      const pct = Math.round((done / files.length) * 100);
+      console.log(`  [${label}] ${done}/${files.length} (${pct}%) — осталось: ${left} файлов, ~${eta}`);
     }
   }
 }
@@ -65,18 +76,29 @@ async function migrateThumbs() {
   );
 
   console.log(`\n[rk-photos/thumbs] Найдено файлов: ${files.length}`);
+  const startTime = Date.now();
 
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
     try {
       await uploadFile(path.join(thumbDir, file), `rk-photos/thumbs/${file}`);
       ok++;
-      if ((i + 1) % 50 === 0 || i + 1 === files.length) {
-        console.log(`  ${i + 1}/${files.length} — загружено`);
-      }
     } catch (err) {
       fail++;
       console.error(`  [ERROR] ${file}: ${err.message}`);
+    }
+
+    if ((i + 1) % 50 === 0 || i + 1 === files.length) {
+      const done = i + 1;
+      const left = files.length - done;
+      const elapsed = (Date.now() - startTime) / 1000;
+      const speed = done / elapsed;
+      const etaSec = left / speed;
+      const eta = etaSec > 60
+        ? `${Math.round(etaSec / 60)} мин`
+        : `${Math.round(etaSec)} сек`;
+      const pct = Math.round((done / files.length) * 100);
+      console.log(`  [rk-photos/thumbs] ${done}/${files.length} (${pct}%) — осталось: ${left} файлов, ~${eta}`);
     }
   }
 }
