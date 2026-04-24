@@ -100,7 +100,9 @@ function useLocalSet(key) {
 }
 
 function thumbUrl(url) {
-  if (url.startsWith('http')) return url.replace('/rk-photos/', '/rk-photos/thumbs/')
+  if (url.startsWith('http')) {
+    return url.replace('/rk-photos/', '/rk-photos/thumbs/').replace(/\.\w+$/, '.jpg')
+  }
   return url.replace('/rk-photos/', '/rk-photos/thumb/')
 }
 
