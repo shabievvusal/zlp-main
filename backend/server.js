@@ -429,9 +429,12 @@ function getDotnetMissingWeightRebuildCmd() {
  * Перестраивает missing_weight.json через .NET-инструмент.
  * Не требует участия фронта — инструмент сам обходит все data/YYYY-MM-DD/HH.json.
  */
+let _rebuildInProgress = false;
 async function rebuildMissingWeightDotnet() {
+  if (_rebuildInProgress) return null;
+  _rebuildInProgress = true;
   const cmd = getDotnetMissingWeightRebuildCmd();
-  if (!cmd) { console.warn('[missing-weight] dotnet tool not found'); return null; }
+  if (!cmd) { _rebuildInProgress = false; console.warn('[missing-weight] dotnet tool not found'); return null; }
 
   // Экспортируем таблицу весов во временный JSON { article: grams }
   const weightsObj = Object.fromEntries(productWeights.getMap());
@@ -451,6 +454,7 @@ async function rebuildMissingWeightDotnet() {
     return null;
   } finally {
     try { fs.unlinkSync(weightsPath); } catch {}
+    _rebuildInProgress = false;
   }
 }
 
