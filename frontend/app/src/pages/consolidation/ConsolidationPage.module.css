@@ -185,6 +185,34 @@
 }
 .noPhoto { color: var(--text-light); }
 
+.complaintRow:hover { background: var(--bg-hover, #f5f5f5); }
+
+.photoCount {
+  font-size: 12px;
+  color: var(--text-light);
+  white-space: nowrap;
+}
+.photoCountActive { color: #2563eb; }
+
+.photoDetailRow td { padding: 0 !important; }
+.photoDetailCell { background: var(--bg-subtle, #f8f9fa); }
+.photoDetailInner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 16px;
+}
+.photoDetailThumb {
+  width: 120px;
+  height: 120px;
+  object-fit: cover;
+  border-radius: 8px;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  transition: transform .15s, box-shadow .15s;
+}
+.photoDetailThumb:hover { transform: scale(1.05); box-shadow: 0 4px 12px rgba(0,0,0,.15); }
+
 /* ── Actions cell ───────────────────────────────────────────────────────────── */
 .actionsCol {
   display: flex;

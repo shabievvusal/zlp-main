@@ -581,56 +581,69 @@ function EditModal({ complaint, onClose, onSaved }) {
 
 function ComplaintRow({ complaint: c, selected, onToggle, onStatusChange, onLookup, onEdit, onPhotoOpen }) {
   const photos = getComplaintPhotos(c)
+  const [expanded, setExpanded] = useState(false)
 
   return (
-    <tr>
-      <td><input type="checkbox" checked={selected} onChange={onToggle} /></td>
-      <td className={s.tdDate}>{formatDateTime(c.createdAt)}</td>
-      <td>{c.employeeName || '—'}</td>
-      <td className={s.tdCell}>{c.cell}</td>
-      <td className={s.tdBarcode}>{c.barcode}</td>
-      <td>{c.nomenclatureCode || '—'}</td>
-      <td>{c.productName || '—'}</td>
-      <td>
-        {c.violator || '—'}
-        {!c.lookupDone && c.lookupError && (
-          <span className={s.lookupErr} title={c.lookupError}>!</span>
-        )}
-      </td>
-      <td>{c.company || '—'}</td>
-      <td className={s.tdDate}>{formatDateTime(c.operationCompletedAt)}</td>
-      <td>
-        {photos.length > 0 ? (
-          <div className={s.photoStack}>
-            {photos.length > 1 && <span className={s.photoCountBadge}>{photos.length}</span>}
-            <img
-              className={s.photoThumb}
-              src={photoUrl(photos[0])}
-              alt="Фото"
-              onClick={() => onPhotoOpen(photos.map(n => photoUrl(n)), 0)}
-            />
+    <>
+      <tr className={s.complaintRow} onClick={() => photos.length > 0 && setExpanded(p => !p)} style={{ cursor: photos.length > 0 ? 'pointer' : 'default' }}>
+        <td onClick={e => e.stopPropagation()}><input type="checkbox" checked={selected} onChange={onToggle} /></td>
+        <td className={s.tdDate}>{formatDateTime(c.createdAt)}</td>
+        <td>{c.employeeName || '—'}</td>
+        <td className={s.tdCell}>{c.cell}</td>
+        <td className={s.tdBarcode}>{c.barcode}</td>
+        <td>{c.nomenclatureCode || '—'}</td>
+        <td>{c.productName || '—'}</td>
+        <td>
+          {c.violator || '—'}
+          {!c.lookupDone && c.lookupError && (
+            <span className={s.lookupErr} title={c.lookupError}>!</span>
+          )}
+        </td>
+        <td>{c.company || '—'}</td>
+        <td className={s.tdDate}>{formatDateTime(c.operationCompletedAt)}</td>
+        <td>
+          {photos.length > 0 ? (
+            <span className={`${s.photoCount} ${expanded ? s.photoCountActive : ''}`}>🖼 {photos.length}</span>
+          ) : (
+            <span className={s.noPhoto}>—</span>
+          )}
+        </td>
+        <td>
+          <span className={`${s.status} ${statusCls(c.status)}`}>{statusLabel(c.status)}</span>
+        </td>
+        <td>
+          <div className={s.actionsCol} onClick={e => e.stopPropagation()}>
+            <select className={s.statusSelect} value={c.status} onChange={e => onStatusChange(c.id, e.target.value)}>
+              <option value="new">Новая</option>
+              <option value="in_progress">В работе</option>
+              <option value="resolved">Решена</option>
+            </select>
+            <div className={s.actionsBtns}>
+              <button className={`btn btn-sm ${s.btnLookup}`} title="Поиск в WMS" onClick={() => onLookup(c)}><Search size={13} strokeWidth={2}/></button>
+              <button className={`btn btn-sm ${s.btnEdit}`} title="Редактировать" onClick={() => onEdit(c)}><Pencil size={13} strokeWidth={2}/></button>
+            </div>
           </div>
-        ) : (
-          <span className={s.noPhoto}>—</span>
-        )}
-      </td>
-      <td>
-        <span className={`${s.status} ${statusCls(c.status)}`}>{statusLabel(c.status)}</span>
-      </td>
-      <td>
-        <div className={s.actionsCol}>
-          <select className={s.statusSelect} value={c.status} onChange={e => onStatusChange(c.id, e.target.value)}>
-            <option value="new">Новая</option>
-            <option value="in_progress">В работе</option>
-            <option value="resolved">Решена</option>
-          </select>
-          <div className={s.actionsBtns}>
-            <button className={`btn btn-sm ${s.btnLookup}`} title="Поиск в WMS" onClick={() => onLookup(c)}><Search size={13} strokeWidth={2}/></button>
-            <button className={`btn btn-sm ${s.btnEdit}`} title="Редактировать" onClick={() => onEdit(c)}><Pencil size={13} strokeWidth={2}/></button>
-          </div>
-        </div>
-      </td>
-    </tr>
+        </td>
+      </tr>
+      {expanded && (
+        <tr className={s.photoDetailRow}>
+          <td colSpan={13} className={s.photoDetailCell}>
+            <div className={s.photoDetailInner}>
+              {photos.map((url, i) => (
+                <img
+                  key={i}
+                  src={photoUrl(url)}
+                  alt={`Фото ${i + 1}`}
+                  className={s.photoDetailThumb}
+                  loading="lazy"
+                  onClick={() => onPhotoOpen(photos.map(n => photoUrl(n)), i)}
+                />
+              ))}
+            </div>
+          </td>
+        </tr>
+      )}
+    </>
   )
 }
 
