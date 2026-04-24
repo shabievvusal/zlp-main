@@ -602,13 +602,6 @@ function ComplaintRow({ complaint: c, selected, onToggle, onStatusChange, onLook
         <td>{c.company || '—'}</td>
         <td className={s.tdDate}>{formatDateTime(c.operationCompletedAt)}</td>
         <td>
-          {photos.length > 0 ? (
-            <span className={`${s.photoCount} ${expanded ? s.photoCountActive : ''}`}>🖼 {photos.length}</span>
-          ) : (
-            <span className={s.noPhoto}>—</span>
-          )}
-        </td>
-        <td>
           <span className={`${s.status} ${statusCls(c.status)}`}>{statusLabel(c.status)}</span>
         </td>
         <td>
@@ -627,7 +620,7 @@ function ComplaintRow({ complaint: c, selected, onToggle, onStatusChange, onLook
       </tr>
       {expanded && (
         <tr className={s.photoDetailRow}>
-          <td colSpan={13} className={s.photoDetailCell}>
+          <td colSpan={12} className={s.photoDetailCell}>
             <div className={s.photoDetailInner}>
               {photos.map((url, i) => (
                 <img
@@ -949,7 +942,6 @@ export default function ConsolidationPage() {
                   <th>Нарушитель</th>
                   <th>Компания</th>
                   <th>Время нарушения</th>
-                  <th>Фото</th>
                   <th>Статус</th>
                   <th>Действия</th>
                 </tr>
