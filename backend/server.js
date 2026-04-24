@@ -12,7 +12,9 @@ const storage = require('./storage');
 const vsAuth = require('./vs-auth');
 const nodeAgent = require('./node-agent');
 const productWeights = require('./product-weights');
-const rkStorage = require('./route-rk-storage');
+const rkStorage = process.env.USE_PG === 'true'
+  ? require('./route-rk-pg')
+  : require('./route-rk-storage');
 const s3Storage = require('./s3');
 const excelReports = require('./excel-reports');
 
@@ -2420,9 +2422,9 @@ app.post('/api/stats/send-idles-telegram', vsSessionOptional, uploadMemory.any(3
 });
 
 // GET /api/shipments/missing-codes — ЦФЗ-адреса без кода получателя
-app.get('/api/shipments/missing-codes', vsSessionRequired, (req, res) => {
+app.get('/api/shipments/missing-codes', vsSessionRequired, async (req, res) => {
   try {
-    const allAddresses = rkStorage.getAddresses();
+    const allAddresses = await rkStorage.getAddresses();
     const missing = excelReports.getMissingCodes(allAddresses);
     res.json(missing);
   } catch (err) {
@@ -2434,9 +2436,9 @@ const ExcelJS = require('exceljs');
 const XLSX    = require('xlsx');
 
 // GET /api/shipments/codes — все адреса с текущими кодами получателей
-app.get('/api/shipments/codes', vsSessionRequired, (req, res) => {
+app.get('/api/shipments/codes', vsSessionRequired, async (req, res) => {
   try {
-    const allAddresses = rkStorage.getAddresses();
+    const allAddresses = await rkStorage.getAddresses();
     const codes = excelReports.getAddressCodes();
     const result = allAddresses.map(address => ({
       address,
@@ -2451,7 +2453,7 @@ app.get('/api/shipments/codes', vsSessionRequired, (req, res) => {
 // GET /api/shipments/codes/export — скачать Excel с адресами без кода
 app.get('/api/shipments/codes/export', vsSessionRequired, async (req, res) => {
   try {
-    const allAddresses = rkStorage.getAddresses();
+    const allAddresses = await rkStorage.getAddresses();
     const codes = excelReports.getAddressCodes();
     const missing = allAddresses.filter(a => !codes[a]);
 
@@ -2517,8 +2519,10 @@ app.get('/api/shipments/report', vsSessionRequired, async (req, res) => {
     const { dateFrom, dateTo } = req.query;
     if (!dateFrom || !dateTo) return res.status(400).json({ error: 'Нужны dateFrom и dateTo' });
 
-    const summaryData = rkStorage.getReportData(dateFrom, dateTo);
-    const allAddresses = rkStorage.getAddresses();
+    const [summaryData, allAddresses] = await Promise.all([
+      rkStorage.getReportData(dateFrom, dateTo),
+      rkStorage.getAddresses(),
+    ]);
 
     const datesSet = new Set();
     summaryData.forEach(e => e.records.forEach(r => datesSet.add(r.date)));
@@ -2538,11 +2542,11 @@ app.get('/api/shipments/report', vsSessionRequired, async (req, res) => {
 });
 
 // DELETE /api/rk/routes/bulk — удалить маршруты по списку ID
-app.delete('/api/rk/routes/bulk', vsSessionRequired, (req, res) => {
+app.delete('/api/rk/routes/bulk', vsSessionRequired, async (req, res) => {
   try {
     const { ids } = req.body;
     if (!Array.isArray(ids) || !ids.length) return res.status(400).json({ error: 'Нужен массив ids' });
-    const deleted = rkStorage.deleteRoutesByIds(ids);
+    const deleted = await rkStorage.deleteRoutesByIds(ids);
     res.json({ ok: true, deleted });
   } catch (err) {
     console.error('DELETE /api/rk/routes/bulk', err);
@@ -2551,11 +2555,11 @@ app.delete('/api/rk/routes/bulk', vsSessionRequired, (req, res) => {
 });
 
 // DELETE /api/rk/routes?dateFrom=YYYY-MM-DD&dateTo=YYYY-MM-DD — удалить маршруты РК за период
-app.delete('/api/rk/routes', vsSessionRequired, (req, res) => {
+app.delete('/api/rk/routes', vsSessionRequired, async (req, res) => {
   try {
     const { dateFrom, dateTo } = req.query;
     if (!dateFrom || !dateTo) return res.status(400).json({ error: 'Нужны dateFrom и dateTo' });
-    const deleted = rkStorage.deleteRoutesByDateRange(dateFrom, dateTo);
+    const deleted = await rkStorage.deleteRoutesByDateRange(dateFrom, dateTo);
     res.json({ ok: true, deleted });
   } catch (err) {
     console.error('DELETE /api/rk/routes', err);
@@ -2567,19 +2571,19 @@ app.delete('/api/rk/routes', vsSessionRequired, (req, res) => {
 // ─── Отгрузка РК (маршрутная модель) ─────────────────────────────────────────
 
 // GET /api/rk/routes?q=&dateFrom=&dateTo=&receivedDateFrom=&receivedDateTo=&status=
-app.get('/api/rk/routes', vsSessionRequired, (req, res) => {
+app.get('/api/rk/routes', vsSessionRequired, async (req, res) => {
   try {
     const { q, dateFrom, dateTo, receivedDateFrom, receivedDateTo, status } = req.query;
-    res.json(rkStorage.getRoutes({ q, dateFrom, dateTo, receivedDateFrom, receivedDateTo, status }));
+    res.json(await rkStorage.getRoutes({ q, dateFrom, dateTo, receivedDateFrom, receivedDateTo, status }));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
 // GET /api/rk/routes/:routeId
-app.get('/api/rk/routes/:routeId', vsSessionRequired, (req, res) => {
+app.get('/api/rk/routes/:routeId', vsSessionRequired, async (req, res) => {
   try {
-    const route = rkStorage.getRouteById(decodeURIComponent(req.params.routeId));
+    const route = await rkStorage.getRouteById(decodeURIComponent(req.params.routeId));
     if (!route) return res.status(404).json({ error: 'Маршрут не найден' });
     res.json(route);
   } catch (err) {
@@ -2588,11 +2592,11 @@ app.get('/api/rk/routes/:routeId', vsSessionRequired, (req, res) => {
 });
 
 // POST /api/rk/import-bulk — импорт маршрутов из WMS (только метаданные, без счёта РК)
-app.post('/api/rk/import-bulk', vsSessionRequired, (req, res) => {
+app.post('/api/rk/import-bulk', vsSessionRequired, async (req, res) => {
   try {
     const routes = Array.isArray(req.body?.routes) ? req.body.routes : [];
     if (!routes.length) return res.status(400).json({ ok: false, error: 'Нет маршрутов' });
-    const result = rkStorage.importBulk(routes);
+    const result = await rkStorage.importBulk(routes);
     res.json({ ok: true, routes: routes.length, ...result });
   } catch (err) {
     console.error('POST /api/rk/import-bulk', err);
@@ -2609,29 +2613,39 @@ const rkPhotoUpload = multer({
     else cb(new Error('Только изображения'));
   },
 });
-app.post('/api/rk/photos', rkPhotoUpload.array('photos', 10), async (req, res) => {
-  try {
-    const urls = await Promise.all((req.files || []).map(async f => {
-      const name = `${Date.now()}_${Math.random().toString(36).slice(2)}.jpg`;
-      const compressed = await sharp(f.buffer)
-        .rotate()
-        .resize(1920, 1920, { fit: 'inside', withoutEnlargement: true })
-        .jpeg({ quality: 85 })
-        .toBuffer();
-      const thumb = await sharp(compressed)
-        .resize(144, 144, { fit: 'cover' })
-        .jpeg({ quality: 70 })
-        .toBuffer();
-      await Promise.all([
-        s3Storage.uploadFile(`rk-photos/${name}`, compressed),
-        s3Storage.uploadFile(`rk-photos/thumbs/${name}`, thumb),
-      ]);
-      return `/rk-photos/${name}`;
-    }));
-    res.json({ ok: true, urls });
-  } catch (err) {
-    res.status(500).json({ ok: false, error: err.message });
-  }
+app.post('/api/rk/photos', (req, res) => {
+  rkPhotoUpload.any()(req, res, async (err) => {
+    if (err) {
+      console.error('[rk/photos] multer error:', err.code, err.field, err.message);
+      return res.status(400).json({ ok: false, error: err.message });
+    }
+    const files = (req.files || []).filter(f => f.fieldname === 'photos' && f.mimetype.startsWith('image/'));
+    console.log('[rk/photos] received fields:', (req.files || []).map(f => f.fieldname));
+    try {
+      const urls = [];
+      for (const f of files) {
+        const name = `${Date.now()}_${Math.random().toString(36).slice(2)}.jpg`;
+        const compressed = await sharp(f.buffer)
+          .rotate()
+          .resize(1280, 1280, { fit: 'inside', withoutEnlargement: true })
+          .jpeg({ quality: 80 })
+          .toBuffer();
+        const thumb = await sharp(compressed)
+          .resize(144, 144, { fit: 'cover' })
+          .jpeg({ quality: 70 })
+          .toBuffer();
+        await Promise.all([
+          s3Storage.uploadFile(`rk-photos/${name}`, compressed),
+          s3Storage.uploadFile(`rk-photos/thumbs/${name}`, thumb),
+        ]);
+        urls.push(`/rk-photos/${name}`);
+      }
+      res.json({ ok: true, urls });
+    } catch (e) {
+      console.error('[rk/photos] upload error:', e.message);
+      res.status(500).json({ ok: false, error: e.message });
+    }
+  });
 });
 
 // Раздача фото
@@ -2694,14 +2708,14 @@ app.use('/rk-photos', (req, res, next) => {
 });
 
 // POST /api/rk/routes/:routeId/ship — отгрузка (кладовщик вводит РК по каждому ЦФЗ)
-app.post('/api/rk/routes/:routeId/ship', (req, res) => {
+app.post('/api/rk/routes/:routeId/ship', async (req, res) => {
   try {
     const routeId = decodeURIComponent(req.params.routeId);
     const { by, gate, tempBefore, tempAfter, rokhlya, items, photos } = req.body;
     if (!Array.isArray(items)) {
       return res.status(400).json({ ok: false, error: 'Некорректный формат данных' });
     }
-    const route = rkStorage.submitShipment(routeId, { by, gate, tempBefore, tempAfter, rokhlya, items, photos });
+    const route = await rkStorage.submitShipment(routeId, { by, gate, tempBefore, tempAfter, rokhlya, items, photos });
     sseNotify('routes-updated');
     res.json({ ok: true, route });
   } catch (err) {
@@ -2710,14 +2724,14 @@ app.post('/api/rk/routes/:routeId/ship', (req, res) => {
 });
 
 // POST /api/rk/routes/:routeId/receive — приёмка возврата РК
-app.post('/api/rk/routes/:routeId/receive', (req, res) => {
+app.post('/api/rk/routes/:routeId/receive', async (req, res) => {
   try {
     const routeId = decodeURIComponent(req.params.routeId);
     const { by, gate, rokhlya, items, photos } = req.body;
     if (!Array.isArray(items)) {
       return res.status(400).json({ ok: false, error: 'Некорректный формат данных' });
     }
-    const route = rkStorage.submitReceiving(routeId, { by, gate, rokhlya, items, photos });
+    const route = await rkStorage.submitReceiving(routeId, { by, gate, rokhlya, items, photos });
     sseNotify('routes-updated');
     res.json({ ok: true, route });
   } catch (err) {
@@ -2726,9 +2740,9 @@ app.post('/api/rk/routes/:routeId/receive', (req, res) => {
 });
 
 // PATCH /api/rk/routes/:routeId/driver — замена водителя на маршруте
-app.patch('/api/rk/routes/:routeId/driver', vsSessionRequired, (req, res) => {
+app.patch('/api/rk/routes/:routeId/driver', vsSessionRequired, async (req, res) => {
   try {
-    const route = rkStorage.updateRouteDriver(decodeURIComponent(req.params.routeId), req.body);
+    const route = await rkStorage.updateRouteDriver(decodeURIComponent(req.params.routeId), req.body);
     res.json({ ok: true, route });
   } catch (err) {
     res.status(400).json({ ok: false, error: err.message });
@@ -2736,9 +2750,9 @@ app.patch('/api/rk/routes/:routeId/driver', vsSessionRequired, (req, res) => {
 });
 
 // PUT /api/rk/routes/:routeId/ship — редактирование отгрузки (включая подтверждённые)
-app.put('/api/rk/routes/:routeId/ship', vsSessionRequired, (req, res) => {
+app.put('/api/rk/routes/:routeId/ship', vsSessionRequired, async (req, res) => {
   try {
-    const route = rkStorage.updateShipment(decodeURIComponent(req.params.routeId), req.body);
+    const route = await rkStorage.updateShipment(decodeURIComponent(req.params.routeId), req.body);
     res.json({ ok: true, route });
   } catch (err) {
     res.status(400).json({ ok: false, error: err.message });
@@ -2746,9 +2760,9 @@ app.put('/api/rk/routes/:routeId/ship', vsSessionRequired, (req, res) => {
 });
 
 // PUT /api/rk/routes/:routeId/receive — редактирование приёмки
-app.put('/api/rk/routes/:routeId/receive', vsSessionRequired, (req, res) => {
+app.put('/api/rk/routes/:routeId/receive', vsSessionRequired, async (req, res) => {
   try {
-    const route = rkStorage.updateReceiving(decodeURIComponent(req.params.routeId), req.body);
+    const route = await rkStorage.updateReceiving(decodeURIComponent(req.params.routeId), req.body);
     res.json({ ok: true, route });
   } catch (err) {
     res.status(400).json({ ok: false, error: err.message });
@@ -2756,12 +2770,12 @@ app.put('/api/rk/routes/:routeId/receive', vsSessionRequired, (req, res) => {
 });
 
 // POST /api/rk/routes/:routeId/confirm-ship — подтверждение отгрузки менеджером
-app.post('/api/rk/routes/:routeId/confirm-ship', vsSessionRequired, (req, res) => {
+app.post('/api/rk/routes/:routeId/confirm-ship', vsSessionRequired, async (req, res) => {
   try {
     const login = req.vsSession?.login;
     const user = login ? vsAuth.findUserByLogin(login) : null;
     const confirmedBy = user?.name || login || null;
-    const route = rkStorage.confirmShipment(decodeURIComponent(req.params.routeId), confirmedBy);
+    const route = await rkStorage.confirmShipment(decodeURIComponent(req.params.routeId), confirmedBy);
     res.json({ ok: true, route });
   } catch (err) {
     res.status(400).json({ ok: false, error: err.message });
@@ -2769,12 +2783,12 @@ app.post('/api/rk/routes/:routeId/confirm-ship', vsSessionRequired, (req, res) =
 });
 
 // POST /api/rk/routes/:routeId/confirm-receive — подтверждение приёмки менеджером
-app.post('/api/rk/routes/:routeId/confirm-receive', vsSessionRequired, (req, res) => {
+app.post('/api/rk/routes/:routeId/confirm-receive', vsSessionRequired, async (req, res) => {
   try {
     const login = req.vsSession?.login;
     const user = login ? vsAuth.findUserByLogin(login) : null;
     const confirmedBy = user?.name || login || null;
-    const route = rkStorage.confirmReceiving(decodeURIComponent(req.params.routeId), confirmedBy);
+    const route = await rkStorage.confirmReceiving(decodeURIComponent(req.params.routeId), confirmedBy);
     res.json({ ok: true, route });
   } catch (err) {
     res.status(400).json({ ok: false, error: err.message });
@@ -2782,9 +2796,9 @@ app.post('/api/rk/routes/:routeId/confirm-receive', vsSessionRequired, (req, res
 });
 
 // GET /api/rk/routes/:routeId/eos — ЕО по маршруту (публичный)
-app.get('/api/rk/routes/:routeId/eos', (req, res) => {
+app.get('/api/rk/routes/:routeId/eos', async (req, res) => {
   try {
-    const eos = rkStorage.getRouteEos(decodeURIComponent(req.params.routeId));
+    const eos = await rkStorage.getRouteEos(decodeURIComponent(req.params.routeId));
     if (eos === null) return res.status(404).json({ error: 'Маршрут не найден' });
     res.json(eos);
   } catch (err) {
@@ -2803,7 +2817,7 @@ app.post('/api/rk/routes/:routeId/eos/refresh', async (req, res) => {
     const stores = Array.isArray(routeVal?.stores) ? routeVal.stores : [];
 
     // Обновляем все ЦФЗ за один load+save
-    const results = rkStorage.updateRouteEosBatch(routeId, stores);
+    const results = await rkStorage.updateRouteEosBatch(routeId, stores);
     // Убираем из очереди запросов
     eoRefreshQueue = eoRefreshQueue.filter(id => id !== routeId);
     res.json({ ok: true, results });
@@ -2813,11 +2827,11 @@ app.post('/api/rk/routes/:routeId/eos/refresh', async (req, res) => {
 });
 
 // GET /api/rk/driver-rokhlya-debt?name= — суммарный долг рохлей водителя (публичный)
-app.get('/api/rk/driver-rokhlya-debt', (req, res) => {
+app.get('/api/rk/driver-rokhlya-debt', async (req, res) => {
   try {
     const name = String(req.query.name || '').trim();
     if (!name) return res.json({ rokhlyaDebt: 0, debtSince: null });
-    const drivers = rkStorage.getByDriver({ q: name });
+    const drivers = await rkStorage.getByDriver({ q: name });
     const driver = drivers.find(d => d.name === name) || drivers[0];
     if (!driver) return res.json({ rokhlyaDebt: 0, debtSince: null });
     const debtRoute = (driver.routes || [])
@@ -2833,65 +2847,65 @@ app.get('/api/rk/driver-rokhlya-debt', (req, res) => {
 });
 
 // GET /api/rk/drivers?q= — сводка по водителям
-app.get('/api/rk/drivers', vsSessionRequired, (req, res) => {
+app.get('/api/rk/drivers', vsSessionRequired, async (req, res) => {
   try {
-    res.json(rkStorage.getByDriver({ q: req.query.q }));
+    res.json(await rkStorage.getByDriver({ q: req.query.q }));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
 // GET /api/rk/drivers/pending?q= — водители с неподтверждёнными маршрутами
-app.get('/api/rk/drivers/pending', (req, res) => {
+app.get('/api/rk/drivers/pending', async (req, res) => {
   try {
-    res.json(rkStorage.getDriversWithPending(req.query.q || ''));
+    res.json(await rkStorage.getDriversWithPending(req.query.q || ''));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
 // GET /api/rk/drivers/:name/routes/pending — маршруты водителя для приёмки
-app.get('/api/rk/drivers/:name/routes/pending', (req, res) => {
+app.get('/api/rk/drivers/:name/routes/pending', async (req, res) => {
   try {
-    res.json(rkStorage.getRoutesByDriverPending(decodeURIComponent(req.params.name)));
+    res.json(await rkStorage.getRoutesByDriverPending(decodeURIComponent(req.params.name)));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
 // GET /api/rk/drivers/unshipped?q= — водители с неотгруженными маршрутами (для страницы кладовщика)
-app.get('/api/rk/drivers/unshipped', (req, res) => {
+app.get('/api/rk/drivers/unshipped', async (req, res) => {
   try {
-    res.json(rkStorage.getDriversUnshipped(req.query.q || ''));
+    res.json(await rkStorage.getDriversUnshipped(req.query.q || ''));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
 // GET /api/rk/drivers/:name/routes/unshipped — неотгруженные маршруты водителя
-app.get('/api/rk/drivers/:name/routes/unshipped', (req, res) => {
+app.get('/api/rk/drivers/:name/routes/unshipped', async (req, res) => {
   try {
-    res.json(rkStorage.getRoutesByDriverUnshipped(decodeURIComponent(req.params.name)));
+    res.json(await rkStorage.getRoutesByDriverUnshipped(decodeURIComponent(req.params.name)));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
 // GET /api/rk/routes-search?q=&mode=unshipped|pending — поиск маршрутов для страницы кладовщика
-app.get('/api/rk/routes-search', (req, res) => {
+app.get('/api/rk/routes-search', async (req, res) => {
   try {
     const { q, mode } = req.query;
     const status = mode === 'unshipped' ? 'unshipped' : mode === 'pending' ? 'pending' : undefined;
-    res.json(rkStorage.getRoutes({ q, status }));
+    res.json(await rkStorage.getRoutes({ q, status }));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
 // GET /api/rk/cfz?q= — сводка по ЦФЗ
-app.get('/api/rk/cfz', vsSessionRequired, (req, res) => {
+app.get('/api/rk/cfz', vsSessionRequired, async (req, res) => {
   try {
-    res.json(rkStorage.getByCfz({ q: req.query.q }));
+    res.json(await rkStorage.getByCfz({ q: req.query.q }));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -3023,8 +3037,17 @@ app.get('*', (_req, res) => {
   res.sendFile(path.join(DIST_DIR, 'index.html'));
 });
 
-app.listen(PORT, '0.0.0.0', () => {
-  scheduler.ensureDataDir();
-  startTelegramBindingPolling();
-  console.log(`Сервер: http://localhost:${PORT} (доступен по сети на порту ${PORT})`);
-});
+async function startServer() {
+  if (process.env.USE_PG === 'true') {
+    console.log('[pg] Инициализация PostgreSQL...');
+    await rkStorage.init();
+    console.log('[pg] PostgreSQL готов');
+  }
+  app.listen(PORT, '0.0.0.0', () => {
+    scheduler.ensureDataDir();
+    startTelegramBindingPolling();
+    console.log(`Сервер: http://localhost:${PORT} (доступен по сети на порту ${PORT})`);
+  });
+}
+
+startServer().catch(e => { console.error('Ошибка запуска сервера:', e); process.exit(1); });

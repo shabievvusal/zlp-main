@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { requestEoRefresh, fetchRouteFromWMS } from '../../api/index.js'
 import { shortFio } from '../../utils/format.js'
+import { compressImage } from '../../utils/compressImage.js'
 import { Package, Truck, PackageOpen, ClipboardList, RefreshCw, Loader2 } from 'lucide-react'
 import s from './ReceivePage.module.css'
 
@@ -187,10 +188,11 @@ function StepData({ opType, route, onDone, byName }) {
   const [saving, setSaving] = useState(false)
   const fileInputRef = useRef(null)
 
-  function onPhotoSelected(e) {
+  async function onPhotoSelected(e) {
     const files = Array.from(e.target.files || [])
-    setPhotos(prev => [...prev, ...files.map(f => ({ file: f, url: URL.createObjectURL(f) }))])
     e.target.value = ''
+    const compressed = await Promise.all(files.map(f => compressImage(f)))
+    setPhotos(prev => [...prev, ...compressed.map(f => ({ file: f, url: URL.createObjectURL(f) }))])
   }
 
   function removePhoto(idx) {

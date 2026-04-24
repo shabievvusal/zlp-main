@@ -14,6 +14,9 @@ services:
       - .:/app/host-project
       - ./backend/server.js:/app/backend/server.js
       - ./backend/vs-auth.js:/app/backend/vs-auth.js
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:'+process.env.PORT+'/api/status', r => process.exit(r.statusCode===200?0:1))"]
       interval: 30s
@@ -21,6 +24,24 @@ services:
       retries: 3
       start_period: 10s
 
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       ${PG_DB:-zlp}
+      POSTGRES_USER:     ${PG_USER:-zlp}
+      POSTGRES_PASSWORD: ${PG_PASSWORD}
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PG_USER:-zlp} -d ${PG_DB:-zlp}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
 volumes:
   node-persist:
+    driver: local
+  pg-data:
     driver: local
