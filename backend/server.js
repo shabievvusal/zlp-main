@@ -13,6 +13,7 @@ const vsAuth = require('./vs-auth');
 const nodeAgent = require('./node-agent');
 const productWeights = require('./product-weights');
 const rkStorage = require('./route-rk-storage');
+const s3Storage = require('./s3');
 const excelReports = require('./excel-reports');
 
 const app = express();
@@ -459,7 +460,7 @@ const CONSOLIDATION_PATH = path.join(__dirname, 'data', 'consolidation.json');
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 
 const upload = multer({
-  dest: UPLOADS_DIR,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 20 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith('image/')) cb(null, true);
@@ -1884,7 +1885,7 @@ app.post('/api/schedule/settings', (req, res) => {
 // ─── Консолидация: маршруты ──────────────────────────────────────────────────
 
 // POST /api/consolidation/complaints — создать жалобу
-app.post('/api/consolidation/complaints', upload.array('photo', 10), (req, res) => {
+app.post('/api/consolidation/complaints', upload.array('photo', 10), async (req, res) => {
   try {
     const { cell, barcode, employeeName } = req.body || {};
     if (!cell || !barcode) {
@@ -1896,10 +1897,14 @@ app.post('/api/consolidation/complaints', upload.array('photo', 10), (req, res) 
     if (uploaded.length > 0) {
       for (let i = 0; i < uploaded.length; i++) {
         const f = uploaded[i];
-        const ext = path.extname(f.originalname) || '.jpg';
         const suffix = i === 0 ? '' : `_${i + 1}`;
-        const newName = `${id}${suffix}${ext}`;
-        fs.renameSync(f.path, path.join(UPLOADS_DIR, newName));
+        const newName = `${id}${suffix}.jpg`;
+        const compressed = await sharp(f.buffer)
+          .rotate()
+          .resize(1920, 1920, { fit: 'inside', withoutEnlargement: true })
+          .jpeg({ quality: 85 })
+          .toBuffer();
+        await s3Storage.uploadFile(`consolidation/${newName}`, compressed);
         photoFilenames.push(newName);
       }
     }
@@ -1992,8 +1997,11 @@ app.get('/api/consolidation/uploads/:filename', (req, res) => {
   const name = path.basename(req.params.filename);
   if (name.includes('..')) return res.status(400).json({ error: 'Invalid' });
   const filePath = path.join(UPLOADS_DIR, name);
-  if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'Not found' });
-  res.sendFile(filePath);
+  if (fs.existsSync(filePath)) {
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    return res.sendFile(filePath);
+  }
+  res.redirect(301, s3Storage.publicUrl(`consolidation/${name}`));
 });
 
 // PUT /api/consolidation/complaints/:id/lookup — сохранить результат WMS-поиска (от клиента)
@@ -2592,13 +2600,25 @@ const rkPhotoUpload = multer({
     else cb(new Error('Только изображения'));
   },
 });
-app.post('/api/rk/photos', rkPhotoUpload.array('photos', 10), (req, res) => {
+app.post('/api/rk/photos', rkPhotoUpload.array('photos', 10), async (req, res) => {
   try {
-    const urls = (req.files || []).map(f => {
-      const ext = path.extname(f.originalname) || '.jpg';
-      const name = `${Date.now()}_${Math.random().toString(36).slice(2)}${ext}`;
-      return rkStorage.savePhoto(name, f.buffer);
-    });
+    const urls = await Promise.all((req.files || []).map(async f => {
+      const name = `${Date.now()}_${Math.random().toString(36).slice(2)}.jpg`;
+      const compressed = await sharp(f.buffer)
+        .rotate()
+        .resize(1920, 1920, { fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality: 85 })
+        .toBuffer();
+      const thumb = await sharp(compressed)
+        .resize(144, 144, { fit: 'cover' })
+        .jpeg({ quality: 70 })
+        .toBuffer();
+      await Promise.all([
+        s3Storage.uploadFile(`rk-photos/${name}`, compressed),
+        s3Storage.uploadFile(`rk-photos/thumbs/${name}`, thumb),
+      ]);
+      return `/rk-photos/${name}`;
+    }));
     res.json({ ok: true, urls });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
@@ -2638,26 +2658,30 @@ app.get('/rk-photos/thumb/:filename', async (req, res) => {
   const thumbPath = path.join(THUMB_DIR, thumbName);
 
   if (!origPath.startsWith(rkStorage.PHOTO_DIR)) return res.status(403).end();
-  if (!fs.existsSync(origPath)) return res.status(404).end();
 
   try {
-    if (!fs.existsSync(thumbPath)) {
-      await sharp(origPath)
-        .resize(144, 144, { fit: 'cover' })
-        .jpeg({ quality: 70 })
-        .toFile(thumbPath);
+    if (fs.existsSync(origPath)) {
+      if (!fs.existsSync(thumbPath)) {
+        await sharp(origPath)
+          .resize(144, 144, { fit: 'cover' })
+          .jpeg({ quality: 70 })
+          .toFile(thumbPath);
+      }
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      return res.sendFile(thumbPath);
     }
-    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-    res.sendFile(thumbPath);
+    res.redirect(301, s3Storage.publicUrl(`rk-photos/thumbs/${thumbName}`));
   } catch {
-    res.sendFile(origPath, err => { if (err) res.status(404).end(); });
+    res.status(404).end();
   }
 });
 
 app.use('/rk-photos', (req, res, next) => {
-  const filePath = path.join(rkStorage.PHOTO_DIR, path.basename(req.path));
+  const filename = path.basename(req.path);
+  const filePath = path.join(rkStorage.PHOTO_DIR, filename);
   if (!filePath.startsWith(rkStorage.PHOTO_DIR)) return res.status(403).end();
-  res.sendFile(filePath, err => { if (err) res.status(404).end(); });
+  if (fs.existsSync(filePath)) return res.sendFile(filePath, err => { if (err) res.status(404).end(); });
+  res.redirect(301, s3Storage.publicUrl(`rk-photos/${filename}`));
 });
 
 // POST /api/rk/routes/:routeId/ship — отгрузка (кладовщик вводит РК по каждому ЦФЗ)
