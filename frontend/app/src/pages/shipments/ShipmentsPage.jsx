@@ -574,7 +574,7 @@ function RouteDetailRow({ route: r, onLightbox }) {
                   <div className={styles.photosRow}>
                     {shipPhotos.map((u, i) => (
                       <span key={u} className={styles.photoThumb} onClick={() => onLightbox(shipPhotos, i)}>
-                        <img src={thumbUrl(u)} alt="фото" decoding="async" />
+                        <img src={thumbUrl(u)} alt="фото" decoding="async" onError={e => { e.currentTarget.src = u }} />
                       </span>
                     ))}
                   </div>
@@ -586,7 +586,7 @@ function RouteDetailRow({ route: r, onLightbox }) {
                   <div className={styles.photosRow}>
                     {recvPhotos.map((u, i) => (
                       <span key={u} className={styles.photoThumb} onClick={() => onLightbox(recvPhotos, i)}>
-                        <img src={thumbUrl(u)} alt="фото" decoding="async" />
+                        <img src={thumbUrl(u)} alt="фото" decoding="async" onError={e => { e.currentTarget.src = u }} />
                       </span>
                     ))}
                   </div>
