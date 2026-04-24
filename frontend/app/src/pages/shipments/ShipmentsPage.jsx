@@ -99,8 +99,8 @@ function useLocalSet(key) {
   return [value, set]
 }
 
-// /rk-photos/file.jpg → /rk-photos/thumb/file.jpg
 function thumbUrl(url) {
+  if (url.startsWith('http')) return url.replace('/rk-photos/', '/rk-photos/thumbs/')
   return url.replace('/rk-photos/', '/rk-photos/thumb/')
 }
 
