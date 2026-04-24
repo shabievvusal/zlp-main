@@ -2901,35 +2901,42 @@ app.get('/api/rk/cfz', vsSessionRequired, (req, res) => {
 
 let telegramPollingOffset = 0;
 
-async function telegramBindingPollOnce() {
+async function telegramBindingPollingLoop() {
+  const config = loadConfig();
+  const botToken = String(config.telegramBotToken || '').trim();
+  if (!botToken) {
+    setTimeout(telegramBindingPollingLoop, 15000);
+    return;
+  }
   try {
-    const config = loadConfig();
-    const botToken = String(config.telegramBotToken || '').trim();
-    if (!botToken) return;
-    const url = `https://api.telegram.org/bot${encodeURIComponent(botToken)}/getUpdates?offset=${telegramPollingOffset}&timeout=20`;
+    const url = `https://api.telegram.org/bot${encodeURIComponent(botToken)}/getUpdates?offset=${telegramPollingOffset}&timeout=25`;
     const r = await fetch(url);
     const data = await r.json().catch(() => ({}));
-    if (!data?.ok || !Array.isArray(data.result)) return;
-    for (const upd of data.result) {
-      if (upd.update_id >= telegramPollingOffset) telegramPollingOffset = upd.update_id + 1;
-      const msg = upd.message || upd.edited_message;
-      if (!msg?.text) continue;
-      const text = String(msg.text).trim().toUpperCase();
-      const chatId = msg.chat?.id;
-      if (!chatId) continue;
-      const login = vsAuth.consumeBindingCode(text);
-      if (login) {
-        vsAuth.setTelegramChatId(login, String(chatId));
-        await sendTelegramMessage(botToken, chatId, '✅ Привязано. Отчёты по статистике будут приходить сюда.');
+    if (data?.ok && Array.isArray(data.result)) {
+      for (const upd of data.result) {
+        if (upd.update_id >= telegramPollingOffset) telegramPollingOffset = upd.update_id + 1;
+        const msg = upd.message || upd.edited_message;
+        if (!msg?.text) continue;
+        const text = String(msg.text).trim().toUpperCase();
+        const chatId = msg.chat?.id;
+        if (!chatId) continue;
+        const login = vsAuth.consumeBindingCode(text);
+        if (login) {
+          vsAuth.setTelegramChatId(login, String(chatId));
+          await sendTelegramMessage(botToken, chatId, '✅ Привязано. Отчёты по статистике будут приходить сюда.');
+        }
       }
     }
   } catch (_) {
-    // игнорируем ошибки опроса
+    // игнорируем ошибки сети — переподключимся через 5 сек
+    await new Promise(r => setTimeout(r, 5000));
   }
+  // следующий запрос стартует сразу после завершения предыдущего
+  setImmediate(telegramBindingPollingLoop);
 }
 
 function startTelegramBindingPolling() {
-  setInterval(telegramBindingPollOnce, 3000);
+  telegramBindingPollingLoop();
 }
 
 // ─── Нарушения (Violations) ─────────────────────────────────────────────────
