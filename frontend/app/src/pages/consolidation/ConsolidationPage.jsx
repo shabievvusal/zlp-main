@@ -89,6 +89,12 @@ function getComplaintPhotos(c) {
     : (c.photoFilename ? [c.photoFilename] : [])
 }
 
+function photoUrl(name) {
+  if (!name) return ''
+  if (name.startsWith('http')) return name
+  return `/api/consolidation/uploads/${encodeURIComponent(name)}`
+}
+
 // ─── WMS lookup (browser-side) ───────────────────────────────────────────────
 
 async function wmsPost(token, body) {
@@ -355,7 +361,7 @@ function buildServiceNoteSection(c, uploadsBaseUrl, supervisorName) {
   const utDisplay = c.nomenclatureCode?.trim() || '—'
   const supervisor = supervisorName?.trim() || ''
   const photos = getComplaintPhotos(c)
-  const photoUrls = photos.map(name => uploadsBaseUrl + encodeURIComponent(name))
+  const photoUrls = photos.map(name => name.startsWith('http') ? name : uploadsBaseUrl + encodeURIComponent(name))
   const imgs = photoUrls.map(url => `<img src="${url}" alt="Фото" class="sz-photo" crossorigin="">`).join('')
   const utBarcode = productBarcode !== '—' ? `ШК${esc(productBarcode)}` : '—'
   return `
@@ -599,9 +605,9 @@ function ComplaintRow({ complaint: c, selected, onToggle, onStatusChange, onLook
             {photos.length > 1 && <span className={s.photoCountBadge}>{photos.length}</span>}
             <img
               className={s.photoThumb}
-              src={`/api/consolidation/uploads/${encodeURIComponent(photos[0])}`}
+              src={photoUrl(photos[0])}
               alt="Фото"
-              onClick={() => onPhotoOpen(photos.map(n => `/api/consolidation/uploads/${encodeURIComponent(n)}`), 0)}
+              onClick={() => onPhotoOpen(photos.map(n => photoUrl(n)), 0)}
             />
           </div>
         ) : (
