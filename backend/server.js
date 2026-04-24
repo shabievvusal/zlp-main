@@ -482,16 +482,21 @@ const uploadExcel = multer({
   limits: { fileSize: 20 * 1024 * 1024 },
 });
 
+let _complaintsCache = null;
+
 function loadComplaints() {
+  if (_complaintsCache) return _complaintsCache;
   try {
     if (!fs.existsSync(CONSOLIDATION_PATH)) return [];
-    return JSON.parse(fs.readFileSync(CONSOLIDATION_PATH, 'utf8'));
+    _complaintsCache = JSON.parse(fs.readFileSync(CONSOLIDATION_PATH, 'utf8'));
+    return _complaintsCache;
   } catch { return []; }
 }
 
 function saveComplaints(list) {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
   fs.writeFileSync(CONSOLIDATION_PATH, JSON.stringify(list, null, 2), 'utf8');
+  _complaintsCache = list;
 }
 
 function tgSafe(v) {

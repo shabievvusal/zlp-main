@@ -38,16 +38,21 @@ const DATA_DIR  = path.join(__dirname, 'data');
 const RK_PATH   = path.join(DATA_DIR, 'route-rk.json');
 const PHOTO_DIR = path.join(DATA_DIR, 'rk-photos');
 
+let _cache = null;
+
 function load() {
+  if (_cache) return _cache;
   try {
     if (!fs.existsSync(RK_PATH)) return {};
-    return JSON.parse(fs.readFileSync(RK_PATH, 'utf-8'));
+    _cache = JSON.parse(fs.readFileSync(RK_PATH, 'utf-8'));
+    return _cache;
   } catch { return {}; }
 }
 
 function save(data) {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
   fs.writeFileSync(RK_PATH, JSON.stringify(data, null, 2), 'utf-8');
+  _cache = data;
 }
 
 function ensurePhotoDir() {
