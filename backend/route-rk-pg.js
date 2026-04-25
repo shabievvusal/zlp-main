@@ -505,7 +505,7 @@ async function getReportData(dateFrom, dateTo) {
   function ensureCell(addr, date) {
     if (!map.has(addr)) map.set(addr, new Map());
     const dm = map.get(addr);
-    if (!dm.has(date)) dm.set(date, { shipped: 0, received: null });
+    if (!dm.has(date)) dm.set(date, { shipped: 0, received: null, shippedBoxes: 0, receivedBoxes: null });
     return dm.get(date);
   }
 
@@ -514,7 +514,11 @@ async function getReportData(dateFrom, dateTo) {
     if (route.shipment) {
       const shipDate = (route.shipment.at || route.date || '').slice(0, 10);
       if (shipDate >= dateFrom && shipDate <= dateTo) {
-        for (const item of (route.shipment.items || [])) ensureCell(item.address, shipDate).shipped += item.rk;
+        for (const item of (route.shipment.items || [])) {
+          const cell = ensureCell(item.address, shipDate);
+          cell.shipped += item.rk;
+          if (item.boxes) cell.shippedBoxes += item.boxes;
+        }
       }
     }
     if (route.receiving) {
@@ -523,6 +527,7 @@ async function getReportData(dateFrom, dateTo) {
         for (const item of (route.receiving.items || [])) {
           const cell = ensureCell(item.address, recvDate);
           cell.received = (cell.received || 0) + item.rk;
+          if (item.boxes) cell.receivedBoxes = (cell.receivedBoxes || 0) + item.boxes;
         }
       }
     }
@@ -532,8 +537,8 @@ async function getReportData(dateFrom, dateTo) {
     .map(([address, dm]) => ({
       address,
       records: [...dm.entries()]
-        .filter(([, v]) => v.shipped > 0 || v.received != null)
-        .map(([date, v]) => ({ date, shipped: v.shipped, received: v.received }))
+        .filter(([, v]) => v.shipped > 0 || v.received != null || v.shippedBoxes > 0 || v.receivedBoxes != null)
+        .map(([date, v]) => ({ date, shipped: v.shipped, received: v.received, shippedBoxes: v.shippedBoxes, receivedBoxes: v.receivedBoxes }))
         .sort((a, b) => a.date.localeCompare(b.date)),
     }))
     .filter(e => e.records.length > 0)

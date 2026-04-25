@@ -2530,7 +2530,7 @@ app.get('/api/shipments/report', vsSessionRequired, async (req, res) => {
 
     const buf = await excelReports.generateReport(summaryData, dates, dateFrom, allAddresses);
 
-    const filename = encodeURIComponent('Отчет по РК.xlsx');
+    const filename = encodeURIComponent('Отчет по РК и ящикам.xlsx');
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${filename}`);

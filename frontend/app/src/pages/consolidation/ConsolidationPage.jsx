@@ -347,10 +347,19 @@ async function lookupViaBrowser(token, barcode, cell) {
 
 // ─── Print service notes ──────────────────────────────────────────────────────
 
+function shortFio(fullName) {
+  if (!fullName) return '—'
+  const parts = String(fullName).trim().split(/\s+/)
+  if (parts.length < 2) return parts[0] || '—'
+  const [last, first, ...rest] = parts
+  const initials = [first, ...rest].filter(Boolean).map(p => p[0].toUpperCase() + '.').join('')
+  return `${last} ${initials}`
+}
+
 function buildServiceNoteSection(c, uploadsBaseUrl, supervisorName) {
   const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-  const company = formatCompanyForSz(c.company)
   const violator = c.violator?.trim() || '—'
+  const violatorShort = shortFio(violator)
   const dateStr = formatDateOnly(c.operationCompletedAt || c.createdAt)
   const timeStr = formatTimeOnly(c.operationCompletedAt || c.createdAt)
   const productName = c.productName?.trim() || '—'
@@ -358,12 +367,12 @@ function buildServiceNoteSection(c, uploadsBaseUrl, supervisorName) {
   const eo = c.handlingUnitBarcode?.trim() || c.barcode?.trim() || '—'
   const cell = c.cell?.trim() || '—'
   const quantity = c.quantity?.trim() || '1'
-  const utDisplay = c.nomenclatureCode?.trim() || '—'
+  const utDisplay = c.nomenclatureCode?.trim() || ''
   const supervisor = supervisorName?.trim() || ''
   const photos = getComplaintPhotos(c)
   const photoUrls = photos.map(name => name.startsWith('http') ? name : uploadsBaseUrl + encodeURIComponent(name))
   const imgs = photoUrls.map(url => `<img src="${url}" alt="Фото" class="sz-photo" crossorigin="">`).join('')
-  const utBarcode = productBarcode !== '—' ? `ШК${esc(productBarcode)}` : '—'
+  const utBarcodeStr = [utDisplay, productBarcode !== '—' ? `ШК ${esc(productBarcode)}` : ''].filter(Boolean).join(' / ')
   return `
     <div class="sz-page">
       <div class="sz-header-right">
@@ -373,30 +382,24 @@ function buildServiceNoteSection(c, uploadsBaseUrl, supervisorName) {
         <p>От начальника смены</p>
         <p>${supervisor ? esc(supervisor) : '________________'}</p>
       </div>
-      <div class="sz-title">СЛУЖЕБНАЯ ЗАПИСКА</div>
-      <div class="sz-subtitle">О выявленных нарушениях в процессе работы</div>
-      <p class="sz-p">Настоящим сообщаю, что <strong>${esc(dateStr)}</strong>, со стороны сотрудника ${esc(company)} были выявлены следующие нарушения:</p>
-      <p class="sz-p sz-p-noident">За сотрудником <strong>${esc(violator)}</strong></p>
-      <p class="sz-p sz-p-noident">выявлено нарушение по п.2 приложения №4 от 01.01.2025, а именно нарушение формирования отправления товара:</p>
-      <p class="sz-p sz-p-noident">«<strong>${esc(productName)}</strong>»</p>
-      <p class="sz-p sz-p-noident"><strong>${esc(utDisplay)}</strong> / ${utBarcode}</p>
-      <p class="sz-p sz-p-noident"><strong>в количестве:</strong> ${esc(quantity)} шт</p>
-      <p class="sz-p sz-p-noident"><strong>Место:</strong> ${esc(cell)}</p>
-      <p class="sz-p sz-p-noident"><strong>EO:</strong> ${esc(eo)}</p>
-      <p class="sz-p sz-p-noident"><strong>Время:</strong> ${esc(dateStr)} ${esc(timeStr)}</p>
-      <div class="sz-sign-row">
-        <div class="sz-sign">
-          <p><strong>Начальник смены</strong></p>
-          <p>Подпись: __________________</p>
-          <p>ФИО: ${supervisor ? esc(supervisor) : '__________________'}</p>
-          <p>Дата: ${dateStr ? esc(dateStr) : '__________________'}</p>
-        </div>
-        <div class="sz-ack">
-          <p>Со служебной запиской ознакомлен</p>
-          <p>Нарушения подтверждаю</p>
-          <p><strong>Бригадир ${esc(company)}</strong></p>
-          <p>Подпись: __________________ &nbsp; ФИО: __________________</p>
-        </div>
+      <div class="sz-title">Служебная записка</div>
+      <div class="sz-title sz-title-sub">о выявленных нарушениях в процессе работы</div>
+      <p class="sz-p">Настоящим сообщаю, что ${esc(dateStr)} года за кладовщиком ${esc(violator)} участка комплектации п. Шушары (г. Санкт-Петербург) было выявлено нарушение формирования отправления по п.2 приложения № 4 от 01.01.2025 года, а именно:</p>
+      <p class="sz-p sz-p-noident">- ${esc(productName)}${utBarcodeStr ? ` ${esc(utBarcodeStr)}` : ''}</p>
+      <p class="sz-p sz-p-noident">В количестве: ${esc(quantity)} шт.</p>
+      <p class="sz-p sz-p-noident">Место: ${esc(cell)}</p>
+      <p class="sz-p sz-p-noident">ЕО: ${esc(eo)}</p>
+      <p class="sz-p sz-p-noident">Время: ${esc(dateStr)} ${esc(timeStr)}</p>
+      <p class="sz-p">Данное нарушение подтверждается камерами видеонаблюдения и результатами приемки на ЦФЗ. Таким образом, зафиксировано ненадлежащее исполнение трудовых обязанностей кладовщиком ${esc(violatorShort)}.</p>
+      <p class="sz-p">Подобные ошибки ведут к сбоям в адресации товара, росту недовозов и дополнительной нагрузке на персонал ЦФЗ, что систематически фиксируется в наших сводках.</p>
+      <p class="sz-p">Так же данные действия привели к увеличению трудозатрат на обработку указанных позиций: дополнительные проверки, пересчеты и инвентаризации. Появляются риски ухудшения деловой репутации нашей компании, а также недоверию к качеству услуг, оказываемых нашей компанией как исполнителем складских логистических услуг.</p>
+      <div class="sz-sign-block">
+        <p class="sz-sign-label">Со служебной запиской ознакомлен, нарушения подтверждаю:</p>
+        <div class="sz-sign-fields"><span></span><span></span><span></span></div>
+        <div class="sz-sign-captions"><span>(Подпись)</span><span>(Расшифровка)</span><span>(Дата)</span></div>
+        <p class="sz-sign-label" style="margin-top:18px">Начальник смены:</p>
+        <div class="sz-sign-fields"><span></span><span></span><span></span></div>
+        <div class="sz-sign-captions"><span>(Подпись)</span><span>(Расшифровка)</span><span>(Дата)</span></div>
       </div>
       ${photoUrls.length > 0 ? `<div class="sz-photos">${imgs}</div>` : ''}
     </div>`
@@ -413,15 +416,18 @@ function printServiceNotes(selected, supervisorName) {
 body { font-family: "Times New Roman", serif; font-size: 12pt; line-height: 1.45; color: #000; margin: 0; padding: 16px; }
 .sz-page { page-break-after: always; padding-bottom: 20px; }
 .sz-page:last-child { page-break-after: auto; }
-.sz-header-right { text-align: right; margin-bottom: 14px; }
+.sz-header-right { text-align: right; margin-bottom: 20px; }
 .sz-header-right p { margin: 2px 0; }
-.sz-title { text-align: center; font-weight: 700; margin: 8px 0 4px; }
-.sz-subtitle { text-align: center; margin-bottom: 12px; }
+.sz-title { text-align: center; font-weight: 700; margin: 8px 0 2px; }
+.sz-title-sub { margin-bottom: 14px; }
 .sz-p { text-align: justify; text-indent: 1.25cm; margin: 0 0 8px 0; }
 .sz-p-noident { text-indent: 0; }
-.sz-sign-row { display: flex; justify-content: space-between; margin-top: 18px; gap: 24px; }
-.sz-sign { flex: 1; } .sz-sign p { margin: 4px 0; }
-.sz-ack { flex: 1; text-align: right; max-width: 50%; } .sz-ack p { margin: 2px 0; }
+.sz-sign-block { margin-top: 24px; }
+.sz-sign-label { margin: 0 0 4px 0; }
+.sz-sign-fields { display: flex; gap: 24px; margin-top: 14px; }
+.sz-sign-fields span { flex: 1; border-bottom: 1px solid #000; min-width: 100px; }
+.sz-sign-captions { display: flex; gap: 24px; margin-top: 2px; }
+.sz-sign-captions span { flex: 1; font-size: 10pt; text-align: center; }
 .sz-photos { margin-top: 16px; height: 230mm; display: flex; flex-direction: column; gap: 0; page-break-inside: avoid; }
 .sz-photo { width: 100%; flex: 1; min-height: 60mm; object-fit: cover; display: block; border: 1px solid #ccc; box-sizing: border-box; }
 </style></head><body>${sections}</body></html>`
