@@ -7,7 +7,7 @@ import {
   getShiftBoundaryMs,
   getWeightByEmployee,
 } from '../../utils/statsCalc.js'
-import { formatWeight } from '../../utils/format.js'
+import { formatWeight, shortFio } from '../../utils/format.js'
 import { normalizeFio, personKey } from '../../utils/emplUtils.js'
 import CompanySummaryTable from '../stats/CompanySummaryTable.jsx'
 import HourlyEmployeeTable from '../stats/HourlyEmployeeTable.jsx'
@@ -39,16 +39,6 @@ const ZONE_NAMES = {
   KDM: 'КДК заморозка'
 }
 
-function avatarColor(name) {
-  let h = 0
-  for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h)
-  return `hsl(${Math.abs(h) % 360}, 52%, 50%)`
-}
-
-function getInitials(name) {
-  const p = name.trim().split(/\s+/)
-  return p.length >= 2 ? p[0][0].toUpperCase() + p[1][0].toUpperCase() : name.slice(0, 2).toUpperCase()
-}
 
 function AnimatedNumber({ value }) {
   const [display, setDisplay] = useState(0)
@@ -68,8 +58,7 @@ function AnimatedNumber({ value }) {
   return <>{display}</>
 }
 
-function Top10Grid({ top10, heDataAll, weightByEmployee }) {
-  const hours = heDataAll?.hours || []
+function Top10Grid({ top10, weightByEmployee }) {
   const [ready, setReady] = useState(false)
   useEffect(() => {
     setReady(false)
@@ -83,8 +72,6 @@ function Top10Grid({ top10, heDataAll, weightByEmployee }) {
   const rest = top10.slice(3)
 
   const card = (r, origIdx, isPodium) => {
-    const barVals = hours.map(h => r.byHour?.[h] || 0)
-    const maxBar = Math.max(...barVals, 1)
     const wTotal = weightByEmployee[r.name]?.total ?? 0
     const wFmt = formatWeight(wTotal)
     const pct = top10[0]?.total > 0 ? (r.total / top10[0].total) * 100 : 0
@@ -97,26 +84,18 @@ function Top10Grid({ top10, heDataAll, weightByEmployee }) {
     const zones = Object.entries(r.byZone || {})
       .map(([z, v]) => [z, zoneVal(v)])
       .sort((a, b) => b[1] - a[1])
-      .slice(0, isPodium ? 4 : 2)
+      .slice(0, 2)
     const zoneTotal = zones.reduce((acc, [, v]) => acc + v, 0)
-    const posClass = isPodium
-      ? (origIdx === 0 ? s.top10Pos1 : origIdx === 1 ? s.top10Pos2 : s.top10Pos3)
-      : ''
     const baseClass = isPodium ? s.top10PodiumCard : s.top10RestCard
     return (
-      <div key={r.name} className={`${s.top10Card} ${baseClass} ${rankCls} ${posClass}`} style={{ '--i': origIdx }}>
+      <div key={r.name} className={`${s.top10Card} ${baseClass} ${rankCls}`} style={{ '--i': origIdx }}>
         <div className={s.top10Header}>
           <span className={s.top10Rank}>{origIdx < 3 ? ['🥇', '🥈', '🥉'][origIdx] : `#${origIdx + 1}`}</span>
           <span className={s.top10Time}>{fmtTime(r.firstAt)} – {fmtTime(r.lastAt)}</span>
         </div>
-        <div className={s.top10Identity}>
-          <div className={s.top10Avatar} style={{ background: avatarColor(r.name) }}>
-            {getInitials(r.name)}
-          </div>
-          <div className={s.top10NameBlock}>
-            <div className={s.top10Name}>{r.name}</div>
-            {tempo > 0 && <div className={s.top10Tempo}>{tempo} СЗ/ч</div>}
-          </div>
+        <div className={s.top10NameBlock}>
+          <div className={s.top10Name}>{shortFio(r.name)}</div>
+          {tempo > 0 && <div className={s.top10Tempo}>{tempo} СЗ/ч</div>}
         </div>
         {zones.length > 0 && (
           <div className={s.top10Zones}>
@@ -151,22 +130,8 @@ function Top10Grid({ top10, heDataAll, weightByEmployee }) {
           <span className={s.top10Total}><AnimatedNumber value={r.total} /> <span className={s.top10Label}>СЗ</span></span>
         </div>
         <div className={s.top10Footer}>
-          <div className={s.top10WeightBlock}>
-            <span className={s.top10Weight}>{wFmt}</span>
-            {wPerH > 0 && <span className={s.top10WeightRate}>{wPerHFmt}/ч</span>}
-          </div>
-          <div className={s.top10Sparkline}>
-            {hours.map((h, bi) => (
-              <div
-                key={h}
-                className={s.top10Bar}
-                style={{
-                  height: ready ? `${Math.max(15, Math.round((barVals[bi] / maxBar) * 100))}%` : '4px',
-                  transitionDelay: ready ? `${0.45 + origIdx * 0.03 + bi * 0.025}s` : '0s',
-                }}
-              />
-            ))}
-          </div>
+          <span className={s.top10Weight}>{wFmt}</span>
+          {wPerH > 0 && <span className={s.top10WeightRate}>{wPerHFmt}/ч</span>}
         </div>
       </div>
     )
@@ -207,7 +172,17 @@ export default function TvPage() {
     selectedDate, shiftFilter,
     idleThresholdMinutes, allowedIdleMinutes,
     loading, status,
+    setShiftFilter, setSelectedDate, loadDateSummary,
   } = useApp()
+
+  // Применяем ?shift= и ?date= из URL при монтировании
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search)
+    const s = p.get('shift')
+    const d = p.get('date')
+    if (s === 'night' || s === 'day') setShiftFilter(s)
+    if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) setSelectedDate(d)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const [tabIdx, setTabIdx]           = useState(0)
   const [slideLeft, setSlideLeft]     = useState(MIN_SLIDE_SEC)
