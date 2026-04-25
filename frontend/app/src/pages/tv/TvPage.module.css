@@ -191,6 +191,413 @@
   font-size: 16px;
 }
 
+/* ── Top 10 ───────────────────────────────────────────── */
+.top10Wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  height: calc(100dvh - 60px - 24px);
+}
+
+/* Podium row: 2nd–1st–3rd, all bottoms aligned */
+.top10Podium {
+  flex: 5 1 0;
+  min-height: 300px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 14px;
+}
+
+/* Smaller grid for places 4–10 */
+.top10Rest {
+  flex: 4 1 0;
+  min-height: 290px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.top10Rest .top10RestCard {
+  min-height: 0;
+}
+
+.top10Rest .top10RestCard:last-child {
+  grid-column: span 2;
+}
+
+@keyframes cardSlideIn {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Base card ──────────────────────────────────────────── */
+.top10Card {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 0;
+  background: var(--bg-card);
+  border: 1.5px solid var(--border);
+  border-top-width: 3px;
+  border-radius: 14px;
+  padding: 14px 16px 12px;
+  overflow: hidden;
+  position: relative;
+  animation: cardSlideIn 0.45s cubic-bezier(0.23, 1, 0.32, 1) both;
+  animation-delay: calc(var(--i, 0) * 55ms);
+}
+
+/* ── Podium card variants ───────────────────────────────── */
+.top10PodiumCard {
+  flex: 1 1 0;
+  min-height: 240px;
+  display: grid;
+  grid-template-rows: auto auto 1fr auto auto;
+  gap: 10px;
+  padding: 14px 18px 14px;
+}
+.top10Pos1 { height: 100%; }
+.top10Pos2 { height: 90%; }
+.top10Pos3 { height: 84%; }
+
+.top10PodiumCard .top10Header {
+  margin-bottom: 0;
+}
+
+.top10PodiumCard .top10Rank {
+  font-size: 28px;
+}
+
+.top10PodiumCard .top10Time {
+  font-size: 20px;
+}
+
+.top10PodiumCard .top10Identity {
+  gap: 14px;
+}
+
+.top10PodiumCard .top10Avatar {
+  width: 60px;
+  height: 60px;
+  font-size: 24px;
+}
+
+.top10PodiumCard .top10Name {
+  font-size: 38px;
+  line-height: 1.12;
+}
+
+.top10PodiumCard .top10Tempo {
+  font-size: 28px;
+}
+
+.top10PodiumCard .top10Zones {
+  align-self: stretch;
+  justify-content: center;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.2), rgba(255,255,255,0.05));
+}
+
+.top10PodiumCard .top10Zone {
+  gap: 10px;
+}
+
+.top10PodiumCard .top10ZoneName {
+  flex-basis: 170px;
+  font-size: 20px;
+}
+
+.top10PodiumCard .top10ZoneBar {
+  height: 10px;
+  border-radius: 6px;
+}
+
+.top10PodiumCard .top10ZoneCount {
+  width: 50px;
+  font-size: 20px;
+}
+
+.top10PodiumCard .top10SzRow {
+  margin-top: 0;
+  gap: 12px;
+}
+
+.top10PodiumCard .top10Progress {
+  height: 10px;
+  border-radius: 6px;
+}
+
+.top10PodiumCard .top10Total {
+  font-size: 54px;
+}
+
+.top10PodiumCard .top10Label {
+  font-size: 20px;
+}
+
+.top10PodiumCard .top10Footer {
+  margin-top: 0;
+  padding-top: 2px;
+}
+
+.top10PodiumCard .top10Weight {
+  font-size: 40px;
+}
+
+.top10PodiumCard .top10WeightRate {
+  font-size: 20px;
+}
+
+.top10PodiumCard .top10Sparkline {
+  height: 62px;
+  gap: 3px;
+}
+
+.top10PodiumCard .top10Bar {
+  width: 8px;
+}
+
+/* ── Rest card overrides ────────────────────────────────── */
+.top10RestCard {
+  padding: 10px 12px 10px;
+  gap: 6px;
+}
+.top10RestCard .top10Header      { margin-bottom: 0; }
+.top10RestCard .top10Identity    { gap: 8px; }
+.top10RestCard .top10NameBlock   { gap: 1px; }
+.top10RestCard .top10SzRow       { gap: 6px; margin-top: 0; }
+.top10RestCard .top10Progress    { height: 6px; }
+.top10RestCard .top10Footer      { padding-top: 2px; }
+.top10RestCard .top10Rank        { font-size: 16px; }
+.top10RestCard .top10Time        { font-size: 11px; }
+.top10RestCard .top10Name        { font-size: 16px; line-height: 1.15; }
+.top10RestCard .top10Tempo       { font-size: 12px; }
+.top10RestCard .top10Total       { font-size: 26px; }
+.top10RestCard .top10Weight      { font-size: 18px; }
+.top10RestCard .top10WeightRate  {
+  display: inline;
+  font-size: 11px;
+  line-height: 1.1;
+}
+.top10RestCard .top10Avatar      { width: 34px; height: 34px; font-size: 13px; }
+.top10RestCard .top10ZoneName    { font-size: 11px; flex: 0 0 72px; }
+.top10RestCard .top10ZoneCount   { font-size: 11px; width: 24px; }
+.top10RestCard .top10Zones       { gap: 3px; }
+.top10RestCard .top10ZoneBar     { height: 4px; }
+.top10RestCard .top10Sparkline   { height: 28px; }
+.top10RestCard .top10Bar         { width: 5px; }
+
+/* ── Medal colours ──────────────────────────────────────── */
+.top10Gold   { border-top-color: #d4a017; background: linear-gradient(160deg, #fffbeb, #fef3c7 80%); }
+.top10Silver { border-top-color: #94a3b8; background: linear-gradient(160deg, #f8fafc, #f1f5f9 80%); }
+.top10Bronze { border-top-color: #b45309; background: linear-gradient(160deg, #fffbf0, #fde8cc 80%); }
+
+.top10Header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2px;
+}
+
+.top10Rank {
+  font-size: 22px;
+  line-height: 1;
+  font-weight: 800;
+  color: var(--text-muted);
+}
+
+.top10Time {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.top10Identity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.top10Avatar {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 17px;
+  font-weight: 800;
+  color: #fff;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+}
+
+.top10NameBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.top10Name {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1.2;
+  word-break: break-word;
+}
+
+.top10Tempo {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--green);
+}
+
+.top10Zones {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.top10Zone {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.top10ZoneName {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 600;
+  flex: 0 0 90px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.top10ZoneBar {
+  flex: 1;
+  height: 5px;
+  background: rgba(0,0,0,0.07);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.top10ZoneFill {
+  height: 100%;
+  border-radius: 3px;
+  width: 0%;
+  transition: width 0.85s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.top10ZoneCount {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  width: 28px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.top10SzRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.top10Progress {
+  flex: 1;
+  height: 7px;
+  background: rgba(0,0,0,0.08);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.top10ProgressFill {
+  height: 100%;
+  background: var(--green);
+  border-radius: 4px;
+  width: 0%;
+  transition: width 0.95s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.top10Gold   .top10ProgressFill { background: #d4a017; }
+.top10Silver .top10ProgressFill { background: #64748b; }
+.top10Bronze .top10ProgressFill { background: #b45309; }
+
+.top10Total {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--text);
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.top10Label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.top10Footer {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 4px;
+}
+
+.top10WeightBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.top10Weight {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.top10WeightRate {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.top10Sparkline {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 32px;
+  flex: 1;
+  justify-content: flex-end;
+}
+
+.top10Bar {
+  width: 5px;
+  min-height: 4px;
+  background: var(--green);
+  border-radius: 2px 2px 0 0;
+  opacity: 0.6;
+  transition: height 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.top10Gold   .top10Bar { background: #d4a017; }
+.top10Silver .top10Bar { background: #64748b; }
+.top10Bronze .top10Bar { background: #b45309; }
+
 /* ── Violation slide ─────────────────────────────────── */
 .violationSlide {
   display: flex;

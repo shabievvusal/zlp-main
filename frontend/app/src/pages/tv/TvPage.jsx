@@ -7,6 +7,7 @@ import {
   getShiftBoundaryMs,
   getWeightByEmployee,
 } from '../../utils/statsCalc.js'
+import { formatWeight } from '../../utils/format.js'
 import { normalizeFio, personKey } from '../../utils/emplUtils.js'
 import CompanySummaryTable from '../stats/CompanySummaryTable.jsx'
 import HourlyEmployeeTable from '../stats/HourlyEmployeeTable.jsx'
@@ -20,10 +21,177 @@ const MIN_SLIDE_SEC = 12   // минимум если контент без ск
 
 const TABS = [
   { id: 'summary',    label: 'Сводка по компаниям' },
+  { id: 'top10',      label: 'Топ-10' },
   { id: 'stats',      label: 'По СЗ' },
   { id: 'idles',      label: 'Простои' },
   { id: 'violations', label: 'Нарушения' },
 ]
+
+const ZONE_PALETTE = ['#22c55e', '#3b82f6', '#f59e0b', '#a855f7', '#ef4444', '#06b6d4']
+
+const ZONE_NAMES = {
+  KDH: 'Кроссдокинг',
+  KDK: 'Кроссдокинг',
+  SH:  'Сухое хранение',
+  KHL: 'Холодильник',
+  FRZ: 'Морозильник',
+  MRZ: 'Морозильник',
+  OVR: 'Овощи/фрукты',
+  ALK: 'Алкоголь',
+}
+
+function avatarColor(name) {
+  let h = 0
+  for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h)
+  return `hsl(${Math.abs(h) % 360}, 52%, 50%)`
+}
+
+function getInitials(name) {
+  const p = name.trim().split(/\s+/)
+  return p.length >= 2 ? p[0][0].toUpperCase() + p[1][0].toUpperCase() : name.slice(0, 2).toUpperCase()
+}
+
+function AnimatedNumber({ value }) {
+  const [display, setDisplay] = useState(0)
+  const rafRef = useRef(null)
+  useEffect(() => {
+    let startTime = null
+    cancelAnimationFrame(rafRef.current)
+    const step = (ts) => {
+      if (!startTime) startTime = ts
+      const p = Math.min((ts - startTime) / 900, 1)
+      setDisplay(Math.round((1 - Math.pow(1 - p, 3)) * value))
+      if (p < 1) rafRef.current = requestAnimationFrame(step)
+    }
+    rafRef.current = requestAnimationFrame(step)
+    return () => cancelAnimationFrame(rafRef.current)
+  }, [value])
+  return <>{display}</>
+}
+
+function Top10Grid({ top10, heDataAll, weightByEmployee }) {
+  const hours = heDataAll?.hours || []
+  const [ready, setReady] = useState(false)
+  useEffect(() => {
+    setReady(false)
+    const raf = requestAnimationFrame(() => setReady(true))
+    return () => cancelAnimationFrame(raf)
+  }, [top10])
+
+  // podiumOrder: visual positions [left=2nd, center=1st, right=3rd] → data indices [1,0,2]
+  const podiumOrder = [1, 0, 2]
+  const podium = podiumOrder.map(i => top10[i]).filter(Boolean)
+  const rest = top10.slice(3)
+
+  const card = (r, origIdx, isPodium) => {
+    const barVals = hours.map(h => r.byHour?.[h] || 0)
+    const maxBar = Math.max(...barVals, 1)
+    const wTotal = weightByEmployee[r.name]?.total ?? 0
+    const wFmt = formatWeight(wTotal)
+    const pct = top10[0]?.total > 0 ? (r.total / top10[0].total) * 100 : 0
+    const rankCls = origIdx === 0 ? s.top10Gold : origIdx === 1 ? s.top10Silver : origIdx === 2 ? s.top10Bronze : ''
+    const durH = r.firstAt && r.lastAt ? (new Date(r.lastAt) - new Date(r.firstAt)) / 3600000 : 0
+    const tempo = durH > 0.1 ? Math.round(r.total / durH) : 0
+    const wPerH = durH > 0.1 && wTotal > 0 ? wTotal / durH : 0
+    const wPerHFmt = formatWeight(wPerH)
+    const zoneVal = (v) => typeof v === 'object' && v !== null ? (v.count || 0) : (v || 0)
+    const zones = Object.entries(r.byZone || {})
+      .map(([z, v]) => [z, zoneVal(v)])
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, isPodium ? 4 : 2)
+    const zoneTotal = zones.reduce((acc, [, v]) => acc + v, 0)
+    const posClass = isPodium
+      ? (origIdx === 0 ? s.top10Pos1 : origIdx === 1 ? s.top10Pos2 : s.top10Pos3)
+      : ''
+    const baseClass = isPodium ? s.top10PodiumCard : s.top10RestCard
+    return (
+      <div key={r.name} className={`${s.top10Card} ${baseClass} ${rankCls} ${posClass}`} style={{ '--i': origIdx }}>
+        <div className={s.top10Header}>
+          <span className={s.top10Rank}>{origIdx < 3 ? ['🥇', '🥈', '🥉'][origIdx] : `#${origIdx + 1}`}</span>
+          <span className={s.top10Time}>{fmtTime(r.firstAt)} – {fmtTime(r.lastAt)}</span>
+        </div>
+        <div className={s.top10Identity}>
+          <div className={s.top10Avatar} style={{ background: avatarColor(r.name) }}>
+            {getInitials(r.name)}
+          </div>
+          <div className={s.top10NameBlock}>
+            <div className={s.top10Name}>{r.name}</div>
+            {tempo > 0 && <div className={s.top10Tempo}>{tempo} СЗ/ч</div>}
+          </div>
+        </div>
+        {zones.length > 0 && (
+          <div className={s.top10Zones}>
+            {zones.map(([zone, count], zi) => (
+              <div key={zone} className={s.top10Zone}>
+                <span className={s.top10ZoneName}>{ZONE_NAMES[zone] || zone}</span>
+                <div className={s.top10ZoneBar}>
+                  <div
+                    className={s.top10ZoneFill}
+                    style={{
+                      width: ready ? `${(count / zoneTotal) * 100}%` : '0%',
+                      background: ZONE_PALETTE[zi % ZONE_PALETTE.length],
+                      transitionDelay: ready ? `${0.25 + origIdx * 0.04 + zi * 0.07}s` : '0s',
+                    }}
+                  />
+                </div>
+                <span className={s.top10ZoneCount}>{count}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className={s.top10SzRow}>
+          <div className={s.top10Progress}>
+            <div
+              className={s.top10ProgressFill}
+              style={{
+                width: ready ? `${pct}%` : '0%',
+                transitionDelay: ready ? `${0.1 + origIdx * 0.04}s` : '0s',
+              }}
+            />
+          </div>
+          <span className={s.top10Total}><AnimatedNumber value={r.total} /> <span className={s.top10Label}>СЗ</span></span>
+        </div>
+        <div className={s.top10Footer}>
+          <div className={s.top10WeightBlock}>
+            <span className={s.top10Weight}>{wFmt}</span>
+            {wPerH > 0 && <span className={s.top10WeightRate}>{wPerHFmt}/ч</span>}
+          </div>
+          <div className={s.top10Sparkline}>
+            {hours.map((h, bi) => (
+              <div
+                key={h}
+                className={s.top10Bar}
+                style={{
+                  height: ready ? `${Math.max(15, Math.round((barVals[bi] / maxBar) * 100))}%` : '4px',
+                  transitionDelay: ready ? `${0.45 + origIdx * 0.03 + bi * 0.025}s` : '0s',
+                }}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className={s.top10Wrapper}>
+      <div className={s.top10Podium}>
+        {podium.map((r, vi) => card(r, podiumOrder[vi], true))}
+      </div>
+      {rest.length > 0 && (
+        <div className={s.top10Rest}>
+          {rest.map((r, i) => card(r, i + 3, false))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function fmtTime(iso) {
+  if (!iso) return '--:--'
+  const d = new Date(iso)
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
 
 function useClock() {
   const [now, setNow] = useState(() => new Date())
@@ -51,7 +219,7 @@ export default function TvPage() {
 
   const bodyRef        = useRef(null)
   const zoomRef        = useRef(null)
-  const measureRefs    = useRef({ summary: null, stats: null, idles: null })
+  const measureRefs    = useRef({ summary: null, top10: null, stats: null, idles: null })
   const zoomMapRef     = useRef({})
   const needsRefreshRef = useRef(false)
   const scrollAnimRef  = useRef(null)
@@ -130,6 +298,14 @@ export default function TvPage() {
     for (const [name, val] of Object.entries(raw)) result[enrich(name)] = val
     return result
   }, [isSummaryOnly, dateSummary, items, selectedDate, shiftFilter, idleThresholdMinutes])
+
+  // ── Top 10 ──────────────────────────────────────────────────────────────────
+  const top10 = useMemo(() => {
+    if (!heDataAll?.allRows?.length) return []
+    return [...heDataAll.allRows]
+      .sort((a, b) => (b.total || 0) - (a.total || 0))
+      .slice(0, 10)
+  }, [heDataAll])
 
   // ── Weight ──────────────────────────────────────────────────────────────────
   const weightByEmployee = useMemo(() => {
@@ -422,6 +598,9 @@ export default function TvPage() {
             <CompanySummaryTable rows={companySummary.rows} hoursDisplay={companySummary.hoursDisplay} showHours={false} />
           )}
         </div>
+        <div style={{ padding: '12px 16px' }} ref={el => { measureRefs.current.top10 = el }}>
+          {top10.length > 0 && <Top10Grid top10={top10} heDataAll={heDataAll} weightByEmployee={weightByEmployee} />}
+        </div>
         <div style={{ padding: '12px 16px' }} ref={el => { measureRefs.current.stats = el }}>
           {heDataAll && (
             <HourlyEmployeeTable allRows={heDataAll.allRows} hours={heDataAll.hours} mode="sz" {...sharedHourlyProps} />
@@ -482,6 +661,12 @@ export default function TvPage() {
                   hoursDisplay={companySummary.hoursDisplay}
                   showHours={false}
                 />
+              : <div className={s.empty}>{loading ? 'Загрузка...' : 'Нет данных'}</div>
+          )}
+
+          {tab === 'top10' && (
+            top10.length > 0
+              ? <Top10Grid top10={top10} heDataAll={heDataAll} weightByEmployee={weightByEmployee} />
               : <div className={s.empty}>{loading ? 'Загрузка...' : 'Нет данных'}</div>
           )}
 
