@@ -348,6 +348,7 @@ function findUserByLogin(login) {
         role,
         shiftType: u.shiftType === 'day' || u.shiftType === 'night' ? u.shiftType : undefined,
         companyIds: Array.isArray(u.companyIds) ? u.companyIds : undefined,
+        visibleCompanies: Array.isArray(u.visibleCompanies) && u.visibleCompanies.length > 0 ? u.visibleCompanies : undefined,
         modules,
         actions,
         allowWithoutToken: !!u.allowWithoutToken,
@@ -454,6 +455,7 @@ function getAllUsersForAdmin() {
       role,
       shiftType: u.shiftType === 'day' || u.shiftType === 'night' ? u.shiftType : undefined,
       companyIds: Array.isArray(u.companyIds) ? u.companyIds : undefined,
+      visibleCompanies: Array.isArray(u.visibleCompanies) && u.visibleCompanies.length > 0 ? u.visibleCompanies : undefined,
       modules,
       actions,
       allowWithoutToken: !!u.allowWithoutToken,
@@ -502,6 +504,7 @@ function saveUser(login, payload) {
     if (payload.modules !== undefined) u.modules = Array.isArray(payload.modules) ? payload.modules.filter(m => ALL_MODULES.includes(m)) : undefined;
     if (payload.shiftType !== undefined) u.shiftType = payload.shiftType === 'day' || payload.shiftType === 'night' ? payload.shiftType : undefined;
     if (payload.companyIds !== undefined) u.companyIds = Array.isArray(payload.companyIds) ? payload.companyIds : undefined;
+    if (payload.visibleCompanies !== undefined) u.visibleCompanies = Array.isArray(payload.visibleCompanies) && payload.visibleCompanies.length > 0 ? payload.visibleCompanies : undefined;
     if (payload.allowWithoutToken !== undefined) u.allowWithoutToken = !!payload.allowWithoutToken;
     if (payload.selfOnly !== undefined) u.selfOnly = !!payload.selfOnly;
     if (payload.actions !== undefined) u.actions = Array.isArray(payload.actions) ? payload.actions.filter(a => ALL_ACTIONS.includes(a)) : undefined;
@@ -520,6 +523,7 @@ function saveUser(login, payload) {
       role,
       shiftType: payload.shiftType === 'day' || payload.shiftType === 'night' ? payload.shiftType : undefined,
       companyIds: Array.isArray(payload.companyIds) ? payload.companyIds : undefined,
+      visibleCompanies: Array.isArray(payload.visibleCompanies) && payload.visibleCompanies.length > 0 ? payload.visibleCompanies : undefined,
       modules: modules && modules.length > 0 ? modules : undefined,
       actions: Array.isArray(payload.actions) ? payload.actions.filter(a => ALL_ACTIONS.includes(a)) : undefined,
       allowWithoutToken: !!payload.allowWithoutToken,

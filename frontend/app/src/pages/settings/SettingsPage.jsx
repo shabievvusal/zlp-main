@@ -88,7 +88,7 @@ function emptyChat() {
 
 // ─── VS User edit modal ───────────────────────────────────────────────────────
 
-function VsUserEditModal({ user, onClose, onSaved, roles = [] }) {
+function VsUserEditModal({ user, onClose, onSaved, roles = [], emplCompanies = [] }) {
   const notify = useNotify()
   const { user: currentUser, refreshUser } = useAuth()  // currentUser used below for self-edit detection
   const isNew = !user?.login
@@ -98,9 +98,16 @@ function VsUserEditModal({ user, onClose, onSaved, roles = [] }) {
   const [companies, setCompanies] = useState((user?.companyIds || []).join(', '))
   const [allowWithoutToken, setAllowWithoutToken] = useState(!!user?.allowWithoutToken)
   const [selfOnly, setSelfOnly] = useState(!!user?.selfOnly)
+  const [visibleCompanies, setVisibleCompanies] = useState(new Set(user?.visibleCompanies || []))
   const [password, setPassword] = useState('')
   const [modules, setModules] = useState(new Set(user?.modules || []))
   const [actions, setActions] = useState(new Set(user?.actions || []))
+
+  const toggleVisibleCompany = c => setVisibleCompanies(prev => {
+    const next = new Set(prev)
+    if (next.has(c)) next.delete(c); else next.add(c)
+    return next
+  })
 
   const toggleModule = m => setModules(prev => {
     const next = new Set(prev)
@@ -120,7 +127,7 @@ function VsUserEditModal({ user, onClose, onSaved, roles = [] }) {
     const companyIds = role === 'manager'
       ? companies.split(/[,;]/).map(x => x.trim()).filter(Boolean)
       : []
-    const payload = { name: name.trim(), role, modules: [...modules], actions: [...actions], companyIds, allowWithoutToken, selfOnly }
+    const payload = { name: name.trim(), role, modules: [...modules], actions: [...actions], companyIds, visibleCompanies: [...visibleCompanies], allowWithoutToken, selfOnly }
     if (password.trim()) payload.password = password.trim()
     try {
       await api.putVsAdminUser(trimmedLogin, payload)
@@ -184,6 +191,20 @@ function VsUserEditModal({ user, onClose, onSaved, roles = [] }) {
               Видит только свои данные
             </label>
           </div>
+          {emplCompanies.length > 0 && (
+            <div className="form-group">
+              <label>Видимые компании <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>(если не выбрано — все)</span></label>
+              <div style={{ marginTop: 6 }}>
+                {emplCompanies.map(c => (
+                  <label key={c} style={{ display: 'block', marginBottom: 6, fontWeight: 400 }}>
+                    <input type="checkbox" checked={visibleCompanies.has(c)} onChange={() => toggleVisibleCompany(c)}
+                      style={{ marginRight: 6 }} />
+                    {c}
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="form-group">
             <label>Модули</label>
             <div style={{ marginTop: 6 }}>
@@ -223,10 +244,12 @@ function VsUserEditModal({ user, onClose, onSaved, roles = [] }) {
 function UsersCard({ roles = [] }) {
   const notify = useNotify()
   const { user: currentUser } = useAuth()
+  const { emplMap, emplCompanies } = useApp()
   const [users, setUsers] = useState([])
   const [loadingUsers, setLoadingUsers] = useState(true)
   const [editUser, setEditUser] = useState(null)
   const [search, setSearch] = useState('')
+  const [companyFilter, setCompanyFilter] = useState('')
 
   const load = useCallback(async () => {
     setLoadingUsers(true)
@@ -254,15 +277,31 @@ function UsersCard({ roles = [] }) {
 
   const successful = users.filter(u => u.lastSuccessAt).length
   const roleLabelsMap = rolesToLabelMap(roles.length ? roles : Object.entries(BUILTIN_ROLE_LABELS).map(([k,v]) => ({ key: k, label: v })))
+  const getUserCompany = useCallback(u => {
+    if (!u.name) return ''
+    return emplMap.get(normalizeFio(u.name)) || ''
+  }, [emplMap])
+
+  const allCompanies = useMemo(() => {
+    const set = new Set()
+    for (const u of users) {
+      const c = getUserCompany(u)
+      if (c) set.add(c)
+    }
+    return [...set].sort()
+  }, [users, getUserCompany])
+
   const q = search.trim().toLowerCase()
-  const filtered = q
-    ? users.filter(u =>
-        (u.login || '').toLowerCase().includes(q) ||
-        (u.name || '').toLowerCase().includes(q) ||
-        (u.role || '').toLowerCase().includes(q) ||
-        (roleLabelsMap[u.role] || '').toLowerCase().includes(q)
-      )
-    : users
+  const filtered = users.filter(u => {
+    const company = getUserCompany(u)
+    if (companyFilter && company !== companyFilter) return false
+    if (!q) return true
+    return (u.login || '').toLowerCase().includes(q) ||
+      (u.name || '').toLowerCase().includes(q) ||
+      (u.role || '').toLowerCase().includes(q) ||
+      (roleLabelsMap[u.role] || '').toLowerCase().includes(q) ||
+      company.toLowerCase().includes(q)
+  })
 
   return (
     <div className={s.card}>
@@ -275,13 +314,23 @@ function UsersCard({ roles = [] }) {
         <button className="btn btn-primary" onClick={() => setEditUser({})}>+ Добавить</button>
       </div>
       <div className={s.settingsBody}>
-        <input
-          className="form-control"
-          placeholder="Поиск по логину, ФИО, роли..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          style={{ marginBottom: 12 }}
-        />
+        <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+          <input
+            className="form-control"
+            placeholder="Поиск по логину, ФИО, роли, компании..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+          <select
+            className="form-control"
+            value={companyFilter}
+            onChange={e => setCompanyFilter(e.target.value)}
+            style={{ width: 200, flexShrink: 0 }}
+          >
+            <option value="">Все компании</option>
+            {allCompanies.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
         <div className={s.tableWrap}>
           <table className={s.table}>
             <thead>
@@ -289,6 +338,7 @@ function UsersCard({ roles = [] }) {
                 <th>Логин</th>
                 <th>ФИО</th>
                 <th>Роль</th>
+                <th>Компания</th>
                 <th>Модули</th>
                 <th>Успешный вход</th>
                 <th style={{ width: 140 }}>Действия</th>
@@ -301,9 +351,9 @@ function UsersCard({ roles = [] }) {
                 <tr><td colSpan={5} className={s.emptyRow}>{users.length ? 'Ничего не найдено' : 'Нет записей о входах'}</td></tr>
               ) : filtered.map(u => {
                 let roleText = u.role ? (roleLabelsMap[u.role] || u.role) : '—'
-                if (u.role === 'manager' && u.companyIds?.length) roleText += ' · ' + u.companyIds.join(', ')
                 if (u.allowWithoutToken) roleText += ' (без токена)'
                 if (u.hasPassword) roleText += ' · пароль'
+                const companyText = getUserCompany(u) || '—'
                 const modulesText = u.modules?.length ? u.modules.map(m => VS_MODULE_LABELS[m] || m).join(', ') : '—'
                 const successText = u.lastSuccessAt
                   ? formatDateTime(u.lastSuccessAt)
@@ -313,6 +363,7 @@ function UsersCard({ roles = [] }) {
                     <td>{u.login || '—'}</td>
                     <td style={{ fontSize: 13 }}>{u.name || '—'}</td>
                     <td>{roleText}</td>
+                    <td style={{ fontSize: 13 }}>{companyText}</td>
                     <td style={{ maxWidth: 200, fontSize: 12 }}>{modulesText}</td>
                     <td style={{ fontSize: 12 }}>{successText}</td>
                     <td>
@@ -339,6 +390,7 @@ function UsersCard({ roles = [] }) {
         <VsUserEditModal
           user={editUser}
           roles={roles}
+          emplCompanies={emplCompanies}
           onClose={() => setEditUser(null)}
           onSaved={() => { setEditUser(null); load() }}
         />

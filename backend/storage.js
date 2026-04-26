@@ -830,6 +830,13 @@ function getDateSummary(dateStr, options = {}, context = {}) {
   if (options.filterExecutorNorm) {
     items = items.filter(it => normalizeFioSummary(it.executor) === options.filterExecutorNorm);
   }
+  if (Array.isArray(options.filterCompanies) && options.filterCompanies.length > 0 && context.getCompany) {
+    const allowed = new Set(options.filterCompanies.map(c => c.trim().toLowerCase()));
+    items = items.filter(it => {
+      const company = context.getCompany(it.executor);
+      return company && allowed.has(company.trim().toLowerCase());
+    });
+  }
   return buildSummaryFromItems(items, {
     shift: options.shift,
     idleThresholdMs: options.idleThresholdMs,

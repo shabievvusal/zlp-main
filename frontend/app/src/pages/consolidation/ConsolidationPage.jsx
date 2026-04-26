@@ -47,13 +47,6 @@ function getSupervisors() {
   try { return JSON.parse(localStorage.getItem(MEMOS_SUPERVISORS_KEY) || '[]') } catch { return [] }
 }
 
-function statusLabel(st) {
-  return { new: 'Новая', in_progress: 'В работе', resolved: 'Решена' }[st] || st
-}
-
-function statusCls(st) {
-  return { new: s.statusNew, in_progress: s.statusProgress, resolved: s.statusResolved }[st] || ''
-}
 
 function formatDateOnly(iso) {
   if (!iso) return '—'
@@ -585,7 +578,7 @@ function EditModal({ complaint, onClose, onSaved }) {
 
 // ─── Complaint row ────────────────────────────────────────────────────────────
 
-function ComplaintRow({ complaint: c, selected, onToggle, onStatusChange, onLookup, onEdit, onPhotoOpen }) {
+function ComplaintRow({ complaint: c, selected, onToggle, onLookup, onEdit, onPhotoOpen }) {
   const photos = getComplaintPhotos(c)
   const [expanded, setExpanded] = useState(false)
 
@@ -608,19 +601,9 @@ function ComplaintRow({ complaint: c, selected, onToggle, onStatusChange, onLook
         <td>{c.company || '—'}</td>
         <td className={s.tdDate}>{formatDateTime(c.operationCompletedAt)}</td>
         <td>
-          <span className={`${s.status} ${statusCls(c.status)}`}>{statusLabel(c.status)}</span>
-        </td>
-        <td>
           <div className={s.actionsCol} onClick={e => e.stopPropagation()}>
-            <select className={s.statusSelect} value={c.status} onChange={e => onStatusChange(c.id, e.target.value)}>
-              <option value="new">Новая</option>
-              <option value="in_progress">В работе</option>
-              <option value="resolved">Решена</option>
-            </select>
-            <div className={s.actionsBtns}>
-              <button className={`btn btn-sm ${s.btnLookup}`} title="Поиск в WMS" onClick={() => onLookup(c)}><Search size={13} strokeWidth={2}/></button>
-              <button className={`btn btn-sm ${s.btnEdit}`} title="Редактировать" onClick={() => onEdit(c)}><Pencil size={13} strokeWidth={2}/></button>
-            </div>
+            <button className={`btn btn-sm ${s.btnLookup}`} title="Поиск в WMS" onClick={() => onLookup(c)}><Search size={13} strokeWidth={2}/></button>
+            <button className={`btn btn-sm ${s.btnEdit}`} title="Редактировать" onClick={() => onEdit(c)}><Pencil size={13} strokeWidth={2}/></button>
           </div>
         </td>
       </tr>
@@ -650,12 +633,11 @@ function ComplaintRow({ complaint: c, selected, onToggle, onStatusChange, onLook
 
 export default function ConsolidationPage() {
   const [complaints, setComplaints] = useState([])
-  const [statusFilter, setStatusFilter] = useState('all')
+  const [violatorFilter, setViolatorFilter] = useState('all')
   const [selected, setSelected] = useState(new Set())
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [lookupAllText, setLookupAllText] = useState(null)
-  const [bulkStatusValue, setBulkStatusValue] = useState('new')
   const [supervisor, setSupervisor] = useState(() => {
     const list = getSupervisors()
     return list[0] || ''
@@ -682,11 +664,16 @@ export default function ConsolidationPage() {
   useEffect(() => { load() }, [load])
 
   // ─── Derived ──────────────────────────────────────────────────────────────
-  const filtered = statusFilter === 'all' ? complaints : complaints.filter(c => c.status === statusFilter)
+  const filtered = violatorFilter === 'all'
+    ? complaints
+    : violatorFilter === 'found'
+      ? complaints.filter(c => c.violator)
+      : complaints.filter(c => !c.violator)
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
   const safePage = Math.min(Math.max(1, page), totalPages)
   const pageItems = filtered.slice((safePage - 1) * pageSize, safePage * pageSize)
-  const countNew = complaints.filter(c => c.status === 'new').length
+  const countFound = complaints.filter(c => c.violator).length
+  const countNotFound = complaints.filter(c => !c.violator).length
 
   const getSelected = () => complaints.filter(c => selected.has(String(c.id)))
 
@@ -706,13 +693,6 @@ export default function ConsolidationPage() {
       else pageIds.forEach(id => next.add(id))
       return next
     })
-  }
-
-  const handleStatusChange = async (id, status) => {
-    try {
-      await api.updateComplaintStatus(id, status)
-      await load()
-    } catch (err) { console.error('updateStatus', err) }
   }
 
   const handleDelete = async id => {
@@ -760,18 +740,6 @@ export default function ConsolidationPage() {
     await load()
   }
 
-  const handleBulkApplyStatus = async () => {
-    const sel = getSelected()
-    if (sel.length === 0) { alert('Отметьте жалобы галочкой'); return }
-    if (!['new', 'in_progress', 'resolved'].includes(bulkStatusValue)) { alert('Выберите корректный статус'); return }
-    try {
-      const results = await Promise.allSettled(sel.map(c => api.updateComplaintStatus(c.id, bulkStatusValue)))
-      const fail = results.filter(r => r.status === 'rejected').length
-      if (fail > 0) alert(`Статус обновлён: ${results.length - fail}, с ошибкой: ${fail}`)
-      await load()
-    } catch (err) { alert('Ошибка: ' + err.message) }
-  }
-
   const handleBulkLookup = async () => {
     const sel = getSelected()
     if (sel.length === 0) { alert('Отметьте жалобы галочкой'); return }
@@ -803,10 +771,8 @@ export default function ConsolidationPage() {
   const handleSendTelegram = async () => {
     const sel = getSelected()
     if (sel.length === 0) { alert('Отметьте жалобы галочкой'); return }
-    const inProgress = sel.filter(c => c.status === 'in_progress')
-    if (inProgress.length === 0) { alert('Для отправки в Telegram выберите жалобы со статусом "В работе"'); return }
     try {
-      const res = await api.sendComplaintsToTelegram(inProgress.map(c => String(c.id)))
+      const res = await api.sendComplaintsToTelegram(sel.map(c => String(c.id)))
       if (!res?.ok) {
         const msg = res?.failed?.[0]?.error || res?.error || 'Ошибка отправки в Telegram'
         alert(msg); return
@@ -863,29 +829,28 @@ export default function ConsolidationPage() {
         {/* Строка 2: групповые действия + счётчики + фильтры */}
         <div className={s.toolbarRow}>
           <div className={s.toolbarLeft}>
-            <select className={s.statusSelect} value={bulkStatusValue} onChange={e => setBulkStatusValue(e.target.value)}>
-              <option value="new">Новая</option>
-              <option value="in_progress">В работе</option>
-              <option value="resolved">Решена</option>
-            </select>
-            <button className="btn btn-secondary btn-sm" onClick={handleBulkApplyStatus}>Изменить статус</button>
             <button className="btn btn-secondary btn-sm" onClick={handleBulkLookup}>Проверить выбранные</button>
             <button className="btn btn-danger btn-sm" onClick={handleBulkDelete}>Удалить выбранные</button>
             <div className={s.toolbarSep}/>
             <div className={s.counters}>
               <span>Всего: <b>{complaints.length}</b></span>
-              <span>Новых: <b>{countNew}</b></span>
+              <span>Найдено: <b>{countFound}</b></span>
+              <span>Не найдено: <b>{countNotFound}</b></span>
               <span>Выбрано: <b>{selected.size}</b></span>
             </div>
           </div>
           <div className={s.filters}>
-            {['all', 'new', 'in_progress', 'resolved'].map(f => (
+            {[
+              { val: 'all',       label: 'Все' },
+              { val: 'found',     label: 'Нарушитель найден' },
+              { val: 'not_found', label: 'Не найден' },
+            ].map(({ val, label }) => (
               <button
-                key={f}
-                className={`${s.filterChip}${statusFilter === f ? ` ${s.filterChipActive}` : ''}`}
-                onClick={() => { setStatusFilter(f); setPage(1) }}
+                key={val}
+                className={`${s.filterChip}${violatorFilter === val ? ` ${s.filterChipActive}` : ''}`}
+                onClick={() => { setViolatorFilter(val); setPage(1) }}
               >
-                {f === 'all' ? 'Все' : f === 'new' ? 'Новые' : f === 'in_progress' ? 'В работе' : 'Решённые'}
+                {label}
               </button>
             ))}
           </div>
@@ -948,7 +913,6 @@ export default function ConsolidationPage() {
                   <th>Нарушитель</th>
                   <th>Компания</th>
                   <th>Время нарушения</th>
-                  <th>Статус</th>
                   <th>Действия</th>
                 </tr>
               </thead>
@@ -959,7 +923,6 @@ export default function ConsolidationPage() {
                     complaint={c}
                     selected={selected.has(String(c.id))}
                     onToggle={() => toggleOne(c.id)}
-                    onStatusChange={handleStatusChange}
                     onLookup={handleLookupOne}
                     onEdit={complaint => setEditModal({ open: true, complaint })}
 

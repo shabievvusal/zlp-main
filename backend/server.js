@@ -1439,11 +1439,11 @@ app.get('/api/vs/admin/users', vsSessionRequired, vsAdminRequired, (_req, res) =
 
 app.put('/api/vs/admin/users', vsSessionRequired, vsAdminRequired, (req, res) => {
   try {
-    const { login, name, role, modules, actions, shiftType, companyIds, allowWithoutToken, selfOnly, password } = req.body || {};
+    const { login, name, role, modules, actions, shiftType, companyIds, visibleCompanies, allowWithoutToken, selfOnly, password } = req.body || {};
     if (!login || String(login).trim() === '') {
       return res.status(400).json({ error: 'Укажите логин (номер телефона или буквенный)' });
     }
-    vsAuth.saveUser(login, { name, role, modules, actions, shiftType, companyIds, allowWithoutToken, selfOnly, password });
+    vsAuth.saveUser(login, { name, role, modules, actions, shiftType, companyIds, visibleCompanies, allowWithoutToken, selfOnly, password });
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1566,6 +1566,14 @@ app.get('/api/date/:date/items', vsSessionOptional, (req, res) => {
       const selfNorm = normalizeFioForMatch(userForItems.name);
       items = items.filter(it => normalizeFioForMatch(it.executor) === selfNorm);
     }
+    if (Array.isArray(userForItems?.visibleCompanies) && userForItems.visibleCompanies.length > 0) {
+      const emplMapForItems = getEmplMapFioToCompany();
+      const allowed = new Set(userForItems.visibleCompanies.map(c => c.trim().toLowerCase()));
+      items = items.filter(it => {
+        const company = getCompanyByFio(emplMapForItems, it.executor);
+        return company && allowed.has(company.trim().toLowerCase());
+      });
+    }
     res.json({ date: dateStr, count: items.length, items });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1599,7 +1607,10 @@ app.get('/api/date/:date/summary', vsSessionOptional, (req, res) => {
     const filterExecutorNorm = userForSummary?.selfOnly && userForSummary?.name
       ? normalizeFioForMatch(userForSummary.name)
       : undefined;
-    const summary = storage.getDateSummary(dateStr, { shift, idleThresholdMs, filterExecutorNorm }, { getCompany });
+    const filterCompanies = Array.isArray(userForSummary?.visibleCompanies) && userForSummary.visibleCompanies.length > 0
+      ? userForSummary.visibleCompanies
+      : undefined;
+    const summary = storage.getDateSummary(dateStr, { shift, idleThresholdMs, filterExecutorNorm, filterCompanies }, { getCompany });
     res.json({ date: dateStr, shift: shift || null, ...summary });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1672,8 +1683,11 @@ app.get('/api/analysis/employee-rates', vsSessionOptional, (req, res) => {
     const filterExecutorNormRates = userForRates?.selfOnly && userForRates?.name
       ? normalizeFioForMatch(userForRates.name)
       : undefined;
+    const filterCompaniesRates = Array.isArray(userForRates?.visibleCompanies) && userForRates.visibleCompanies.length > 0
+      ? userForRates.visibleCompanies
+      : undefined;
     for (const dateStr of dates) {
-      const summary = storage.getDateSummary(dateStr, { shift, idleThresholdMs, filterExecutorNorm: filterExecutorNormRates }, { getCompany });
+      const summary = storage.getDateSummary(dateStr, { shift, idleThresholdMs, filterExecutorNorm: filterExecutorNormRates, filterCompanies: filterCompaniesRates }, { getCompany });
       const hb = summary && summary.hourlyByEmployee;
       const rows = hb && Array.isArray(hb.rows) ? hb.rows : [];
       const hours = hb && Array.isArray(hb.hours) ? hb.hours : [];
