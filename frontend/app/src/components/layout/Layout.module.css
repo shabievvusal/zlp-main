@@ -19,7 +19,7 @@
   overflow: visible;
   z-index: 100;
   flex-shrink: 0;
-  transition: width 0.22s ease, min-width 0.22s ease;
+  transition: width 0.22s var(--ease-out), min-width 0.22s var(--ease-out);
 }
 
 .sidebarCollapsed {
@@ -218,6 +218,13 @@
   box-shadow: var(--shadow-md);
   z-index: 200;
   overflow: hidden;
+  transform-origin: bottom left;
+  transition: opacity 150ms var(--ease-out), transform 150ms var(--ease-out);
+
+  @starting-style {
+    opacity: 0;
+    transform: scale(0.95) translateY(4px);
+  }
 }
 
 .userPopupCollapsed {

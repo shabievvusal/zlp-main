@@ -4,6 +4,11 @@
   align-items: center;
   justify-content: center;
   background: linear-gradient(135deg, var(--green) 0%, var(--green-dark) 100%);
+  transition: opacity .3s var(--ease-out);
+
+  @starting-style {
+    opacity: 0;
+  }
 }
 
 .card {
@@ -12,6 +17,12 @@
   padding: 40px;
   width: 380px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  transition: opacity .35s var(--ease-out), transform .35s var(--ease-out);
+
+  @starting-style {
+    opacity: 0;
+    transform: translateY(16px);
+  }
 }
 
 .logo {
@@ -58,6 +69,12 @@
   color: var(--error);
   font-size: 13px;
   margin-bottom: 12px;
+  transition: opacity .2s var(--ease-out), transform .2s var(--ease-out);
+
+  @starting-style {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
 }
 
 /* ─── Tabs ─── */
@@ -80,11 +97,11 @@
   font-weight: 500;
   color: var(--text-muted);
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition: background .15s var(--ease-out), color .15s var(--ease-out), box-shadow .15s var(--ease-out);
 }
 
-.tab:hover {
-  color: var(--text);
+@media (hover: hover) and (pointer: fine) {
+  .tab:hover { color: var(--text); }
 }
 
 .tabActive {

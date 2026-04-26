@@ -307,7 +307,7 @@
 /* ── Table body ─────────────────────────────────────────── */
 .tr {
   border-bottom: 1px solid var(--border);
-  transition: background 0.1s;
+  transition: background .1s var(--ease-out);
 }
 .tr:last-child { border-bottom: none; }
 .tr:hover { background: var(--bg); }

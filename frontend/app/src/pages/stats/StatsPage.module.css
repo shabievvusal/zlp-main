@@ -142,7 +142,7 @@
   font-size: 12px;
   font-family: var(--font);
   cursor: pointer;
-  transition: all .15s;
+  transition: border-color .15s var(--ease-out), color .15s var(--ease-out), background .15s var(--ease-out);
   color: var(--text);
 }
 .filterChip:hover { border-color: var(--green); color: var(--green); }
@@ -321,6 +321,7 @@
   padding: 8px 10px;
   border-bottom: 1px solid var(--border);
   vertical-align: middle;
+  transition: background .1s var(--ease-out);
 }
 .table tr:last-child td { border-bottom: none; }
 .table tr:hover td { background: rgba(79,142,247,0.04); }
