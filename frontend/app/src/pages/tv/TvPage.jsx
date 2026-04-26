@@ -76,9 +76,9 @@ function Top10Grid({ top10, weightByEmployee }) {
     const wFmt = formatWeight(wTotal)
     const pct = top10[0]?.total > 0 ? (r.total / top10[0].total) * 100 : 0
     const rankCls = origIdx === 0 ? s.top10Gold : origIdx === 1 ? s.top10Silver : origIdx === 2 ? s.top10Bronze : ''
-    const durH = r.firstAt && r.lastAt ? (new Date(r.lastAt) - new Date(r.firstAt)) / 3600000 : 0
-    const tempo = durH > 0.1 ? Math.round(r.total / durH) : 0
-    const wPerH = durH > 0.1 && wTotal > 0 ? wTotal / durH : 0
+    const workingHours = Object.values(r.byHour || {}).filter(v => v > 0).length
+    const tempo = workingHours > 0 ? Math.round(r.total / workingHours) : 0
+    const wPerH = workingHours > 0 && wTotal > 0 ? wTotal / workingHours : 0
     const wPerHFmt = formatWeight(wPerH)
     const zoneVal = (v) => typeof v === 'object' && v !== null ? (v.count || 0) : (v || 0)
     const zones = Object.entries(r.byZone || {})
@@ -172,7 +172,7 @@ export default function TvPage() {
     selectedDate, shiftFilter,
     idleThresholdMinutes, allowedIdleMinutes,
     loading, status,
-    setShiftFilter, setSelectedDate, loadDateSummary,
+    setShiftFilter, setSelectedDate,
   } = useApp()
 
   // Применяем ?shift= и ?date= из URL при монтировании
