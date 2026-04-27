@@ -209,9 +209,17 @@ async function lookupViaBrowser(token, barcode, cell) {
     const tzOffset = -3 * 60
     return new Date(date.getTime() - tzOffset * 60000).toISOString().replace('Z', '+03:00')
   }
-  const today = new Date(); today.setHours(0, 0, 0, 0)
-  const todayISO = isoMsk(today)
-  const nowISO = isoMsk(new Date())
+  const now = new Date()
+  const mskOffset = 3 * 60
+  const mskNow = new Date(now.getTime() + (mskOffset + now.getTimezoneOffset()) * 60000)
+  const shiftStart = new Date(mskNow)
+  if (mskNow.getHours() < 9) {
+    shiftStart.setDate(shiftStart.getDate() - 1)
+  }
+  shiftStart.setHours(9, 0, 0, 0)
+  const shiftStartUTC = new Date(shiftStart.getTime() - (mskOffset + now.getTimezoneOffset()) * 60000)
+  const from24hISO = isoMsk(shiftStartUTC)
+  const nowISO = isoMsk(now)
 
   const result = {
     productName: null, nomenclatureCode: null, productBarcode: null,
@@ -229,8 +237,8 @@ async function lookupViaBrowser(token, barcode, cell) {
   const baseBody = {
     productId: null, parts: [], operationTypes: null,
     sourceCellId: null, targetCellId: null,
-    operationStartedAtFrom: todayISO, operationStartedAtTo: nowISO,
-    operationCompletedAtFrom: todayISO, operationCompletedAtTo: nowISO,
+    operationStartedAtFrom: from24hISO, operationStartedAtTo: nowISO,
+    operationCompletedAtFrom: from24hISO, operationCompletedAtTo: nowISO,
     executorId: null,
   }
 

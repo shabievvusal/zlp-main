@@ -112,6 +112,13 @@ export default function ConsolidationFormPage() {
                   title="Холод"
                   onClick={() => selectPrefix('KDH')}
                 >KDH</button>
+                <button
+                  type="button"
+                  data-prefix="ZGH"
+                  className={prefix === 'ZGH' ? styles.cellToggleBtnActive : styles.cellToggleBtn}
+                  title="ZGH"
+                  onClick={() => selectPrefix('ZGH')}
+                >ZGH</button>
               </div>
               <div className={styles.cellFields}>
                 <input
