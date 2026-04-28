@@ -714,7 +714,14 @@ const handleAddRow = () => setRows(prev => [{ fio: '', company: '' }, ...prev])
     }
   }
 
+  const [companyFilter, setCompanyFilter] = useState('__all__')
+
   const filteredRows = rows.filter(r => {
+    if (companyFilter === '__none__') {
+      if (r.company) return false
+    } else if (companyFilter !== '__all__') {
+      if (r.company !== companyFilter) return false
+    }
     if (!search) return true
     const q = search.toLowerCase()
     return r.fio.toLowerCase().includes(q) || r.company.toLowerCase().includes(q)
@@ -824,6 +831,18 @@ const handleAddRow = () => setRows(prev => [{ fio: '', company: '' }, ...prev])
 
             <button className="btn btn-primary btn-sm" onClick={handleSave}>Сохранить</button>
           </div>
+
+          {allCompanies.length > 0 && (
+            <div className={s.emplCompanyFilter}>
+              {[{ value: '__all__', label: 'Все' }, ...allCompanies.map(c => ({ value: c, label: c })), { value: '__none__', label: 'Без компании' }].map(o => (
+                <button
+                  key={o.value}
+                  className={`${s.emplFilterChip} ${companyFilter === o.value ? s.emplFilterChipActive : ''}`}
+                  onClick={() => setCompanyFilter(o.value)}
+                >{o.label}</button>
+              ))}
+            </div>
+          )}
 
           <div className={s.emplEditorTableWrap}>
             <table className={s.emplEditorTable}>
