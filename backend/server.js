@@ -818,7 +818,7 @@ function getEmplMapFioToCompany() {
 }
 
 function normalizeFioForMatch(fio) {
-  return String(fio || '').replace(/\s+/g, ' ').trim().toLowerCase();
+  return String(fio || '').trim().replace(/^-\s+/, '').trim().replace(/\s+/g, ' ').toLowerCase();
 }
 
 function getCompanyByFio(emplMap, executorFio) {

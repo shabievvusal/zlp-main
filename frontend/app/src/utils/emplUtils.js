@@ -1,5 +1,5 @@
 export function normalizeFio(fio) {
-  return (fio || '').trim().toLowerCase().replace(/\s+/g, ' ')
+  return (fio || '').trim().replace(/^-\s+/, '').trim().toLowerCase().replace(/\s+/g, ' ')
 }
 
 export function personKey(norm) {

@@ -57,7 +57,7 @@ async function init() {
 // ─── Нормализация ФИО ──────────────────────────────────────────────────────────
 
 function normFio(fio) {
-  return String(fio || '').replace(/\s+/g, ' ').trim().toLowerCase();
+  return String(fio || '').trim().replace(/^-\s+/, '').trim().replace(/\s+/g, ' ').toLowerCase();
 }
 
 // Ключ реестра: "фамилия и" (совпадает с normPkForRegistry в server.js)
