@@ -204,22 +204,26 @@ function matchesTargetCell(item, cellIds, cellNorm) {
   return matchesCell(item, cellNorm)
 }
 
-async function lookupViaBrowser(token, barcode, cell) {
+async function lookupViaBrowser(token, barcode, cell, createdAt) {
   function isoMsk(date) {
     const tzOffset = -3 * 60
     return new Date(date.getTime() - tzOffset * 60000).toISOString().replace('Z', '+03:00')
   }
-  const now = new Date()
   const mskOffset = 3 * 60
-  const mskNow = new Date(now.getTime() + (mskOffset + now.getTimezoneOffset()) * 60000)
-  const shiftStart = new Date(mskNow)
-  if (mskNow.getHours() < 9) {
+  const now = new Date()
+  const refDate = createdAt ? new Date(createdAt) : now
+  const mskRef = new Date(refDate.getTime() + (mskOffset + refDate.getTimezoneOffset()) * 60000)
+  const shiftStart = new Date(mskRef)
+  if (mskRef.getHours() < 9) {
     shiftStart.setDate(shiftStart.getDate() - 1)
   }
   shiftStart.setHours(9, 0, 0, 0)
-  const shiftStartUTC = new Date(shiftStart.getTime() - (mskOffset + now.getTimezoneOffset()) * 60000)
+  const shiftEnd = new Date(mskRef)
+  shiftEnd.setHours(23, 59, 59, 999)
+  const shiftStartUTC = new Date(shiftStart.getTime() - (mskOffset + refDate.getTimezoneOffset()) * 60000)
+  const shiftEndUTC   = new Date(shiftEnd.getTime()   - (mskOffset + refDate.getTimezoneOffset()) * 60000)
   const from24hISO = isoMsk(shiftStartUTC)
-  const nowISO = isoMsk(now)
+  const nowISO     = isoMsk(shiftEndUTC)
 
   const result = {
     productName: null, nomenclatureCode: null, productBarcode: null,
@@ -787,7 +791,7 @@ export default function ConsolidationPage() {
     const token = getStoredToken()
     if (!token) { alert('Войдите в WMS для поиска'); return }
     try {
-      const result = await lookupViaBrowser(token, c.barcode, c.cell)
+      const result = await lookupViaBrowser(token, c.barcode, c.cell, c.createdAt)
       await api.saveComplaintLookup(c.id, result)
       await load()
     } catch (err) {
@@ -811,7 +815,7 @@ export default function ConsolidationPage() {
       const c = needLookup[i]
       setLookupAllText(`${i + 1}/${total}...`)
       try {
-        const result = await lookupViaBrowser(token, c.barcode, c.cell)
+        const result = await lookupViaBrowser(token, c.barcode, c.cell, c.createdAt)
         await api.saveComplaintLookup(c.id, result)
       } catch (err) {
         await api.saveComplaintLookup(c.id, { lookupDone: false, lookupError: err.message || 'Ошибка WMS' })
@@ -830,7 +834,7 @@ export default function ConsolidationPage() {
     let ok = 0, fail = 0
     for (const c of sel) {
       try {
-        const result = await lookupViaBrowser(token, c.barcode, c.cell)
+        const result = await lookupViaBrowser(token, c.barcode, c.cell, c.createdAt)
         await api.saveComplaintLookup(c.id, result); ok++
       } catch (err) {
         await api.saveComplaintLookup(c.id, { lookupDone: false, lookupError: err.message || 'Ошибка WMS' }); fail++
