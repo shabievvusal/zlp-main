@@ -204,7 +204,7 @@ function matchesTargetCell(item, cellIds, cellNorm) {
   return matchesCell(item, cellNorm)
 }
 
-async function lookupViaBrowser(token, barcode, cell, createdAt) {
+async function lookupViaBrowser(token, barcode, cell, createdAt, preScannedEuBarcode) {
   function isoMsk(date) {
     const tzOffset = -3 * 60
     return new Date(date.getTime() - tzOffset * 60000).toISOString().replace('Z', '+03:00')
@@ -246,44 +246,55 @@ async function lookupViaBrowser(token, barcode, cell, createdAt) {
     executorId: null,
   }
 
-  // ─── ZGH strategy: штрихкод → ЕО → кто комплектовал ─────────────────────
+  // ─── ZGH strategy: ЕО → кто комплектовал ───────────────────────────────
   if (String(cell || '').trim().toUpperCase().startsWith('ZGH')) {
-    console.log('[ZGH lookup] barcode:', barcodeNorm, 'cell:', cellNorm, 'cellIds:', cellIds)
+    console.log('[ZGH lookup] barcode:', barcodeNorm, 'cell:', cellNorm, 'cellIds:', cellIds, 'preEu:', preScannedEuBarcode)
     console.log('[ZGH lookup] dateFrom:', from24hISO, 'dateTo:', nowISO)
     try {
-      // Шаг 1: ищем операцию по штрихкоду товара в ZGH-ячейке — находим ЕО
       let euBarcode = null
       let productName = null, nomenclatureCode = null, productBarcode = null
 
-      const step1Bodies = cellIds.length > 0
-        ? cellIds.map(id => ({ ...baseBody, targetCellId: id }))
-        : [{ ...baseBody }]
+      if (preScannedEuBarcode && String(preScannedEuBarcode).trim()) {
+        // ЕО barcode уже известен (отсканирован при подаче жалобы) — шаг 1 пропускаем
+        euBarcode = String(preScannedEuBarcode).trim()
+        console.log('[ZGH] ЕО из формы:', euBarcode)
+      } else {
+        // Шаг 1: ищем операцию по штрихкоду товара в ZGH-ячейке — находим ЕО
+        const step1Bodies = cellIds.length > 0
+          ? cellIds.map(id => ({ ...baseBody, targetCellId: id }))
+          : [{ ...baseBody }]
 
-      let pageNum = 1
-      let step1TotalItems = 0
-      outer: while (true) {
-        const batches = await Promise.all(step1Bodies.map(b => wmsPost(token, { ...b, pageNumber: pageNum, pageSize: 500 })))
-        const items = batches.flatMap(b => b?.value?.items || [])
-        step1TotalItems += items.length
-        console.log('[ZGH step1] page', pageNum, '— items:', items.length)
-        if (!items.length) break
-        for (const it of items) {
-          if (matchesBarcode(it, barcodeNorm) || matchesHandlingUnitBarcode(it, barcodeNorm)) {
-            euBarcode = it?.targetAddress?.handlingUnitBarcode || it?.sourceAddress?.handlingUnitBarcode || null
-            productName = it.product?.name || null
-            nomenclatureCode = it.product?.nomenclatureCode || null
-            productBarcode = pickProductBarcode(it, barcodeNorm)
-            console.log('[ZGH step1] MATCH found, euBarcode:', euBarcode, 'opType:', it.operationType)
-            break outer
+        let pageNum = 1
+        let step1TotalItems = 0
+        outer: while (true) {
+          const batches = await Promise.all(step1Bodies.map(b => wmsPost(token, { ...b, pageNumber: pageNum, pageSize: 500 })))
+          const items = batches.flatMap(b => b?.value?.items || [])
+          step1TotalItems += items.length
+          console.log('[ZGH step1] page', pageNum, '— items:', items.length)
+          if (pageNum === 1 && items.length > 0) {
+            console.log('[ZGH step1] sample (first 3):')
+            items.slice(0, 3).forEach((it, i) => {
+              console.log(`  [${i}] opType:`, it.operationType,
+                '| barcodes:', it.product?.barcodes,
+                '| targetHU:', it.targetAddress?.handlingUnitBarcode)
+            })
           }
+          if (!items.length) break
+          for (const it of items) {
+            if (matchesBarcode(it, barcodeNorm) || matchesHandlingUnitBarcode(it, barcodeNorm)) {
+              euBarcode = it?.targetAddress?.handlingUnitBarcode || it?.sourceAddress?.handlingUnitBarcode || null
+              productName = it.product?.name || null
+              nomenclatureCode = it.product?.nomenclatureCode || null
+              productBarcode = pickProductBarcode(it, barcodeNorm)
+              console.log('[ZGH step1] MATCH, euBarcode:', euBarcode, 'opType:', it.operationType)
+              break outer
+            }
+          }
+          pageNum++
         }
-        pageNum++
+        console.log('[ZGH step1] total:', step1TotalItems, 'euBarcode:', euBarcode)
       }
-      console.log('[ZGH step1] done, totalItems:', step1TotalItems, 'euBarcode:', euBarcode)
 
-      result.productName = productName
-      result.nomenclatureCode = nomenclatureCode
-      result.productBarcode = productBarcode
       result.handlingUnitBarcode = euBarcode
 
       if (!euBarcode) {
@@ -291,7 +302,7 @@ async function lookupViaBrowser(token, barcode, cell, createdAt) {
         return result
       }
 
-      // Шаг 2: ищем кто комплектовал эту ЕО — фильтруем по targetHandlingUnitBarcode на стороне API
+      // Шаг 2: ищем кто комплектовал эту ЕО по targetHandlingUnitBarcode
       const euNorm = String(euBarcode).trim()
       let pageNum2 = 1
       const candidates = []
@@ -305,9 +316,26 @@ async function lookupViaBrowser(token, barcode, cell, createdAt) {
         })
         const items = data?.value?.items || []
         if (!items.length) break
+        // Если штрихкод товара указан — извлекаем название товара из результатов
+        if (!productName && barcodeNorm) {
+          const pi = items.find(it => matchesBarcode(it, barcodeNorm))
+          if (pi) {
+            productName = pi.product?.name || null
+            nomenclatureCode = pi.product?.nomenclatureCode || null
+            productBarcode = pickProductBarcode(pi, barcodeNorm)
+          }
+        }
         candidates.push(...items)
         pageNum2++
       }
+      // Если название товара ещё не нашли — берём из первой операции
+      if (!productName && candidates.length > 0) {
+        productName = candidates[0].product?.name || null
+        nomenclatureCode = candidates[0].product?.nomenclatureCode || null
+      }
+      result.productName = productName
+      result.nomenclatureCode = nomenclatureCode
+      result.productBarcode = productBarcode
 
       console.log('[ZGH step2] candidates:', candidates.length)
       if (candidates.length > 0) {
@@ -318,7 +346,7 @@ async function lookupViaBrowser(token, barcode, cell, createdAt) {
         result.operationType = v.operationType || null
         result.operationCompletedAt = v.operationCompletedAt || null
         result.strategy = 'zgh_eu_match'
-        console.log('[ZGH step2] violator:', result.violator, 'opType:', result.operationType, 'completedAt:', result.operationCompletedAt)
+        console.log('[ZGH step2] violator:', result.violator, 'completedAt:', result.operationCompletedAt)
       } else {
         result.strategy = 'zgh_violator_not_found'
       }
@@ -800,7 +828,7 @@ export default function ConsolidationPage() {
     const token = getStoredToken()
     if (!token) { alert('Войдите в WMS для поиска'); return }
     try {
-      const result = await lookupViaBrowser(token, c.barcode, c.cell, c.createdAt)
+      const result = await lookupViaBrowser(token, c.barcode, c.cell, c.createdAt, c.handlingUnitBarcode)
       await api.saveComplaintLookup(c.id, result)
       await load()
     } catch (err) {
@@ -824,7 +852,7 @@ export default function ConsolidationPage() {
       const c = needLookup[i]
       setLookupAllText(`${i + 1}/${total}...`)
       try {
-        const result = await lookupViaBrowser(token, c.barcode, c.cell, c.createdAt)
+        const result = await lookupViaBrowser(token, c.barcode, c.cell, c.createdAt, c.handlingUnitBarcode)
         await api.saveComplaintLookup(c.id, result)
       } catch (err) {
         await api.saveComplaintLookup(c.id, { lookupDone: false, lookupError: err.message || 'Ошибка WMS' })
@@ -843,7 +871,7 @@ export default function ConsolidationPage() {
     let ok = 0, fail = 0
     for (const c of sel) {
       try {
-        const result = await lookupViaBrowser(token, c.barcode, c.cell, c.createdAt)
+        const result = await lookupViaBrowser(token, c.barcode, c.cell, c.createdAt, c.handlingUnitBarcode)
         await api.saveComplaintLookup(c.id, result); ok++
       } catch (err) {
         await api.saveComplaintLookup(c.id, { lookupDone: false, lookupError: err.message || 'Ошибка WMS' }); fail++

@@ -13,19 +13,22 @@ export default function ConsolidationFormPage() {
   const [rowVal, setRowVal]   = useState(() => localStorage.getItem(STORAGE_KEY_ROW) || '')
   const [place, setPlace]     = useState('')
   const [barcode, setBarcode] = useState('')
+  const [euBarcode, setEuBarcode] = useState('')
   const [photos, setPhotos]   = useState(null)
   const [status, setStatus]   = useState(null) // { ok, text }
   const [busy, setBusy]       = useState(false)
 
+  const isZgh = prefix === 'ZGH'
   const cellPreview = prefix + (rowVal || place ? '-' + [rowVal, place].filter(Boolean).join('-') : '-')
 
   // focus-order refs for Enter navigation
-  const rowRef     = useRef()
-  const placeRef   = useRef()
-  const barcodeRef = useRef()
-  const nameRef    = useRef()
-  const photoRef   = useRef()
-  const focusOrder = [rowRef, placeRef, barcodeRef, photoRef]
+  const rowRef       = useRef()
+  const placeRef     = useRef()
+  const barcodeRef   = useRef()
+  const euBarcodeRef = useRef()
+  const nameRef      = useRef()
+  const photoRef     = useRef()
+  const focusOrder = isZgh ? [euBarcodeRef, barcodeRef, photoRef] : [rowRef, placeRef, barcodeRef, photoRef]
 
   function handleKeyDown(e) {
     if (e.key !== 'Enter') return
@@ -43,17 +46,22 @@ export default function ConsolidationFormPage() {
 
   async function handleSubmit(e) {
     e.preventDefault()
-    if (!rowVal.trim() || !place.trim()) {
+    if (!isZgh && (!rowVal.trim() || !place.trim())) {
       setStatus({ ok: false, text: 'Введите ряд и место в ряду' })
+      return
+    }
+    if (isZgh && !euBarcode.trim()) {
+      setStatus({ ok: false, text: 'Отсканируйте или введите штрихкод ЕО' })
       return
     }
     setStatus(null)
     setBusy(true)
-    const cell = prefix + '-' + rowVal.trim() + '-' + place.trim()
+    const cell = isZgh ? 'ZGH' : prefix + '-' + rowVal.trim() + '-' + place.trim()
     const fd = new FormData()
     fd.append('cell', cell)
     fd.append('barcode', barcode)
     fd.append('employeeName', name)
+    if (isZgh) fd.append('handlingUnitBarcode', euBarcode.trim())
     if (photos) {
       for (const f of photos) fd.append('photo', f)
     }
@@ -67,6 +75,7 @@ export default function ConsolidationFormPage() {
         setStatus({ ok: true, text: 'Жалоба отправлена! Спасибо.' })
         setPlace('')
         setBarcode('')
+        setEuBarcode('')
         setPhotos(null)
         if (photoRef.current) photoRef.current.value = ''
       } else {
@@ -93,9 +102,9 @@ export default function ConsolidationFormPage() {
         <p className={styles.subtitle}>Заполните форму и прикрепите фото</p>
 
         <form onSubmit={handleSubmit} onKeyDown={handleKeyDown}>
-          {/* Cell */}
+          {/* Cell / zone */}
           <div className={styles.formGroup}>
-            <label className={styles.labelRequired}>Место хранения (ячейка)</label>
+            <label className={styles.labelRequired}>Зона</label>
             <div className={styles.cellRow}>
               <div className={styles.cellToggle} role="group" aria-label="Тип зоны">
                 <button
@@ -120,50 +129,73 @@ export default function ConsolidationFormPage() {
                   onClick={() => selectPrefix('ZGH')}
                 >ZGH</button>
               </div>
-              <div className={styles.cellFields}>
-                <input
-                  ref={rowRef}
-                  className={`${styles.formControl} ${styles.cellRowNum}`}
-                  type="text"
-                  placeholder="4"
-                  maxLength={1}
-                  autoComplete="off"
-                  inputMode="numeric"
-                  title="Ряд (1 цифра, сохраняется)"
-                  value={rowVal}
-                  onChange={e => setRowVal(e.target.value)}
-                />
-                <input
-                  ref={placeRef}
-                  className={`${styles.formControl} ${styles.cellPlaceNum}`}
-                  type="text"
-                  placeholder="44"
-                  maxLength={2}
-                  required
-                  autoComplete="off"
-                  inputMode="numeric"
-                  title="Место в ряду (2 цифры)"
-                  value={place}
-                  onChange={e => setPlace(e.target.value)}
-                />
-              </div>
+              {!isZgh && (
+                <div className={styles.cellFields}>
+                  <input
+                    ref={rowRef}
+                    className={`${styles.formControl} ${styles.cellRowNum}`}
+                    type="text"
+                    placeholder="4"
+                    maxLength={1}
+                    autoComplete="off"
+                    inputMode="numeric"
+                    title="Ряд (1 цифра, сохраняется)"
+                    value={rowVal}
+                    onChange={e => setRowVal(e.target.value)}
+                  />
+                  <input
+                    ref={placeRef}
+                    className={`${styles.formControl} ${styles.cellPlaceNum}`}
+                    type="text"
+                    placeholder="44"
+                    maxLength={2}
+                    autoComplete="off"
+                    inputMode="numeric"
+                    title="Место в ряду (2 цифры)"
+                    value={place}
+                    onChange={e => setPlace(e.target.value)}
+                  />
+                </div>
+              )}
             </div>
-            <small className={styles.cellHint}>
-              Ряд и место в ряду. Итог: <strong>{cellPreview}</strong>
-            </small>
+            {!isZgh && (
+              <small className={styles.cellHint}>
+                Ряд и место в ряду. Итог: <strong>{cellPreview}</strong>
+              </small>
+            )}
           </div>
+
+          {/* ЕО barcode (ZGH only) */}
+          {isZgh && (
+            <div className={styles.formGroup}>
+              <label className={styles.labelRequired} htmlFor="cf-eu-barcode">Штрихкод ЕО</label>
+              <input
+                ref={euBarcodeRef}
+                id="cf-eu-barcode"
+                className={styles.formControl}
+                type="text"
+                inputMode="numeric"
+                placeholder="отсканируй или введи ШК ЕО"
+                autoComplete="off"
+                value={euBarcode}
+                onChange={e => setEuBarcode(e.target.value)}
+              />
+            </div>
+          )}
 
           {/* Barcode */}
           <div className={styles.formGroup}>
-            <label className={styles.labelRequired} htmlFor="cf-barcode">Штрихкод товара</label>
+            <label className={isZgh ? undefined : styles.labelRequired} htmlFor="cf-barcode">
+              Штрихкод товара{isZgh ? ' (необязательно)' : ''}
+            </label>
             <input
               ref={barcodeRef}
               id="cf-barcode"
               className={styles.formControl}
               type="text"
               inputMode="numeric"
-              placeholder="отсканируй ШК товара или ЕО"
-              required
+              placeholder="отсканируй ШК товара"
+              required={!isZgh}
               autoComplete="off"
               value={barcode}
               onChange={e => setBarcode(e.target.value)}

@@ -1982,8 +1982,12 @@ app.post('/api/schedule/settings', (req, res) => {
 // POST /api/consolidation/complaints — создать жалобу
 app.post('/api/consolidation/complaints', upload.array('photo', 10), async (req, res) => {
   try {
-    const { cell, barcode, employeeName } = req.body || {};
-    if (!cell || !barcode) {
+    const { cell, barcode, employeeName, handlingUnitBarcode } = req.body || {};
+    const isZgh = (cell || '').trim().toUpperCase() === 'ZGH';
+    if (isZgh && !handlingUnitBarcode) {
+      return res.status(400).json({ ok: false, error: 'Укажите штрихкод ЕО' });
+    }
+    if (!isZgh && (!cell || !barcode)) {
       return res.status(400).json({ ok: false, error: 'Укажите место хранения и штрихкод' });
     }
     const id = Date.now() + '_' + Math.random().toString(36).slice(2, 8);
@@ -2012,8 +2016,10 @@ app.post('/api/consolidation/complaints', upload.array('photo', 10), async (req,
       employeeName: (employeeName || '').trim() || null,
       photoFilename,
       photoFilenames,
+      handlingUnitBarcode: handlingUnitBarcode ? handlingUnitBarcode.trim() : null,
       productName: null,
       nomenclatureCode: null,
+      productBarcode: null,
       violator: null,
       violatorId: null,
       operationType: null,
