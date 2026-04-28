@@ -309,7 +309,6 @@ async function lookupViaBrowser(token, barcode, cell, createdAt, preScannedEuBar
       while (true) {
         const data = await wmsPost(token, {
           ...baseBody,
-          operationTypes: LOOKUP_OP_TYPES,
           targetHandlingUnitBarcode: euNorm,
           pageNumber: pageNum2,
           pageSize: 500,
@@ -337,10 +336,12 @@ async function lookupViaBrowser(token, barcode, cell, createdAt, preScannedEuBar
       result.nomenclatureCode = nomenclatureCode
       result.productBarcode = productBarcode
 
-      console.log('[ZGH step2] candidates:', candidates.length)
-      if (candidates.length > 0) {
-        candidates.sort((a, b) => new Date(b.operationCompletedAt || 0) - new Date(a.operationCompletedAt || 0))
-        const v = candidates[0]
+      const pickingCandidates = candidates.filter(it => LOOKUP_OP_TYPES.includes(it.operationType))
+      const finalCandidates = pickingCandidates.length > 0 ? pickingCandidates : candidates
+      console.log('[ZGH step2] total:', candidates.length, 'picking:', pickingCandidates.length)
+      if (finalCandidates.length > 0) {
+        finalCandidates.sort((a, b) => new Date(b.operationCompletedAt || 0) - new Date(a.operationCompletedAt || 0))
+        const v = finalCandidates[0]
         result.violator = fioFromUser(v.responsibleUser) || fioFromUser(v.executor) || null
         result.violatorId = v.responsibleUser?.id || v.executorId || null
         result.operationType = v.operationType || null
@@ -348,7 +349,7 @@ async function lookupViaBrowser(token, barcode, cell, createdAt, preScannedEuBar
         result.strategy = 'zgh_eu_match'
         console.log('[ZGH step2] violator:', result.violator, 'completedAt:', result.operationCompletedAt)
       } else {
-        result.strategy = 'zgh_violator_not_found'
+        result.strategy = candidates.length > 0 ? 'zgh_no_picking_ops' : 'zgh_violator_not_found'
       }
     } catch (err) {
       result.lookupDone = false
