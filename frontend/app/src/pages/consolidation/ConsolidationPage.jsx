@@ -218,7 +218,7 @@ async function lookupViaBrowser(token, barcode, cell, createdAt) {
     shiftStart.setDate(shiftStart.getDate() - 1)
   }
   shiftStart.setHours(9, 0, 0, 0)
-  const shiftEnd = new Date(mskRef)
+  const shiftEnd = new Date(shiftStart)
   shiftEnd.setHours(23, 59, 59, 999)
   const shiftStartUTC = new Date(shiftStart.getTime() - (mskOffset + refDate.getTimezoneOffset()) * 60000)
   const shiftEndUTC   = new Date(shiftEnd.getTime()   - (mskOffset + refDate.getTimezoneOffset()) * 60000)
@@ -239,7 +239,7 @@ async function lookupViaBrowser(token, barcode, cell, createdAt) {
   try { cellIds = await findCellIdsByAddress(token, cell) } catch { /* ignore */ }
 
   const baseBody = {
-    productId: null, parts: [], operationTypes: null,
+    productId: null, parts: [], operationTypes: [],
     sourceCellId: null, targetCellId: null,
     operationStartedAtFrom: from24hISO, operationStartedAtTo: nowISO,
     operationCompletedAtFrom: from24hISO, operationCompletedAtTo: nowISO,
@@ -248,6 +248,8 @@ async function lookupViaBrowser(token, barcode, cell, createdAt) {
 
   // ─── ZGH strategy: штрихкод → ЕО → кто комплектовал ─────────────────────
   if (String(cell || '').trim().toUpperCase().startsWith('ZGH')) {
+    console.log('[ZGH lookup] barcode:', barcodeNorm, 'cell:', cellNorm, 'cellIds:', cellIds)
+    console.log('[ZGH lookup] dateFrom:', from24hISO, 'dateTo:', nowISO)
     try {
       // Шаг 1: ищем операцию по штрихкоду товара в ZGH-ячейке — находим ЕО
       let euBarcode = null
@@ -258,9 +260,12 @@ async function lookupViaBrowser(token, barcode, cell, createdAt) {
         : [{ ...baseBody }]
 
       let pageNum = 1
+      let step1TotalItems = 0
       outer: while (true) {
         const batches = await Promise.all(step1Bodies.map(b => wmsPost(token, { ...b, pageNumber: pageNum, pageSize: 500 })))
         const items = batches.flatMap(b => b?.value?.items || [])
+        step1TotalItems += items.length
+        console.log('[ZGH step1] page', pageNum, '— items:', items.length)
         if (!items.length) break
         for (const it of items) {
           if (matchesBarcode(it, barcodeNorm) || matchesHandlingUnitBarcode(it, barcodeNorm)) {
@@ -268,11 +273,13 @@ async function lookupViaBrowser(token, barcode, cell, createdAt) {
             productName = it.product?.name || null
             nomenclatureCode = it.product?.nomenclatureCode || null
             productBarcode = pickProductBarcode(it, barcodeNorm)
+            console.log('[ZGH step1] MATCH found, euBarcode:', euBarcode, 'opType:', it.operationType)
             break outer
           }
         }
         pageNum++
       }
+      console.log('[ZGH step1] done, totalItems:', step1TotalItems, 'euBarcode:', euBarcode)
 
       result.productName = productName
       result.nomenclatureCode = nomenclatureCode
@@ -302,6 +309,7 @@ async function lookupViaBrowser(token, barcode, cell, createdAt) {
         pageNum2++
       }
 
+      console.log('[ZGH step2] candidates:', candidates.length)
       if (candidates.length > 0) {
         candidates.sort((a, b) => new Date(b.operationCompletedAt || 0) - new Date(a.operationCompletedAt || 0))
         const v = candidates[0]
@@ -310,6 +318,7 @@ async function lookupViaBrowser(token, barcode, cell, createdAt) {
         result.operationType = v.operationType || null
         result.operationCompletedAt = v.operationCompletedAt || null
         result.strategy = 'zgh_eu_match'
+        console.log('[ZGH step2] violator:', result.violator, 'opType:', result.operationType, 'completedAt:', result.operationCompletedAt)
       } else {
         result.strategy = 'zgh_violator_not_found'
       }
