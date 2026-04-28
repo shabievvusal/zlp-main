@@ -119,7 +119,7 @@ function getMergeKeyFromLight(light) {
 /** Привести полный объект операции с API к лёгкому формату (как flattenItem на клиенте) */
 function toLightItem(item) {
   const ru = item.responsibleUser || {};
-  const executor = [ru.lastName, ru.firstName, ru.middleName].filter(Boolean).join(' ').trim() || '';
+  const executor = [ru.lastName, ru.firstName, ru.middleName].filter(p => p && p.trim() !== '-').join(' ').trim() || '';
   const product = item.product || {};
   return {
     id: item.id || '',

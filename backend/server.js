@@ -15,6 +15,7 @@ const productWeights = require('./product-weights');
 const rkStorage = process.env.USE_PG === 'true'
   ? require('./route-rk-pg')
   : require('./route-rk-storage');
+const emplPg = process.env.USE_PG === 'true' ? require('./empl-pg') : null;
 const s3Storage = require('./s3');
 const excelReports = require('./excel-reports');
 
@@ -385,7 +386,7 @@ function updateNamesRegistry(items) {
         const fullFio = registry[normPkForRegistry(fio)];
         if (fullFio && fullFio.split(/\s+/).length > fio.split(/\s+/).length) {
           csvChanged = true;
-          const titled = fullFio.replace(/\S+/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+          const titled = fullFio.replace(/\S+/g, w => w.split('-').map(p => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join('-'));
           return titled + ';' + company;
         }
         return line;
@@ -396,11 +397,23 @@ function updateNamesRegistry(items) {
     } catch {}
   }
 
-  // Возвращаем имена из текущей выгрузки, которых нет в empl.csv
+  // Для PG: fire-and-forget обогащение имён
+  if (emplPg && Object.keys(registry).length > 0) {
+    emplPg.enrichNames(registry).catch(err => console.error('empl-pg enrichNames:', err.message));
+  }
+
+  // Возвращаем имена из текущей выгрузки, которых нет в хранилище
+  const knownFios = emplPg
+    ? new Set([...emplPg.getEmplMapFioToCompany().keys()])
+    : existingPks;
   const newNames = [];
   for (const [pk, full] of itemNames) {
-    if (!existingPks.has(pk)) {
-      const titled = full.replace(/\S+/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+    const norm = full.replace(/\s+/g, ' ').trim().toLowerCase();
+    const known = emplPg
+      ? [...knownFios].some(k => k === norm || k.includes(norm) || norm.includes(k))
+      : knownFios.has(pk);
+    if (!known) {
+      const titled = full.replace(/\S+/g, w => w.split('-').map(p => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join('-'));
       newNames.push(titled);
     }
   }
@@ -779,6 +792,7 @@ function readEmplCsvText() {
 
 /** Карта нормализованное ФИО -> компания для фильтра по роли manager */
 function getEmplMapFioToCompany() {
+  if (emplPg) return emplPg.getEmplMapFioToCompany();
   const map = new Map();
   if (!fs.existsSync(EMPL_CSV_PATH)) return map;
   let text;
@@ -808,6 +822,7 @@ function normalizeFioForMatch(fio) {
 }
 
 function getCompanyByFio(emplMap, executorFio) {
+  if (emplPg) return emplPg.getCompanyByFio(emplMap, executorFio);
   const norm = normalizeFioForMatch(executorFio);
   if (!norm) return null;
   for (const [key, company] of emplMap) {
@@ -873,32 +888,40 @@ app.delete('/api/vs/admin/product-weights', vsSessionRequired, vsAdminRequired, 
   }
 });
 
-app.get('/api/empl', (req, res) => {
-  if (!fs.existsSync(EMPL_CSV_PATH)) {
-    return res.json({ employees: [], companies: [] });
-  }
-  let text;
+app.get('/api/empl', async (req, res) => {
   try {
-    text = readEmplCsvText();
-  } catch {
-    return res.json({ employees: [], companies: [] });
-  }
-  const employees = [];
-  const companySet = new Set();
-  const lines = text.replace(/\r\n/g, '\n').split('\n');
-  for (const line of lines) {
-    const t = line.trim();
-    if (!t) continue;
-    const idx = t.indexOf(';');
-    if (idx < 0) continue;
-    const fio = t.slice(0, idx).trim();
-    const company = t.slice(idx + 1).trim();
-    if (fio) {
-      employees.push({ fio, company });
-      if (company) companySet.add(company);
+    if (emplPg) {
+      const data = await emplPg.listEmployees();
+      return res.json(data);
     }
+    if (!fs.existsSync(EMPL_CSV_PATH)) {
+      return res.json({ employees: [], companies: [] });
+    }
+    let text;
+    try {
+      text = readEmplCsvText();
+    } catch {
+      return res.json({ employees: [], companies: [] });
+    }
+    const employees = [];
+    const companySet = new Set();
+    const lines = text.replace(/\r\n/g, '\n').split('\n');
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t) continue;
+      const idx = t.indexOf(';');
+      if (idx < 0) continue;
+      const fio = t.slice(0, idx).trim();
+      const company = t.slice(idx + 1).trim();
+      if (fio) {
+        employees.push({ fio, company });
+        if (company) companySet.add(company);
+      }
+    }
+    res.json({ employees, companies: [...companySet].sort() });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
-  res.json({ employees, companies: [...companySet].sort() });
 });
 
 function appendToEmplCsv(fio, company) {
@@ -908,13 +931,17 @@ function appendToEmplCsv(fio, company) {
   fs.appendFileSync(EMPL_CSV_PATH, Buffer.from(line, 'utf8'));
 }
 
-app.post('/api/empl', (req, res) => {
+app.post('/api/empl', async (req, res) => {
   try {
-    const { fio, company } = req.body || {};
+    const { fio, company, executorId } = req.body || {};
     if (!fio || typeof fio !== 'string' || !fio.trim()) {
       return res.status(400).json({ ok: false, error: 'Укажите ФИО' });
     }
-    appendToEmplCsv(fio.trim(), (company != null ? String(company) : '').trim());
+    if (emplPg) {
+      await emplPg.upsertEmployee({ executorId, fio: fio.trim(), company: (company != null ? String(company) : '').trim() });
+    } else {
+      appendToEmplCsv(fio.trim(), (company != null ? String(company) : '').trim());
+    }
     res.json({ ok: true });
   } catch (err) {
     console.error('POST /api/empl', err);
@@ -922,9 +949,16 @@ app.post('/api/empl', (req, res) => {
   }
 });
 
-// POST /api/empl/add-new — добавить новых сотрудников в empl.csv (без компании)
-app.post('/api/empl/add-new', (req, res) => {
+// POST /api/empl/add-new — добавить новых сотрудников (без компании)
+app.post('/api/empl/add-new', async (req, res) => {
   try {
+    if (emplPg) {
+      const raw = Array.isArray(req.body?.executors) ? req.body.executors
+        : (Array.isArray(req.body?.names) ? req.body.names.map(n => ({ fio: n })) : []);
+      const added = await emplPg.addNewEmployees(raw);
+      const data = await emplPg.listEmployees();
+      return res.json({ ok: true, added, ...data });
+    }
     const names = Array.isArray(req.body?.names) ? req.body.names : [];
     if (!names.length) return res.json({ ok: true, added: 0 });
 
@@ -984,8 +1018,8 @@ app.post('/api/empl/add-new', (req, res) => {
   }
 });
 
-// POST /api/empl/enrich-names — обогатить empl.csv отчествами из сырых WMS-файлов
-app.post('/api/empl/enrich-names', (req, res) => {
+// POST /api/empl/enrich-names — обогатить ФИО отчествами из сырых WMS-файлов
+app.post('/api/empl/enrich-names', async (req, res) => {
   try {
     // Читаем реестр имён (накапливается при каждом fetch из WMS)
     let registry = {};
@@ -1013,6 +1047,13 @@ app.post('/api/empl/enrich-names', (req, res) => {
       }
     }
 
+    if (emplPg) {
+      if (!Object.keys(registry).length) return res.json({ ok: true, updated: 0, employees: [], companies: [] });
+      const updated = await emplPg.enrichNames(registry);
+      const data = await emplPg.listEmployees();
+      return res.json({ ok: true, updated, ...data });
+    }
+
     if (Object.keys(registry).length === 0 || !fs.existsSync(EMPL_CSV_PATH)) {
       return res.json({ ok: true, updated: 0, employees: [], companies: [] });
     }
@@ -1032,7 +1073,7 @@ app.post('/api/empl/enrich-names', (req, res) => {
       const fullFio = registry[normPkForRegistry(fio)];
       if (fullFio && fullFio.split(/\s+/).length > fio.split(/\s+/).length) {
         updated++;
-        const titled = fullFio.replace(/\S+/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+        const titled = fullFio.replace(/\S+/g, w => w.split('-').map(p => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join('-'));
         return titled + ';' + company;
       }
       return line;
@@ -1785,9 +1826,13 @@ app.get('/api/shifts/:shiftKey/items', (req, res) => {
   }
 });
 
-// GET/POST /api/employees — для страницы /vs (csv)
-app.get('/api/employees', (req, res) => {
+// GET/POST /api/employees — для страницы настроек
+app.get('/api/employees', async (req, res) => {
   try {
+    if (emplPg) {
+      const data = await emplPg.listEmployees();
+      return res.json({ csv: '', ...data });
+    }
     if (!fs.existsSync(EMPL_CSV_PATH)) {
       return res.json({ csv: '', employees: [], companies: [] });
     }
@@ -1813,8 +1858,33 @@ app.get('/api/employees', (req, res) => {
   }
 });
 
-app.post('/api/employees', (req, res) => {
+app.post('/api/employees', async (req, res) => {
   try {
+    if (emplPg) {
+      // Принимаем либо массив [{executorId?, fio, company}], либо CSV-текст для совместимости
+      if (Array.isArray(req.body?.employees)) {
+        await emplPg.saveAll(req.body.employees);
+        const data = await emplPg.listEmployees();
+        return res.json({ ok: true, ...data });
+      }
+      // Парсим CSV если передан
+      const { csv } = req.body || {};
+      if (typeof csv === 'string') {
+        const parsed = [];
+        for (const line of csv.replace(/\r\n/g, '\n').split('\n')) {
+          const t = line.trim();
+          if (!t) continue;
+          const idx = t.indexOf(';');
+          const fio = idx >= 0 ? t.slice(0, idx).trim() : t.trim();
+          const company = idx >= 0 ? t.slice(idx + 1).trim() : '';
+          if (fio) parsed.push({ fio, company });
+        }
+        await emplPg.saveAll(parsed);
+        const data = await emplPg.listEmployees();
+        return res.json({ ok: true, ...data });
+      }
+      return res.status(400).json({ error: 'Нет данных' });
+    }
     const { csv } = req.body || {};
     if (typeof csv !== 'string') return res.status(400).json({ error: 'Нет поля csv' });
     const bom = Buffer.from([0xEF, 0xBB, 0xBF]);
@@ -3055,6 +3125,7 @@ async function startServer() {
   if (process.env.USE_PG === 'true') {
     console.log('[pg] Инициализация PostgreSQL...');
     await rkStorage.init();
+    await emplPg.init();
     console.log('[pg] PostgreSQL готов');
   }
   app.listen(PORT, '0.0.0.0', () => {
