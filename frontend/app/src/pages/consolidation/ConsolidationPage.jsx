@@ -242,6 +242,76 @@ async function lookupViaBrowser(token, barcode, cell) {
     executorId: null,
   }
 
+  // ─── ZGH strategy: штрихкод → ЕО → кто комплектовал ─────────────────────
+  if (String(cell || '').trim().toUpperCase().startsWith('ZGH')) {
+    try {
+      // Шаг 1: ищем операцию по штрихкоду товара — находим ЕО
+      let euBarcode = null
+      let productName = null, nomenclatureCode = null, productBarcode = null
+
+      let pageNum = 1
+      outer: while (true) {
+        const data = await wmsPost(token, { ...baseBody, operationTypes: LOOKUP_OP_TYPES, pageNumber: pageNum, pageSize: 500 })
+        const items = data?.value?.items || []
+        if (!items.length) break
+        for (const it of items) {
+          if (matchesBarcode(it, barcodeNorm) || matchesHandlingUnitBarcode(it, barcodeNorm)) {
+            euBarcode = it?.targetAddress?.handlingUnitBarcode || it?.sourceAddress?.handlingUnitBarcode || null
+            productName = it.product?.name || null
+            nomenclatureCode = it.product?.nomenclatureCode || null
+            productBarcode = pickProductBarcode(it, barcodeNorm)
+            break outer
+          }
+        }
+        pageNum++
+      }
+
+      result.productName = productName
+      result.nomenclatureCode = nomenclatureCode
+      result.productBarcode = productBarcode
+      result.handlingUnitBarcode = euBarcode
+
+      if (!euBarcode) {
+        result.strategy = 'zgh_eu_not_found'
+        return result
+      }
+
+      // Шаг 2: ищем кто комплектовал эту ЕО — фильтруем по targetHandlingUnitBarcode на стороне API
+      const euNorm = String(euBarcode).trim()
+      let pageNum2 = 1
+      const candidates = []
+      while (true) {
+        const data = await wmsPost(token, {
+          ...baseBody,
+          operationTypes: LOOKUP_OP_TYPES,
+          targetHandlingUnitBarcode: euNorm,
+          pageNumber: pageNum2,
+          pageSize: 500,
+        })
+        const items = data?.value?.items || []
+        if (!items.length) break
+        candidates.push(...items)
+        pageNum2++
+      }
+
+      if (candidates.length > 0) {
+        candidates.sort((a, b) => new Date(b.operationCompletedAt || 0) - new Date(a.operationCompletedAt || 0))
+        const v = candidates[0]
+        result.violator = fioFromUser(v.responsibleUser) || fioFromUser(v.executor) || null
+        result.violatorId = v.responsibleUser?.id || v.executorId || null
+        result.operationType = v.operationType || null
+        result.operationCompletedAt = v.operationCompletedAt || null
+        result.strategy = 'zgh_eu_match'
+      } else {
+        result.strategy = 'zgh_violator_not_found'
+      }
+    } catch (err) {
+      result.lookupDone = false
+      result.lookupError = err.message || 'Ошибка WMS (ZGH)'
+    }
+    return result
+  }
+
   // ─── Priority: exact match (cell + barcode) ───────────────────────────────
   try {
     const exactBodies = cellIds.length > 0
