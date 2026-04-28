@@ -245,14 +245,18 @@ async function lookupViaBrowser(token, barcode, cell) {
   // ─── ZGH strategy: штрихкод → ЕО → кто комплектовал ─────────────────────
   if (String(cell || '').trim().toUpperCase().startsWith('ZGH')) {
     try {
-      // Шаг 1: ищем операцию по штрихкоду товара — находим ЕО
+      // Шаг 1: ищем операцию по штрихкоду товара в ZGH-ячейке — находим ЕО
       let euBarcode = null
       let productName = null, nomenclatureCode = null, productBarcode = null
 
+      const step1Bodies = cellIds.length > 0
+        ? cellIds.map(id => ({ ...baseBody, targetCellId: id }))
+        : [{ ...baseBody }]
+
       let pageNum = 1
       outer: while (true) {
-        const data = await wmsPost(token, { ...baseBody, operationTypes: LOOKUP_OP_TYPES, pageNumber: pageNum, pageSize: 500 })
-        const items = data?.value?.items || []
+        const batches = await Promise.all(step1Bodies.map(b => wmsPost(token, { ...b, pageNumber: pageNum, pageSize: 500 })))
+        const items = batches.flatMap(b => b?.value?.items || [])
         if (!items.length) break
         for (const it of items) {
           if (matchesBarcode(it, barcodeNorm) || matchesHandlingUnitBarcode(it, barcodeNorm)) {
