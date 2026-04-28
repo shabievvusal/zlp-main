@@ -303,16 +303,20 @@ async function lookupViaBrowser(token, barcode, cell, createdAt, preScannedEuBar
       }
 
       // Шаг 2: ищем кто комплектовал эту ЕО по targetHandlingUnitBarcode
+      // Дата не ограничивается — ЕО могла быть собрана в любой день
       const euNorm = String(euBarcode).trim()
+      const step2Body = {
+        productId: null, parts: [], operationTypes: [],
+        sourceCellId: null, targetCellId: null,
+        operationStartedAtFrom: null, operationStartedAtTo: null,
+        operationCompletedAtFrom: null, operationCompletedAtTo: null,
+        executorId: null,
+        targetHandlingUnitBarcode: euNorm,
+      }
       let pageNum2 = 1
       const candidates = []
       while (true) {
-        const data = await wmsPost(token, {
-          ...baseBody,
-          targetHandlingUnitBarcode: euNorm,
-          pageNumber: pageNum2,
-          pageSize: 500,
-        })
+        const data = await wmsPost(token, { ...step2Body, pageNumber: pageNum2, pageSize: 500 })
         const items = data?.value?.items || []
         if (!items.length) break
         // Если штрихкод товара указан — извлекаем название товара из результатов
