@@ -376,6 +376,17 @@
   border-top: 1px solid var(--border);
 }
 
+.dateInput {
+  font-size: 12px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-card);
+  color: var(--text);
+  height: 30px;
+}
+.dateInput:focus { outline: none; border-color: var(--primary); }
+
 @media (max-width: 768px) {
   .filters { margin-left: 0; width: 100%; }
   .toolbar { gap: 10px; }

@@ -7,7 +7,7 @@ import { normalizeFio, hasMatchInEmplKeys, personKey } from '../../utils/emplUti
 import { formatDateTime } from '../../utils/format.js'
 import {
   Users, Send, Lock, Settings, RefreshCw, FolderOpen, Scale,
-  User, UserCircle, Trash2, X, Upload, Download, Clock, Theater,
+  User, UserCircle, Trash2, X, Upload, Download, Clock, Theater, FileText,
 } from 'lucide-react'
 import s from './SettingsPage.module.css'
 
@@ -1561,10 +1561,74 @@ function AccessContent() {
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
+// ─── Docs card ────────────────────────────────────────────────────────────────
+
+const LS_COMPANY_FULL_NAMES = 'sz_company_full_names'
+
+function DocsCard() {
+  const [companies, setCompanies] = useState([])
+  const [fullNames, setFullNames] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(LS_COMPANY_FULL_NAMES) || '{}') } catch { return {} }
+  })
+
+  useEffect(() => {
+    api.getEmployees().then(d => setCompanies(d.companies || [])).catch(() => {})
+  }, [])
+
+  const handleChange = (company, value) => {
+    setFullNames(prev => {
+      const updated = { ...prev, [company]: value }
+      localStorage.setItem(LS_COMPANY_FULL_NAMES, JSON.stringify(updated))
+      return updated
+    })
+  }
+
+  return (
+    <div className={s.card}>
+      <div className={s.cardTitle}>Полные названия компаний</div>
+      <div className={s.cardSub}>Используются при печати служебных записок (СЗ)</div>
+      <div className={s.tableWrap}>
+        <table className={s.table}>
+          <thead>
+            <tr>
+              <th style={{ width: '40%' }}>Краткое название</th>
+              <th>Полное юридическое название</th>
+            </tr>
+          </thead>
+          <tbody>
+            {companies.map(company => (
+              <tr key={company}>
+                <td>{company}</td>
+                <td>
+                  <input
+                    className="form-control"
+                    style={{ fontSize: 13, padding: '4px 8px' }}
+                    value={fullNames[company] || ''}
+                    onChange={e => handleChange(company, e.target.value)}
+                    placeholder='ООО "Название компании"'
+                  />
+                </td>
+              </tr>
+            ))}
+            {companies.length === 0 && (
+              <tr>
+                <td colSpan={2} style={{ color: 'var(--text-muted)', textAlign: 'center', padding: 16 }}>
+                  Загрузите сотрудников — появятся компании
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
 const TAB_DEFS = [
   { key: 'employees', label: 'Сотрудники', Icon: Users },
   { key: 'telegram',  label: 'Telegram',   Icon: Send },
   { key: 'access',    label: 'Доступ',     Icon: Lock },
+  { key: 'docs',      label: 'Документы',  Icon: FileText },
   { key: 'system',    label: 'Система',    Icon: Settings },
 ]
 
@@ -1578,6 +1642,7 @@ export default function SettingsPage() {
     if (t.key === 'employees') return isNonManager
     if (t.key === 'telegram')  return true
     if (t.key === 'access')    return isNonManager
+    if (t.key === 'docs')      return isNonManager
     if (t.key === 'system')    return isNonManager
     return false
   })
@@ -1621,6 +1686,10 @@ export default function SettingsPage() {
 
         {visitedTabs.has('access') && isNonManager && (
           <div style={hide('access')}><AccessContent /></div>
+        )}
+
+        {visitedTabs.has('docs') && isNonManager && (
+          <div style={hide('docs')}><DocsCard /></div>
         )}
 
         {visitedTabs.has('system') && isNonManager && (

@@ -477,7 +477,7 @@ function shortFio(fullName) {
   return `${last} ${initials}`
 }
 
-function buildServiceNoteSection(c, uploadsBaseUrl, supervisorName) {
+function buildServiceNoteSection(c, uploadsBaseUrl, supervisorName, companyFullNames, origin) {
   const esc = s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
   const violator = c.violator?.trim() || '—'
   const violatorShort = shortFio(violator)
@@ -490,27 +490,37 @@ function buildServiceNoteSection(c, uploadsBaseUrl, supervisorName) {
   const quantity = c.quantity?.trim() || '1'
   const utDisplay = c.nomenclatureCode?.trim() || ''
   const supervisor = supervisorName?.trim() || ''
+  const companyFull = (companyFullNames || {})[c.company?.trim() || ''] || ''
+  const p2 = n => String(n).padStart(2, '0')
+  const now = new Date()
+  const todayStr = `${p2(now.getDate())}.${p2(now.getMonth() + 1)}.${now.getFullYear()}`
   const photos = getComplaintPhotos(c)
   const photoUrls = photos.map(name => name.startsWith('http') ? name : uploadsBaseUrl + encodeURIComponent(name))
   const imgs = photoUrls.map(url => `<img src="${url}" alt="Фото" class="sz-photo" crossorigin="">`).join('')
   const utBarcodeStr = [utDisplay, productBarcode !== '—' ? `ШК ${esc(productBarcode)}` : ''].filter(Boolean).join(' / ')
   return `
     <div class="sz-page">
-      <div class="sz-header-right">
-        <p>Начальнику склада</p>
-        <p>${esc(SZ_ORG)}</p>
-        <p>${esc(SZ_RECIPIENT)}</p>
-        <p>От начальника смены</p>
-        <p>${supervisor ? esc(supervisor) : '________________'}</p>
+      <div class="sz-header">
+        <div class="sz-header-top">
+          <img src="${esc(origin)}/logo.png" class="sz-logo" alt="" onerror="this.style.display='none'">
+          ${companyFull ? `<div class="sz-company-name">${esc(companyFull)}</div>` : ''}
+        </div>
+        <div class="sz-header-right">
+          <p>Начальнику склада</p>
+          <p>${esc(SZ_ORG)}</p>
+          <p>${esc(SZ_RECIPIENT)}</p>
+          <p>От начальника смены</p>
+          <p>${supervisor ? esc(supervisor) : '________________'}</p>
+        </div>
       </div>
       <div class="sz-title">Служебная записка</div>
       <div class="sz-title sz-title-sub">о выявленных нарушениях в процессе работы</div>
       <p class="sz-p">Настоящим сообщаю, что ${esc(dateStr)} года за кладовщиком ${esc(violator)} участка комплектации п. Шушары (г. Санкт-Петербург) было выявлено нарушение формирования отправления по п.2 приложения № 4 от 01.01.2025 года, а именно:</p>
-      <p class="sz-p sz-p-noident">- ${esc(productName)}${utBarcodeStr ? ` ${esc(utBarcodeStr)}` : ''}</p>
-      <p class="sz-p sz-p-noident">В количестве: ${esc(quantity)} шт.</p>
-      <p class="sz-p sz-p-noident">Место: ${esc(cell)}</p>
-      <p class="sz-p sz-p-noident">ЕО: ${esc(eo)}</p>
-      <p class="sz-p sz-p-noident">Время: ${esc(dateStr)} ${esc(timeStr)}</p>
+      <p class="sz-p sz-p-noident"><b>- ${esc(productName)}${utBarcodeStr ? ` ${esc(utBarcodeStr)}` : ''}</b></p>
+      <p class="sz-p sz-p-noident"><b>В количестве: ${esc(quantity)} шт.</b></p>
+      <p class="sz-p sz-p-noident"><b>Место: ${esc(cell)}</b></p>
+      <p class="sz-p sz-p-noident"><b>ЕО: ${esc(eo)}</b></p>
+      <p class="sz-p sz-p-noident"><b>Время: ${esc(dateStr)} ${esc(timeStr)}</b></p>
       <p class="sz-p">Данное нарушение подтверждается камерами видеонаблюдения и результатами приемки на ЦФЗ. Таким образом, зафиксировано ненадлежащее исполнение трудовых обязанностей кладовщиком ${esc(violatorShort)}.</p>
       <p class="sz-p">Подобные ошибки ведут к сбоям в адресации товара, росту недовозов и дополнительной нагрузке на персонал ЦФЗ, что систематически фиксируется в наших сводках.</p>
       <p class="sz-p">Так же данные действия привели к увеличению трудозатрат на обработку указанных позиций: дополнительные проверки, пересчеты и инвентаризации. Появляются риски ухудшения деловой репутации нашей компании, а также недоверию к качеству услуг, оказываемых нашей компанией как исполнителем складских логистических услуг.</p>
@@ -519,7 +529,7 @@ function buildServiceNoteSection(c, uploadsBaseUrl, supervisorName) {
         <div class="sz-sign-fields"><span></span><span></span><span></span></div>
         <div class="sz-sign-captions"><span>(Подпись)</span><span>(Расшифровка)</span><span>(Дата)</span></div>
         <p class="sz-sign-label" style="margin-top:18px">Начальник смены:</p>
-        <div class="sz-sign-fields"><span></span><span></span><span></span></div>
+        <div class="sz-sign-fields"><span></span><span class="sz-prefilled">${supervisor ? esc(supervisor) : ''}</span><span class="sz-prefilled">${todayStr}</span></div>
         <div class="sz-sign-captions"><span>(Подпись)</span><span>(Расшифровка)</span><span>(Дата)</span></div>
       </div>
       ${photoUrls.length > 0 ? `<div class="sz-photos">${imgs}</div>` : ''}
@@ -530,14 +540,20 @@ function printServiceNotes(selected, supervisorName) {
   if (selected.length === 0) { alert('Отметьте галочками жалобы для печати СЗ'); return }
   const origin = window.location.origin || ''
   const uploadsBaseUrl = origin + '/api/consolidation/uploads/'
-  const sections = selected.map(c => buildServiceNoteSection(c, uploadsBaseUrl, supervisorName)).join('')
+  let companyFullNames = {}
+  try { companyFullNames = JSON.parse(localStorage.getItem('sz_company_full_names') || '{}') } catch {}
+  const sections = selected.map(c => buildServiceNoteSection(c, uploadsBaseUrl, supervisorName, companyFullNames, origin)).join('')
   const html = `<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><title>Служебные записки</title>
 <style>
 @page { size: A4; margin: 20mm; }
 body { font-family: "Times New Roman", serif; font-size: 12pt; line-height: 1.45; color: #000; margin: 0; padding: 16px; }
 .sz-page { page-break-after: always; padding-bottom: 20px; }
 .sz-page:last-child { page-break-after: auto; }
-.sz-header-right { text-align: right; margin-bottom: 20px; }
+.sz-header { margin-bottom: 20px; }
+.sz-header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.sz-logo { width: 180px; height: auto; display: block; }
+.sz-company-name { font-size: 14pt; font-weight: 700; text-align: right; }
+.sz-header-right { text-align: right; }
 .sz-header-right p { margin: 2px 0; }
 .sz-title { text-align: center; font-weight: 700; margin: 8px 0 2px; }
 .sz-title-sub { margin-bottom: 14px; }
@@ -546,7 +562,8 @@ body { font-family: "Times New Roman", serif; font-size: 12pt; line-height: 1.45
 .sz-sign-block { margin-top: 24px; }
 .sz-sign-label { margin: 0 0 4px 0; }
 .sz-sign-fields { display: flex; gap: 24px; margin-top: 14px; }
-.sz-sign-fields span { flex: 1; border-bottom: 1px solid #000; min-width: 100px; }
+.sz-sign-fields span { flex: 1; border-bottom: 1px solid #000; min-width: 100px; padding-bottom: 2px; }
+.sz-prefilled { text-align: center; font-size: 11pt; }
 .sz-sign-captions { display: flex; gap: 24px; margin-top: 2px; }
 .sz-sign-captions span { flex: 1; font-size: 10pt; text-align: center; }
 .sz-photos { margin-top: 16px; height: 230mm; display: flex; flex-direction: column; gap: 0; page-break-inside: avoid; }
@@ -762,6 +779,8 @@ function ComplaintRow({ complaint: c, selected, onToggle, onLookup, onEdit, onPh
 export default function ConsolidationPage() {
   const [complaints, setComplaints] = useState([])
   const [violatorFilter, setViolatorFilter] = useState('all')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo]     = useState('')
   const [selected, setSelected] = useState(new Set())
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
@@ -792,11 +811,17 @@ export default function ConsolidationPage() {
   useEffect(() => { load() }, [load])
 
   // ─── Derived ──────────────────────────────────────────────────────────────
-  const filtered = violatorFilter === 'all'
-    ? complaints
-    : violatorFilter === 'found'
-      ? complaints.filter(c => c.violator)
-      : complaints.filter(c => !c.violator)
+  const filtered = complaints.filter(c => {
+    if (violatorFilter === 'found' && !c.violator) return false
+    if (violatorFilter === 'not_found' && c.violator) return false
+    if (dateFrom && c.createdAt < new Date(dateFrom).toISOString()) return false
+    if (dateTo) {
+      const toDate = new Date(dateTo)
+      toDate.setSeconds(59, 999)
+      if (c.createdAt > toDate.toISOString()) return false
+    }
+    return true
+  })
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
   const safePage = Math.min(Math.max(1, page), totalPages)
   const pageItems = filtered.slice((safePage - 1) * pageSize, safePage * pageSize)
@@ -981,6 +1006,32 @@ export default function ConsolidationPage() {
                 {label}
               </button>
             ))}
+          </div>
+        </div>
+
+        {/* Строка 3: фильтр по дате подачи */}
+        <div className={s.toolbarRow}>
+          <div className={s.toolbarLeft} style={{ alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 12, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Дата подачи:</span>
+            <input
+              type="datetime-local"
+              className={s.dateInput}
+              value={dateFrom}
+              onChange={e => { setDateFrom(e.target.value); setPage(1) }}
+            />
+            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>—</span>
+            <input
+              type="datetime-local"
+              className={s.dateInput}
+              value={dateTo}
+              onChange={e => { setDateTo(e.target.value); setPage(1) }}
+            />
+            {(dateFrom || dateTo) && (
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => { setDateFrom(''); setDateTo(''); setPage(1) }}
+              >✕</button>
+            )}
           </div>
         </div>
       </div>
