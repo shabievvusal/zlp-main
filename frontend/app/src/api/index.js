@@ -934,6 +934,31 @@ const INBOUND_TYPE_SLUG = {
   STORAGE_DC: 'storage_dc',
 }
 
+export async function getInboundTaskResponsibleUsers(token, { taskType, id }) {
+  const slug = INBOUND_TYPE_SLUG[taskType] || taskType.toLowerCase().replace('_', '-')
+  const url  = `https://api.samokat.ru/wmsin-wwh/inbound/${slug}/tasks/${id}/responsible-users`
+  const r    = await fetch(url, {
+    headers: {
+      'Accept':        'application/json',
+      'Authorization': `Bearer ${token}`,
+      'Origin':        'https://wwh.samokat.ru',
+      'Referer':       'https://wwh.samokat.ru/',
+      'User-Agent':    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36',
+    },
+  })
+  const text    = await r.text()
+  const trimmed = (text || '').trim().toLowerCase()
+  if (trimmed.startsWith('<!doctype') || trimmed.startsWith('<html')) {
+    throw new Error('Нет доступа к API. Проверьте VPN или войдите заново.')
+  }
+  let data
+  try { data = text ? JSON.parse(text) : null } catch {
+    throw new Error('Ответ не JSON: ' + (text || '').slice(0, 150))
+  }
+  if (!r.ok) throw new Error(`API ${r.status}: ${data?.message || data?.error || r.statusText}`)
+  return data
+}
+
 export async function getInboundTaskDetail(token, { taskType, id }) {
   const slug = INBOUND_TYPE_SLUG[taskType] || taskType.toLowerCase().replace('_', '-')
   const url  = `https://api.samokat.ru/wmsin-wwh/inbound/${slug}/tasks/${id}`

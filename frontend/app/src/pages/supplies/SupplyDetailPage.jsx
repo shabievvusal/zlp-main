@@ -1,11 +1,32 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext.jsx'
-import { getInboundTaskDetail, getEoRemaining } from '../../api/index.js'
+import { getInboundTaskDetail, getEoRemaining, getInboundTaskResponsibleUsers } from '../../api/index.js'
 import { Search, Copy, ChevronDown, ChevronUp, X, Users } from 'lucide-react'
 import s from './SupplyDetailPage.module.css'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
+
+const RESP_TYPE_LABELS = {
+  TRANSPORTATION_ASSIGNED: 'Транспортировка привязана',
+  GATE_ASSIGNED:           'Ворота назначены',
+  ACCEPTANCE_STARTED:      'Приёмка начата',
+  ACCEPTANCE_COMPLETED:    'Приёмка завершена',
+  ACCEPTANCE_CANCELLED:    'Приёмка отменена',
+  ACCEPTANCE_SUSPENDED:    'Приёмка приостановлена',
+  VERIFIED:                'Поставка завершена',
+}
+
+const RESP_ROLE_LABELS = {
+  OPERATOR: 'Делопроизводитель',
+  STOCKMAN: 'Кладовщик',
+}
+
+const RESP_GROUPS = [
+  { label: 'Подготовка к приёмке',         types: ['TRANSPORTATION_ASSIGNED', 'GATE_ASSIGNED'] },
+  { label: 'Приёмка на ТСД',               types: ['ACCEPTANCE_STARTED', 'ACCEPTANCE_COMPLETED', 'ACCEPTANCE_SUSPENDED', 'ACCEPTANCE_CANCELLED'] },
+  { label: 'Проверка результатов приёмки', types: ['VERIFIED'] },
+]
 
 const STATUS_LABELS = {
   TRANSPORTATION_NOT_ASSIGNED: 'Не привязано',
@@ -102,6 +123,11 @@ function fmtDiff(d) {
 function diffCls(d) {
   if (d == null || d === 0) return ''
   return d > 0 ? s.diffPos : s.diffNeg
+}
+
+function fmtFullName(user) {
+  if (!user) return '—'
+  return [user.lastName, user.firstName, user.middleName].filter(Boolean).join(' ') || '—'
 }
 
 // Транспортировка: номер машины + водитель
@@ -271,6 +297,62 @@ function EoPanel({ products, remainingMap, onClose }) {
   )
 }
 
+// ─── ExecutorsPanel ───────────────────────────────────────────────────────────
+
+function ExecutorsPanel({ users, loading, onClose }) {
+  const [collapsed, setCollapsed] = useState({})
+
+  function toggleGroup(label) {
+    setCollapsed(prev => ({ ...prev, [label]: !prev[label] }))
+  }
+
+  return (
+    <div className={s.execPanel}>
+      <div className={s.eoPanelHeader}>
+        <span className={s.eoPanelTitle}>Исполнители по поставке</span>
+        <button type="button" className={s.eoPanelClose} onClick={onClose}>
+          <X size={16} />
+        </button>
+      </div>
+      <div className={s.eoList}>
+        {loading && <div className={s.eoEmpty}>Загрузка...</div>}
+        {!loading && users !== null && users.length === 0 && (
+          <div className={s.eoEmpty}>Нет данных об исполнителях</div>
+        )}
+        {!loading && users !== null && RESP_GROUPS.map(group => {
+          const items = users.filter(u => group.types.includes(u.type))
+          if (items.length === 0) return null
+          const isCollapsed = !!collapsed[group.label]
+          return (
+            <div key={group.label} className={s.execGroup}>
+              <button
+                type="button"
+                className={s.execGroupHeader}
+                onClick={() => toggleGroup(group.label)}
+              >
+                <span className={s.execGroupTitle}>{group.label}</span>
+                {isCollapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+              </button>
+              {!isCollapsed && items.map((u, i) => (
+                <div key={i} className={s.execItem}>
+                  <div className={s.execItemLeft}>
+                    <span className={s.execEvent}>{RESP_TYPE_LABELS[u.type] || u.type}</span>
+                    <span className={s.execTime}>{fmtDateTime(u.timestamp)}</span>
+                  </div>
+                  <div className={s.execItemRight}>
+                    <span className={s.execName}>{fmtFullName(u.user)}</span>
+                    {u.user?.role && <span className={s.execRole}>{RESP_ROLE_LABELS[u.user.role] || u.user.role}</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function SupplyDetailPage() {
@@ -287,6 +369,9 @@ export default function SupplyDetailPage() {
   const [pickPct, setPickPct]               = useState(null)  // 0–100
   const [remainingMap, setRemainingMap]     = useState({})    // { barcode → remaining | null }
   const [pickLoading, setPickLoading]       = useState(false)
+  const [respOpen, setRespOpen]             = useState(false)
+  const [respUsers, setRespUsers]           = useState(null)  // null = не загружено, [] = загружено
+  const [respLoading, setRespLoading]       = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -378,6 +463,26 @@ export default function SupplyDetailPage() {
     loadPickStatus()
     return () => { cancelled = true }
   }, [data, getToken, isTokenValid, forceRefresh])
+
+  async function openExecutors() {
+    setRespOpen(true)
+    if (respUsers !== null) return
+    setRespLoading(true)
+    try {
+      let token = getToken()
+      if (!token || !isTokenValid()) {
+        const ok = await forceRefresh()
+        if (!ok) { setRespLoading(false); return }
+        token = getToken()
+      }
+      const res = await getInboundTaskResponsibleUsers(token, { taskType, id })
+      setRespUsers(res?.value?.responsibleUsers ?? [])
+    } catch {
+      setRespUsers([])
+    } finally {
+      setRespLoading(false)
+    }
+  }
 
   // Товары: поле products[] с реальной структурой API
   const products = data?.products ?? []
@@ -526,18 +631,31 @@ export default function SupplyDetailPage() {
             <SideField label="Принятые ЕО"        value={data.handlingUnitsQuantity != null ? `${data.handlingUnitsQuantity} шт.` : null} />
           </div>
 
-          <button type="button" className={s.executorsBtn}>
+          <button
+            type="button"
+            className={s.executorsBtn}
+            onClick={openExecutors}
+            disabled={respLoading}
+          >
             <Users size={14} />
-            Посмотреть исполнителей
+            {respLoading ? 'Загрузка...' : 'Посмотреть исполнителей'}
           </button>
         </div>
       )}
 
-      {/* ── EO overlay (поверх всего, с затемнением) ── */}
+      {/* ── EO overlay ── */}
       {eoOpen && (
         <>
           <div className={s.eoBackdrop} onClick={() => setEoOpen(false)} />
           <EoPanel products={products} remainingMap={remainingMap} onClose={() => setEoOpen(false)} />
+        </>
+      )}
+
+      {/* ── Executors overlay ── */}
+      {respOpen && (
+        <>
+          <div className={s.eoBackdrop} onClick={() => setRespOpen(false)} />
+          <ExecutorsPanel users={respUsers} loading={respLoading} onClose={() => setRespOpen(false)} />
         </>
       )}
     </div>

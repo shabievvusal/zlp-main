@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { useNavigate } from 'react-router-dom'
-import { getInboundTasks, getInboundTaskDetail, getEoRemaining } from '../../api/index.js'
+import { getInboundTasks, getInboundTaskDetail, getEoRemaining, getInboundTaskResponsibleUsers } from '../../api/index.js'
 import { Search, X, ChevronDown, ChevronLeft, ChevronRight, RefreshCw, SlidersHorizontal } from 'lucide-react'
 import s from './SuppliesPage.module.css'
 
@@ -23,13 +23,6 @@ const ALL_STATUSES = [
 const ALL_TYPES = ['IMPORT', 'CROSSDOCK', 'STORAGE', 'STORAGE_DC']
 const ALL_TEMPS = ['LOW_COLD', 'MEDIUM_COLD', 'ORDINARY']
 
-// Колонки, которые сортирует сервер. Всё остальное — клиентски.
-const SERVER_SORT_COLS = new Set(['plannedArrivalDate', 'taskNumber'])
-
-const API_SORT_FIELD = {
-  plannedArrivalDate: 'PLANNED_ARRIVAL_DATE',
-  taskNumber:         'TASK_NUMBER',
-}
 
 const STATUS_LABELS = {
   TRANSPORTATION_NOT_ASSIGNED: 'Не привязано',
@@ -71,6 +64,14 @@ const TYPE_LABELS = {
 // Статусы приёмки, после которых для CROSSDOCK начинается комплектация
 const CROSSDOCK_PICK_STATUSES = new Set(['COMPLETED_AS_PLANNED', 'COMPLETED_WITH_DISCREPANCY'])
 
+// Статусы, при которых имеет смысл показывать «Кто принял»
+const ACCEPTANCE_RELEVANT_STATUSES = new Set([
+  'ACCEPTANCE_IN_PROGRESS',
+  'NOT_VERIFIED',
+  'COMPLETED_AS_PLANNED',
+  'COMPLETED_WITH_DISCREPANCY',
+])
+
 // Логический порядок статусов для сортировки (активные → ожидание → завершённые)
 // CROSSDOCK с завершённой приёмкой сортируется по статусу комплектации (60–62)
 const STATUS_ORDER = {
@@ -90,6 +91,13 @@ const RU_MONTHS    = ['Январь','Февраль','Март','Апрель',
 const RU_DAYS_SHORT = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс']
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function fmtUserName(user) {
+  if (!user) return '—'
+  const { lastName = '', firstName = '', middleName = '' } = user
+  const initials = [firstName, middleName].filter(Boolean).map(n => n[0] + '.').join('')
+  return [lastName, initials].filter(Boolean).join(' ') || '—'
+}
 
 function fmtNum(n) {
   if (n == null) return '—'
@@ -174,7 +182,7 @@ function statusSortKey(row, pickStatusMap) {
 
 // Клиентская сортировка текущей страницы
 function clientSort(rows, sort, pickStatusMap = {}) {
-  if (!sort.key || SERVER_SORT_COLS.has(sort.key)) return rows
+  if (!sort.key) return rows
   return [...rows].sort((a, b) => {
     // Статус: учитываем статус комплектации для CROSSDOCK
     if (sort.key === 'status') {
@@ -482,11 +490,35 @@ function DatePickerDropdown({ label, placeholder, dateRange, onChange, onRemove 
   )
 }
 
+// ─── Column visibility ────────────────────────────────────────────────────────
+
+const LS_COLS_KEY = 'supplies_visible_cols'
+const COLUMNS = [
+  { key: 'status',      label: 'Статус',         fixed: true },
+  { key: 'acceptedBy',  label: 'Кто принял' },
+  { key: 'taskNumber',  label: 'Поставка' },
+  { key: 'orderNumber', label: 'Заказ' },
+  { key: 'plannedDate', label: 'Плановая дата' },
+  { key: 'supplier',    label: 'Поставщик' },
+  { key: 'type',        label: 'Тип' },
+  { key: 'temperature', label: 'Температура' },
+  { key: 'gate',        label: 'Ворота' },
+  { key: 'planQty',     label: 'План. товары' },
+  { key: 'planKg',      label: 'План, кг' },
+  { key: 'factKg',      label: 'Факт, кг' },
+  { key: 'eo',          label: 'ЕО' },
+  { key: 'planPcs',     label: 'План шт.' },
+  { key: 'condition',   label: 'Кондиция' },
+  { key: 'defect',      label: 'Брак' },
+  { key: 'startedAt',   label: 'Начало приёмки' },
+  { key: 'completedAt', label: 'Окончание' },
+]
+
 // ─── Page-level cache — переживает навигацию (не сбрасывается при размонтировании) ──
 
 const _cache = {
-  allRows: null, serverRows: [], total: 0,
-  filtersKey: null, serverKey: null,
+  allRows: null,
+  loadKey: null,
   page: 1, sort: { key: 'plannedArrivalDate', dir: 'desc' },
   search: '', plannedRange: null, completedRange: null,
   statuses: [], types: [], temps: [],
@@ -498,11 +530,7 @@ export default function SuppliesPage() {
   const { getToken, isTokenValid, forceRefresh } = useAuth()
   const navigate = useNavigate()
 
-  // serverRows — текущая страница при серверной сортировке
-  // allRows    — ВСЕ строки при клиентской сортировке (null = ещё не загружено)
-  const [serverRows, setServerRows]         = useState(() => _cache.serverRows)
   const [allRows, setAllRows]               = useState(() => _cache.allRows)
-  const [total, setTotal]                   = useState(() => _cache.total)
   const [loading, setLoading]               = useState(false)
   const [error, setError]                   = useState(null)
   const [page, setPage]                     = useState(() => _cache.page)
@@ -513,16 +541,49 @@ export default function SuppliesPage() {
   const [statuses, setStatuses]             = useState(() => _cache.statuses)
   const [types, setTypes]                   = useState(() => _cache.types)
   const [temps, setTemps]                   = useState(() => _cache.temps)
+  const [acceptorSearch, setAcceptorSearch] = useState('')
+  const [acceptorOpen, setAcceptorOpen]     = useState(false)
+  const acceptorRef                         = useRef(null)
+
+  const [visibleCols, setVisibleCols] = useState(() => {
+    try {
+      const saved = localStorage.getItem(LS_COLS_KEY)
+      if (saved) return new Set(JSON.parse(saved))
+    } catch {}
+    return new Set(COLUMNS.map(c => c.key))
+  })
+  const [colsOpen, setColsOpen] = useState(false)
+  const colsRef                 = useRef(null)
 
   // { rowId: 'loading' | { status: 'waiting'|'in_progress'|'done', pct: number } }
   const [pickStatusMap, setPickStatusMap] = useState({})
+  // { rowId: 'loading' | user-object | null }
+  const [respUsersMap, setRespUsersMap]   = useState({})
 
   const abortRef       = useRef(null)
-  // Запоминаем, для каких фильтров загружен allRows — инициализируем из кэша
-  const allRowsKeyRef  = useRef(_cache.filtersKey)
-  const serverKeyRef   = useRef(_cache.serverKey)
-  // ID поставок, для которых уже запущен fetch статуса комплектации
+  const loadKeyRef     = useRef(_cache.loadKey)
   const fetchedPickRef = useRef(new Set())
+  const fetchedRespRef = useRef(new Set())
+
+  useEffect(() => {
+    if (!colsOpen) return
+    function onOut(e) {
+      if (colsRef.current && !colsRef.current.contains(e.target)) setColsOpen(false)
+    }
+    document.addEventListener('mousedown', onOut)
+    return () => document.removeEventListener('mousedown', onOut)
+  }, [colsOpen])
+
+  // Уникальные имена принявших из загруженных данных — для подсказок
+  const acceptorOptions = useMemo(() => {
+    const seen = new Set()
+    for (const u of Object.values(respUsersMap)) {
+      if (!u || u === 'loading') continue
+      const name = fmtUserName(u)
+      if (name && name !== '—') seen.add(name)
+    }
+    return [...seen].sort()
+  }, [respUsersMap])
 
   // Синхронизируем UI-состояние в кэш при каждом изменении
   useEffect(() => {
@@ -536,22 +597,7 @@ export default function SuppliesPage() {
     _cache.temps          = temps
   }, [page, sort, search, plannedRange, completedRange, statuses, types, temps])
 
-  const getBaseParams = (planned, completed, sts, tps, tmps) => {
-    const p = {
-      dateFrom:         dateToApiFrom(planned.fromDate),
-      dateTo:           dateToApiTo(planned.toDate),
-      statuses:         sts.length ? sts : undefined,
-      types:            tps.length ? tps : undefined,
-      temperatureModes: tmps.length ? tmps : undefined,
-    }
-    if (completed?.fromDate) {
-      p.completedDateFrom = dateToApiFrom(completed.fromDate)
-      p.completedDateTo   = dateToApiTo(completed.toDate)
-    }
-    return p
-  }
-
-  const load = useCallback(async (isClient, pg, srt, planned, completed, sts, tps, tmps) => {
+  const load = useCallback(async (planned, completed) => {
     let token = getToken()
     if (!token || !isTokenValid()) {
       const ok = await forceRefresh()
@@ -565,44 +611,37 @@ export default function SuppliesPage() {
 
     setLoading(true)
     setError(null)
-    setPickStatusMap({})         // сбрасываем при каждой новой загрузке
-    fetchedPickRef.current.clear() // разрешаем повторный fetch статусов
+    setAllRows(null)
+    setPickStatusMap({})
+    setRespUsersMap({})
+    fetchedPickRef.current.clear()
+    fetchedRespRef.current.clear()
 
-    const base = getBaseParams(planned, completed, sts, tps, tmps)
+    const base = {}
+    if (planned?.fromDate) {
+      base.dateFrom = dateToApiFrom(planned.fromDate)
+      base.dateTo   = dateToApiTo(planned.toDate)
+    }
+    if (completed?.fromDate) {
+      base.completedDateFrom = dateToApiFrom(completed.fromDate)
+      base.completedDateTo   = dateToApiTo(completed.toDate)
+    }
 
     try {
-      if (isClient) {
-        // ── Загружаем ВСЕ страницы (pageSize=100, параллельно) ──
-        const first = await getInboundTasks(token, { ...base, pageNumber: 1, pageSize: 100 })
-        const totalCount  = first?.value?.total ?? 0
-        let   items       = [...(first?.value?.items ?? [])]
-        const totalPages  = Math.ceil(totalCount / 100)
-
-        if (totalPages > 1) {
-          const rest = await Promise.all(
-            Array.from({ length: totalPages - 1 }, (_, i) =>
-              getInboundTasks(token, { ...base, pageNumber: i + 2, pageSize: 100 })
-            )
+      const first      = await getInboundTasks(token, { ...base, pageNumber: 1, pageSize: 100 })
+      const totalCount = first?.value?.total ?? 0
+      let   items      = [...(first?.value?.items ?? [])]
+      const pages      = Math.ceil(totalCount / 100)
+      if (pages > 1) {
+        const rest = await Promise.all(
+          Array.from({ length: pages - 1 }, (_, i) =>
+            getInboundTasks(token, { ...base, pageNumber: i + 2, pageSize: 100 })
           )
-          for (const r of rest) items = items.concat(r?.value?.items ?? [])
-        }
-
-        setAllRows(items);        _cache.allRows = items
-        setTotal(totalCount);     _cache.total   = totalCount
-      } else {
-        // ── Одна страница, серверная сортировка ──
-        const data = await getInboundTasks(token, {
-          ...base,
-          pageNumber:    pg,
-          pageSize:      PAGE_SIZE,
-          sortField:     API_SORT_FIELD[srt.key] || 'PLANNED_ARRIVAL_DATE',
-          sortDirection: srt.dir.toUpperCase(),
-        })
-        const rows = data?.value?.items || []
-        const tot  = data?.value?.total ?? 0
-        setServerRows(rows); _cache.serverRows = rows
-        setTotal(tot);       _cache.total      = tot
+        )
+        for (const r of rest) items = items.concat(r?.value?.items ?? [])
       }
+      setAllRows(items)
+      _cache.allRows = items
     } catch (err) {
       if (err.name !== 'AbortError') setError(err.message)
     } finally {
@@ -610,35 +649,18 @@ export default function SuppliesPage() {
     }
   }, [getToken, isTokenValid, forceRefresh])
 
+  // Перезагружаем только при смене диапазона дат
   useEffect(() => {
-    // Поиск (как и клиентская сортировка) требует загрузки всех страниц
-    const hasSearch  = !!search.trim()
-    const isClient   = !SERVER_SORT_COLS.has(sort.key) || hasSearch
-    const filtersKey = JSON.stringify({ plannedRange, completedRange, statuses, types, temps })
+    const key = JSON.stringify({ plannedRange, completedRange })
+    if (loadKeyRef.current === key) return
+    loadKeyRef.current = key
+    _cache.loadKey = key
+    setPage(1)
+    load(plannedRange, completedRange)
+  }, [plannedRange, completedRange, load])
 
-    if (isClient) {
-      // Перезагружаем все страницы только если изменились фильтры
-      // (смена search / sort.dir / page не вызывает повторный fetch)
-      if (allRowsKeyRef.current === filtersKey) return
-      allRowsKeyRef.current = filtersKey
-      _cache.filtersKey = filtersKey
-      setPage(1)
-      load(true, 1, sort, plannedRange, completedRange, statuses, types, temps)
-    } else {
-      // Серверная сортировка: не перезагружаем если данные уже есть для этих параметров
-      const serverKey = JSON.stringify({ filtersKey, page, sKey: sort.key, sDir: sort.dir })
-      if (serverKeyRef.current === serverKey) return
-      serverKeyRef.current = serverKey
-      _cache.serverKey = serverKey
-      load(false, page, sort, plannedRange, completedRange, statuses, types, temps)
-    }
-  }, [page, sort.key, sort.dir, plannedRange, completedRange, statuses, types, temps, search, load])
-
-  // Загружаем статус комплектации для CROSSDOCK строк со статусами приёмки завершена.
-  // Зависим от allRows/serverRows (меняются только при реальной загрузке данных),
-  // а не от `displayed` (новая ссылка на каждый рендер — вызывало infinite loop).
   useEffect(() => {
-    const rows = allRows ?? serverRows
+    const rows = allRows ?? []
     const toFetch = rows.filter(
       r => r.type === 'CROSSDOCK'
         && CROSSDOCK_PICK_STATUSES.has(r.status)
@@ -709,58 +731,127 @@ export default function SuppliesPage() {
 
     fetchAll()
     return () => { cancelled = true }
-  }, [allRows, serverRows]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [allRows]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Загружаем «Кто принял» для строк в статусах приёмки
+  useEffect(() => {
+    const rows = allRows ?? []
+    const toFetch = rows.filter(
+      r => ACCEPTANCE_RELEVANT_STATUSES.has(r.status) && !fetchedRespRef.current.has(r.id)
+    )
+    if (toFetch.length === 0) return
+
+    toFetch.forEach(r => fetchedRespRef.current.add(r.id))
+    setRespUsersMap(prev => {
+      const next = { ...prev }
+      toFetch.forEach(r => { next[r.id] = 'loading' })
+      return next
+    })
+
+    let cancelled = false
+
+    async function fetchAll() {
+      let token = getToken()
+      if (!token || !isTokenValid()) {
+        const ok = await forceRefresh()
+        if (!ok || cancelled) return
+        token = getToken()
+      }
+
+      await Promise.all(toFetch.map(async row => {
+        try {
+          const res   = await getInboundTaskResponsibleUsers(token, { taskType: row.type, id: row.id })
+          const users = res?.value?.responsibleUsers ?? []
+          const accepted = users.find(u => u.type === 'ACCEPTANCE_COMPLETED')
+            ?? users.find(u => u.type === 'ACCEPTANCE_STARTED')
+          if (!cancelled) setRespUsersMap(prev => ({ ...prev, [row.id]: accepted?.user ?? null }))
+        } catch {
+          if (!cancelled) setRespUsersMap(prev => ({ ...prev, [row.id]: null }))
+        }
+      }))
+    }
+
+    fetchAll()
+    return () => { cancelled = true }
+  }, [allRows]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleSort(col) {
-    const next = sort.key === col
-      ? { key: col, dir: sort.dir === 'desc' ? 'asc' : 'desc' }
-      : { key: col, dir: 'desc' }
-    setSort(next)
-    if (SERVER_SORT_COLS.has(col)) setPage(1)
+    setSort(prev =>
+      prev.key === col
+        ? { key: col, dir: prev.dir === 'desc' ? 'asc' : 'desc' }
+        : { key: col, dir: 'desc' }
+    )
+    setPage(1)
   }
 
-  // Базовые строки в зависимости от режима сортировки.
-  // Если есть поисковая строка — всегда загружаем все страницы (client mode).
-  const isClientSort = !SERVER_SORT_COLS.has(sort.key) || !!search.trim()
-  const baseRows     = isClientSort ? (allRows ?? []) : serverRows
+  function toggleCol(key) {
+    const c = COLUMNS.find(c => c.key === key)
+    if (c?.fixed) return
+    setVisibleCols(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      try { localStorage.setItem(LS_COLS_KEY, JSON.stringify([...next])) } catch {}
+      return next
+    })
+  }
 
-  // Поиск
-  const searched = search.trim()
-    ? baseRows.filter(r => {
-        const q = search.toLowerCase()
-        return (r.taskNumber || '').toLowerCase().includes(q)
-          || (r.orderNumber || '').toLowerCase().includes(q)
-          || (r.supplier?.name || '').toLowerCase().includes(q)
+  // Все фильтры — мгновенно по уже загруженным данным
+  const filtered = useMemo(() => {
+    let rows = allRows ?? []
+    if (statuses.length) rows = rows.filter(r => statuses.includes(r.status))
+    if (types.length)    rows = rows.filter(r => types.includes(r.type))
+    if (temps.length)    rows = rows.filter(r => temps.includes(r.temperatureMode))
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      rows = rows.filter(r =>
+        (r.taskNumber || '').toLowerCase().includes(q) ||
+        (r.orderNumber || '').toLowerCase().includes(q) ||
+        (r.supplier?.name || '').toLowerCase().includes(q)
+      )
+    }
+    if (acceptorSearch.trim()) {
+      rows = rows.filter(r => {
+        if (!ACCEPTANCE_RELEVANT_STATUSES.has(r.status)) return false
+        const u = respUsersMap[r.id]
+        if (u === undefined || u === 'loading') return true
+        if (!u) return false
+        return fmtUserName(u).toLowerCase().includes(acceptorSearch.toLowerCase().trim())
       })
-    : baseRows
+    }
+    return rows
+  }, [allRows, statuses, types, temps, search, acceptorSearch, respUsersMap])
 
-  // Клиентская сортировка + пагинация (только в client-sort режиме)
-  const sorted    = isClientSort ? clientSort(searched, sort, pickStatusMap) : searched
-  const displayed = isClientSort
-    ? sorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
-    : sorted
+  const sorted    = useMemo(() => clientSort(filtered, sort, pickStatusMap), [filtered, sort, pickStatusMap])
+  const displayed = useMemo(() => sorted.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [sorted, page])
 
-  // Для пагинации: в client-режиме используем кол-во отфильтрованных строк
-  const displayTotal = isClientSort ? searched.length : total
-  const totalPages   = Math.ceil(displayTotal / PAGE_SIZE)
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
 
   function renderPages() {
     if (totalPages <= 1) return []
-    const pages = []
     if (totalPages <= 7) {
-      for (let i = 1; i <= totalPages; i++) pages.push(i)
-    } else {
-      pages.push(1, 2, 3)
-      if (page > 4) pages.push('...')
-      if (page > 3 && page < totalPages - 2) pages.push(page - 1, page, page + 1)
-      if (page < totalPages - 3) pages.push('...')
-      pages.push(totalPages - 1, totalPages)
+      return Array.from({ length: totalPages }, (_, i) => i + 1)
     }
-    return [...new Set(pages)]
+    // Собираем «ядро» — первая, последняя и окно вокруг текущей
+    const core = new Set([1, totalPages])
+    for (let i = Math.max(1, page - 1); i <= Math.min(totalPages, page + 1); i++) core.add(i)
+    const sorted = [...core].sort((a, b) => a - b)
+    // Вставляем '...' в разрывы
+    const result = []
+    let prev = 0
+    for (const p of sorted) {
+      if (p - prev > 1) result.push('...')
+      result.push(p)
+      prev = p
+    }
+    return result
   }
 
-  const pageStart = displayTotal === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
-  const pageEnd   = Math.min(page * PAGE_SIZE, displayTotal)
+  const pageStart = filtered.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
+  const pageEnd   = Math.min(page * PAGE_SIZE, filtered.length)
+
+  const isVis         = key => visibleCols.has(key)
+  const activeColCount = COLUMNS.filter(c => visibleCols.has(c.key)).length
 
   return (
     <div className={s.page}>
@@ -777,7 +868,7 @@ export default function SuppliesPage() {
               label="Плановая дата"
               dateRange={plannedRange}
               onChange={r => { setPlannedRange(r); setPage(1) }}
-              onRemove={() => { setPlannedRange(todayPlannedRange()); setPage(1) }}
+              onRemove={() => { setPlannedRange(null); setPage(1) }}
             />
 
             {/* Дата завершения (опционально) */}
@@ -813,6 +904,52 @@ export default function SuppliesPage() {
               onChange={v => { setTemps(v); setPage(1) }}
             />
 
+            {/* Кто принял — autocomplete */}
+            <div className={s.acceptorWrap} ref={acceptorRef}>
+              <input
+                className={`${s.acceptorInput} ${acceptorSearch ? s.acceptorInputActive : ''}`}
+                placeholder="Кто принял..."
+                value={acceptorSearch}
+                onChange={e => { setAcceptorSearch(e.target.value); setPage(1); setAcceptorOpen(true) }}
+                onFocus={() => setAcceptorOpen(true)}
+                onBlur={e => {
+                  // закрываем только если фокус ушёл за пределы враппера
+                  if (!acceptorRef.current?.contains(e.relatedTarget)) setAcceptorOpen(false)
+                }}
+              />
+              {acceptorSearch && (
+                <button
+                  type="button"
+                  className={s.acceptorClear}
+                  onMouseDown={e => e.preventDefault()}
+                  onClick={() => { setAcceptorSearch(''); setPage(1); setAcceptorOpen(false) }}
+                >
+                  <X size={11} />
+                </button>
+              )}
+              {acceptorOpen && (() => {
+                const q = acceptorSearch.toLowerCase().trim()
+                const suggestions = q
+                  ? acceptorOptions.filter(n => n.toLowerCase().includes(q))
+                  : acceptorOptions
+                if (suggestions.length === 0) return null
+                return (
+                  <div className={`${s.dropdownMenu} ${s.acceptorMenu}`}>
+                    {suggestions.map(name => (
+                      <div
+                        key={name}
+                        className={s.dropdownItem}
+                        onMouseDown={e => e.preventDefault()}
+                        onClick={() => { setAcceptorSearch(name); setPage(1); setAcceptorOpen(false) }}
+                      >
+                        {name}
+                      </div>
+                    ))}
+                  </div>
+                )
+              })()}
+            </div>
+
           </div>
         </div>
 
@@ -830,31 +967,44 @@ export default function SuppliesPage() {
             type="button"
             className={s.refreshBtn}
             onClick={() => {
-              // Сброс кэша → принудительная перезагрузка
-              allRowsKeyRef.current = null;  _cache.filtersKey = null
-              serverKeyRef.current  = null;  _cache.serverKey  = null
-              const hasSearch  = !!search.trim()
-              const isClient   = !SERVER_SORT_COLS.has(sort.key) || hasSearch
-              const filtersKey = JSON.stringify({ plannedRange, completedRange, statuses, types, temps })
-              if (isClient) {
-                allRowsKeyRef.current = filtersKey
-                _cache.filtersKey = filtersKey
-                load(true, 1, sort, plannedRange, completedRange, statuses, types, temps)
-              } else {
-                const serverKey = JSON.stringify({ filtersKey, page, sKey: sort.key, sDir: sort.dir })
-                serverKeyRef.current = serverKey
-                _cache.serverKey = serverKey
-                load(false, page, sort, plannedRange, completedRange, statuses, types, temps)
-              }
+              loadKeyRef.current = null
+              _cache.loadKey = null
+              load(plannedRange, completedRange)
             }}
             disabled={loading}
             title="Обновить"
           >
             <RefreshCw size={15} className={loading ? s.spinning : ''} />
           </button>
-          <button type="button" className={s.filterBtn} title="Фильтры">
-            <SlidersHorizontal size={16} />
-          </button>
+          <div className={s.colsWrap} ref={colsRef}>
+            <button
+              type="button"
+              className={`${s.filterBtn} ${colsOpen ? s.filterBtnOpen : ''} ${visibleCols.size < COLUMNS.length ? s.filterBtnActive : ''}`}
+              title="Настройка колонок"
+              onClick={() => setColsOpen(v => !v)}
+            >
+              <SlidersHorizontal size={16} />
+            </button>
+            {colsOpen && (
+              <div className={s.colsMenu}>
+                <div className={s.colsMenuTitle}>Колонки</div>
+                {COLUMNS.map(c => (
+                  <label
+                    key={c.key}
+                    className={`${s.dropdownItem} ${c.fixed ? s.dropdownItemDisabled : ''}`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={visibleCols.has(c.key)}
+                      disabled={c.fixed}
+                      onChange={() => toggleCol(c.key)}
+                    />
+                    {c.label}
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -866,60 +1016,75 @@ export default function SuppliesPage() {
         <table className={s.table}>
           <thead>
             <tr>
-              <SortTh label="Статус" col="status" sort={sort} onSort={handleSort} />
-              <SortTh label="Поставка"       col="taskNumber"            sort={sort} onSort={handleSort} />
-              <th className={s.th}>Заказ</th>
-              <SortTh label="План. дата"     col="plannedArrivalDate"    sort={sort} onSort={handleSort} />
-              <th className={s.th}>Поставщик</th>
-              <th className={s.th}>Тип</th>
-              <th className={s.th}>Температура</th>
-              <th className={s.th}>Ворота</th>
-              <SortTh label="План. товары"   col="productsQuantity"      sort={sort} onSort={handleSort} />
-              <SortTh label="План, кг"       col="plannedTotalWeight"    sort={sort} onSort={handleSort} />
-              <th className={s.th}>Факт, кг</th>
-              <SortTh label="ЕО"             col="handlingUnitsQuantity" sort={sort} onSort={handleSort} />
-              <th className={s.th}>План шт.</th>
-              <th className={s.th}>Кондиция</th>
-              <th className={s.th}>Брак</th>
-              <SortTh label="Начало приёмки" col="startedAt"             sort={sort} onSort={handleSort} />
-              <th className={s.th}>Окончание</th>
+              {isVis('status')      && <SortTh label="Статус"         col="status"               sort={sort} onSort={handleSort} />}
+              {isVis('acceptedBy')  && <th className={s.th}>Кто принял</th>}
+              {isVis('taskNumber')  && <SortTh label="Поставка"       col="taskNumber"            sort={sort} onSort={handleSort} />}
+              {isVis('orderNumber') && <th className={s.th}>Заказ</th>}
+              {isVis('plannedDate') && <SortTh label="План. дата"     col="plannedArrivalDate"    sort={sort} onSort={handleSort} />}
+              {isVis('supplier')    && <th className={s.th}>Поставщик</th>}
+              {isVis('type')        && <th className={s.th}>Тип</th>}
+              {isVis('temperature') && <th className={s.th}>Температура</th>}
+              {isVis('gate')        && <th className={s.th}>Ворота</th>}
+              {isVis('planQty')     && <SortTh label="План. товары"   col="productsQuantity"      sort={sort} onSort={handleSort} />}
+              {isVis('planKg')      && <SortTh label="План, кг"       col="plannedTotalWeight"    sort={sort} onSort={handleSort} />}
+              {isVis('factKg')      && <th className={s.th}>Факт, кг</th>}
+              {isVis('eo')          && <SortTh label="ЕО"             col="handlingUnitsQuantity" sort={sort} onSort={handleSort} />}
+              {isVis('planPcs')     && <th className={s.th}>План шт.</th>}
+              {isVis('condition')   && <th className={s.th}>Кондиция</th>}
+              {isVis('defect')      && <th className={s.th}>Брак</th>}
+              {isVis('startedAt')   && <SortTh label="Начало приёмки" col="startedAt"             sort={sort} onSort={handleSort} />}
+              {isVis('completedAt') && <th className={s.th}>Окончание</th>}
             </tr>
           </thead>
           <tbody>
             {loading && displayed.length === 0 ? (
-              <tr><td colSpan={17} className={s.stateRow}>Загрузка...</td></tr>
+              <tr><td colSpan={activeColCount} className={s.stateRow}>Загрузка...</td></tr>
             ) : !loading && displayed.length === 0 ? (
-              <tr><td colSpan={17} className={s.stateRow}>Нет данных</td></tr>
+              <tr><td colSpan={activeColCount} className={s.stateRow}>Нет данных</td></tr>
             ) : displayed.map(row => (
               <tr key={row.id} className={s.tr} style={{ cursor: 'pointer' }} onClick={() => navigate(`/supplies/${row.type}/${row.id}`)}>
-                <td className={s.td}>
-                  {row.type === 'CROSSDOCK' && CROSSDOCK_PICK_STATUSES.has(row.status)
-                    ? (() => {
-                        const ps = pickStatusMap[row.id]
-                        if (!ps || ps === 'loading') return <span className={s.badgePickWaiting}>...</span>
-                        if (ps.status === 'done')        return <span className={s.badgeAccepted}>Скомплектована</span>
-                        if (ps.status === 'in_progress') return <span className={s.badgeDiscrepancy}>Комплектация {ps.pct}%</span>
-                        return <span className={s.badgePickWaiting}>Ждёт комплектацию</span>
-                      })()
-                    : <StatusBadge status={row.status} />
-                  }
-                </td>
-                <td className={`${s.td} ${s.tdMono}`}>{row.taskNumber}</td>
-                <td className={s.td}><span className={s.orderName}>{row.orderNumber || '—'}</span></td>
-                <td className={`${s.td} ${s.tdDate}`}>{fmtDate(row.plannedArrivalDate)}</td>
-                <td className={`${s.td} ${s.tdMuted}`}><span className={s.supplierName}>{row.supplier?.name || '—'}</span></td>
-                <td className={`${s.td} ${s.tdMuted}`}>{TYPE_LABELS[row.type] || row.type || '—'}</td>
-                <td className={s.td}>{TEMP_LABELS[row.temperatureMode] || row.temperatureMode || '—'}</td>
-                <td className={`${s.td} ${s.tdGate}`}>{row.gateInfo?.gateNumber || '—'}</td>
-                <td className={`${s.td} ${s.tdNum}`}>{row.productsQuantity ?? '—'}</td>
-                <td className={`${s.td} ${s.tdNum}`}>{fmtKg(row.plannedTotalWeightInGrams)}</td>
-                <td className={`${s.td} ${s.tdNum}`}>{fmtKg(row.actualTotalWeight)}</td>
-                <td className={`${s.td} ${s.tdNum}`}>{row.handlingUnitsQuantity || '—'}</td>
-                <td className={`${s.td} ${s.tdNum}`}>{fmtNum(row.plannedQuantities?.pieceProducts)}</td>
-                <td className={`${s.td} ${s.tdNum}`}>{fmtNum(row.actualQuantities?.pieceProducts)}</td>
-                <td className={`${s.td} ${s.tdNum}`}>{fmtNum(row.actualDefectiveQuantities?.pieceProducts) || '—'}</td>
-                <td className={`${s.td} ${s.tdDate}`}>{fmtDateTime(row.startedAt)}</td>
-                <td className={`${s.td} ${s.tdDate}`}>{fmtDateTime(row.completedAt)}</td>
+                {isVis('status') && (
+                  <td className={s.td}>
+                    {row.type === 'CROSSDOCK' && CROSSDOCK_PICK_STATUSES.has(row.status)
+                      ? (() => {
+                          const ps = pickStatusMap[row.id]
+                          if (!ps || ps === 'loading') return <span className={s.badgePickWaiting}>...</span>
+                          if (ps.status === 'done')        return <span className={s.badgeAccepted}>Скомплектована</span>
+                          if (ps.status === 'in_progress') return <span className={s.badgeDiscrepancy}>Комплектация {ps.pct}%</span>
+                          return <span className={s.badgePickWaiting}>Ждёт комплектацию</span>
+                        })()
+                      : <StatusBadge status={row.status} />
+                    }
+                  </td>
+                )}
+                {isVis('acceptedBy') && (
+                  <td className={`${s.td} ${s.tdMuted}`}>
+                    {ACCEPTANCE_RELEVANT_STATUSES.has(row.status)
+                      ? (() => {
+                          const u = respUsersMap[row.id]
+                          if (u === undefined || u === 'loading') return <span style={{ color: 'var(--text-light)' }}>...</span>
+                          return fmtUserName(u)
+                        })()
+                      : '—'
+                    }
+                  </td>
+                )}
+                {isVis('taskNumber')  && <td className={`${s.td} ${s.tdMono}`}>{row.taskNumber}</td>}
+                {isVis('orderNumber') && <td className={s.td}><span className={s.orderName}>{row.orderNumber || '—'}</span></td>}
+                {isVis('plannedDate') && <td className={`${s.td} ${s.tdDate}`}>{fmtDate(row.plannedArrivalDate)}</td>}
+                {isVis('supplier')    && <td className={`${s.td} ${s.tdMuted}`}><span className={s.supplierName}>{row.supplier?.name || '—'}</span></td>}
+                {isVis('type')        && <td className={`${s.td} ${s.tdMuted}`}>{TYPE_LABELS[row.type] || row.type || '—'}</td>}
+                {isVis('temperature') && <td className={s.td}>{TEMP_LABELS[row.temperatureMode] || row.temperatureMode || '—'}</td>}
+                {isVis('gate')        && <td className={`${s.td} ${s.tdGate}`}>{row.gateInfo?.gateNumber || '—'}</td>}
+                {isVis('planQty')     && <td className={`${s.td} ${s.tdNum}`}>{row.productsQuantity ?? '—'}</td>}
+                {isVis('planKg')      && <td className={`${s.td} ${s.tdNum}`}>{fmtKg(row.plannedTotalWeightInGrams)}</td>}
+                {isVis('factKg')      && <td className={`${s.td} ${s.tdNum}`}>{fmtKg(row.actualTotalWeight)}</td>}
+                {isVis('eo')          && <td className={`${s.td} ${s.tdNum}`}>{row.handlingUnitsQuantity || '—'}</td>}
+                {isVis('planPcs')     && <td className={`${s.td} ${s.tdNum}`}>{fmtNum(row.plannedQuantities?.pieceProducts)}</td>}
+                {isVis('condition')   && <td className={`${s.td} ${s.tdNum}`}>{fmtNum(row.actualQuantities?.pieceProducts)}</td>}
+                {isVis('defect')      && <td className={`${s.td} ${s.tdNum}`}>{fmtNum(row.actualDefectiveQuantities?.pieceProducts) || '—'}</td>}
+                {isVis('startedAt')   && <td className={`${s.td} ${s.tdDate}`}>{fmtDateTime(row.startedAt)}</td>}
+                {isVis('completedAt') && <td className={`${s.td} ${s.tdDate}`}>{fmtDateTime(row.completedAt)}</td>}
               </tr>
             ))}
           </tbody>
@@ -929,7 +1094,7 @@ export default function SuppliesPage() {
       {/* ── Pagination ── */}
       <div className={s.pagination}>
         <span className={s.pageInfo}>
-          {loading ? 'Загрузка...' : total > 0 ? `${pageStart}–${pageEnd} из ${fmtNum(total)}` : ''}
+          {loading ? 'Загрузка...' : filtered.length > 0 ? `${pageStart}–${pageEnd} из ${fmtNum(filtered.length)}` : ''}
         </span>
         <div className={s.pageButtons}>
           <button
