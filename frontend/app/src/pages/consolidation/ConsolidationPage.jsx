@@ -552,7 +552,7 @@ body { font-family: "Times New Roman", serif; font-size: 12pt; line-height: 1.45
 .sz-header { margin-bottom: 20px; }
 .sz-header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .sz-logo { width: 180px; height: auto; display: block; }
-.sz-company-name { font-size: 14pt; font-weight: 700; text-align: right; }
+.sz-company-name { font-size: 12pt; font-weight: 700; text-align: right; }
 .sz-header-right { text-align: right; }
 .sz-header-right p { margin: 2px 0; }
 .sz-title { text-align: center; font-weight: 700; margin: 8px 0 2px; }
