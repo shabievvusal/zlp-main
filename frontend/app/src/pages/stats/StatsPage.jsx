@@ -450,7 +450,7 @@ export default function StatsPage() {
         <div className={styles.newEmplBanner}>
           <div className={styles.newEmplBannerBody}>
             <span className={styles.newEmplBannerTitle}>Новые сотрудники из WMS ({newEmployeesFromFetch.length}):</span>
-            <span className={styles.newEmplBannerList}>{newEmployeesFromFetch.join(', ')}</span>
+            <span className={styles.newEmplBannerList}>{newEmployeesFromFetch.map(e => typeof e === 'string' ? e : e.fio).join(', ')}</span>
           </div>
           <div className={styles.newEmplBannerActions}>
             <button type="button" className="btn btn-primary btn-sm" onClick={() => addNewEmployees(newEmployeesFromFetch)}>

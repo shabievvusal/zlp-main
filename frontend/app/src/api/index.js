@@ -262,7 +262,8 @@ export async function fetchDataViaBrowser(token, options = {}) {
     lastTimings = saveRes.timings || lastTimings
     lastDotnetError = saveRes.dotnetError || lastDotnetError
     for (const n of (saveRes.newEmployees || [])) {
-      if (!seenNewNames.has(n)) { seenNewNames.add(n); allNewEmployees.push(n) }
+      const key = (typeof n === 'string') ? n : (n.executorId || n.fio)
+      if (!seenNewNames.has(key)) { seenNewNames.add(key); allNewEmployees.push(n) }
     }
   }
 
@@ -316,11 +317,11 @@ export async function enrichEmplNames() {
   return req('/api/empl/enrich-names', { method: 'POST' })
 }
 
-export async function addNewEmployees(names) {
+export async function addNewEmployees(executors) {
   return req('/api/empl/add-new', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ names }),
+    body: JSON.stringify({ executors }),
   })
 }
 

@@ -347,7 +347,7 @@ function updateNamesRegistry(items) {
   } catch {}
 
   let changed = false;
-  const itemNames = new Map(); // pk -> best full name from current items
+  const itemNames = new Map(); // pk -> { fio, executorId }
   for (const item of (items || [])) {
     const ru = item.responsibleUser || {};
     const full = [ru.lastName, ru.firstName, ru.middleName].filter(Boolean).join(' ').trim();
@@ -359,8 +359,10 @@ function updateNamesRegistry(items) {
       changed = true;
     }
     const cur = itemNames.get(pk);
-    if (!cur || full.split(/\s+/).length > cur.split(/\s+/).length) {
-      itemNames.set(pk, full);
+    if (!cur || full.split(/\s+/).length > cur.fio.split(/\s+/).length) {
+      itemNames.set(pk, { fio: full, executorId: ru.id || null });
+    } else if (cur && !cur.executorId && ru.id) {
+      cur.executorId = ru.id;
     }
   }
 
@@ -406,18 +408,18 @@ function updateNamesRegistry(items) {
   const knownFios = emplPg
     ? new Set([...emplPg.getEmplMapFioToCompany().keys()])
     : existingPks;
-  const newNames = [];
-  for (const [pk, full] of itemNames) {
-    const norm = full.replace(/\s+/g, ' ').trim().toLowerCase();
+  const newEmployees = [];
+  for (const [pk, { fio, executorId }] of itemNames) {
+    const norm = fio.replace(/\s+/g, ' ').trim().toLowerCase();
     const known = emplPg
       ? [...knownFios].some(k => k === norm || k.includes(norm) || norm.includes(k))
       : knownFios.has(pk);
     if (!known) {
-      const titled = full.replace(/\S+/g, w => w.split('-').map(p => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join('-'));
-      newNames.push(titled);
+      const titled = fio.replace(/\S+/g, w => w.split('-').map(p => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join('-'));
+      newEmployees.push({ executorId: executorId || null, fio: titled });
     }
   }
-  return { newNames };
+  return { newEmployees };
 }
 
 function loadMissingWeight() {
@@ -676,7 +678,7 @@ app.post('/api/save-fetched-data', async (req, res) => {
     let newEmployees = [];
     if (items.length > 0) {
       const regResult = updateNamesRegistry(items);
-      newEmployees = regResult.newNames || [];
+      newEmployees = regResult.newEmployees || [];
     }
 
     let engine = 'dotnet';
