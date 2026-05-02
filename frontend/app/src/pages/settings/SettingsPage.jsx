@@ -614,14 +614,21 @@ function EmployeesCard() {
       const norm = normalizeFio(fio)
       return emplNameMap.get(personKey(norm)) || fio
     }
+    const setIdMapEntry = (norm, enriched, executorId) => {
+      if (!executorId) return
+      if (!idMap.has(norm)) idMap.set(norm, executorId)
+      const enrichedNorm = normalizeFio(enriched)
+      if (!idMap.has(enrichedNorm)) idMap.set(enrichedNorm, executorId)
+    }
     for (const item of allItems) {
       const fio = (item.executor || '').trim()
       if (!fio) continue
       if (emplIdMap && item.executorId && emplIdMap.has(item.executorId)) continue
       const norm = normalizeFio(fio)
       if (!hasMatchInEmplKeys(norm, emplMap)) {
-        fioToFull.set(norm, enrich(fio))
-        if (item.executorId && !idMap.has(norm)) idMap.set(norm, item.executorId)
+        const enriched = enrich(fio)
+        fioToFull.set(norm, enriched)
+        setIdMapEntry(norm, enriched, item.executorId)
       }
     }
     for (const e of (dateSummary?.executors || [])) {
@@ -629,8 +636,9 @@ function EmployeesCard() {
       if (!fio) continue
       const norm = normalizeFio(fio)
       if (!hasMatchInEmplKeys(norm, emplMap)) {
-        fioToFull.set(norm, enrich(fio))
-        if (e.executorId && !idMap.has(norm)) idMap.set(norm, e.executorId)
+        const enriched = enrich(fio)
+        fioToFull.set(norm, enriched)
+        setIdMapEntry(norm, enriched, e.executorId)
       }
     }
     return {
@@ -722,7 +730,7 @@ const handleAddRow = () => {
       const k = normalizeFio(r.fio)
       if (!seen.has(k)) {
         seen.add(k)
-        all.push({ fio: r.fio, company: r.company, executorId: r.executorId || undefined })
+        all.push({ fio: r.fio, company: r.company, executorId: r.executorId || null })
       }
     }
     try {

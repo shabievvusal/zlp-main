@@ -192,10 +192,10 @@ async function saveAll(employees) {
     await client.query('BEGIN');
     await client.query('TRUNCATE employees');
     for (const { executorId, fio, company } of employees) {
-      const id = (executorId || '').trim() || ('fio:' + normFio(fio));
+      const id = (executorId || '').trim();
       const f  = String(fio || '').trim();
       const c  = String(company != null ? company : '').trim();
-      if (!f) continue;
+      if (!f || !id) continue;
       await client.query(
         'INSERT INTO employees (executor_id, fio, company) VALUES ($1, $2, $3) ON CONFLICT (executor_id) DO UPDATE SET fio=$2, company=$3',
         [id, f, c]
