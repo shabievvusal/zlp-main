@@ -666,6 +666,14 @@ export async function saveEmployeesCsv(csv) {
   })
 }
 
+export async function saveEmployeesAll(employees) {
+  return req('/api/employees', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ employees }),
+  })
+}
+
 export async function fetchRkFromWms({ dateFrom, dateTo, token, onProgress }) {
   const fromIso = new Date(dateFrom + 'T00:00:00+03:00').toISOString()
   const toIso   = new Date(dateTo   + 'T23:59:59+03:00').toISOString()

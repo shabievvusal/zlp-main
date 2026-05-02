@@ -596,7 +596,7 @@ function EmployeesCard() {
       const employees = res.employees || []
       const companies = res.companies || emplCompanies
       setAllCompanies(companies)
-      const withIds = employees.map(e => ({ fio: titleCaseFio(e.fio), company: e.company || '', _id: e.executorId || nextId() }))
+      const withIds = employees.map(e => ({ fio: titleCaseFio(e.fio), company: e.company || '', executorId: e.executorId || null, _id: e.executorId || nextId() }))
       baseRowsRef.current = withIds
       setRows(withIds)
       setInfo(employees.length
@@ -668,7 +668,7 @@ function EmployeesCard() {
   }
 
 const handleAddRow = () => {
-    const newRow = { fio: '', company: '', _id: nextId() }
+    const newRow = { fio: '', company: '', executorId: null, _id: nextId() }
     setRows(prev => [newRow, ...prev])
     baseRowsRef.current = [newRow, ...baseRowsRef.current]
   }
@@ -694,7 +694,7 @@ const handleAddRow = () => {
         const trimmed = line.trim()
         if (!trimmed) continue
         const cols = trimmed.split(sep).map(c => c.trim().replace(/^"|"$/g, ''))
-        if (cols[0]) imported.push({ fio: titleCaseFio(cols[0]), company: cols[1] || '', _id: nextId() })
+        if (cols[0]) imported.push({ fio: titleCaseFio(cols[0]), company: cols[1] || '', executorId: null, _id: nextId() })
       }
       baseRowsRef.current = imported
       setRows(imported)
@@ -720,11 +720,13 @@ const handleAddRow = () => {
     for (const r of rows) {
       if (!r.fio.trim()) continue
       const k = normalizeFio(r.fio)
-      if (!seen.has(k)) { seen.add(k); all.push(r) }
+      if (!seen.has(k)) {
+        seen.add(k)
+        all.push({ fio: r.fio, company: r.company, executorId: r.executorId || undefined })
+      }
     }
-    const csv = all.map(r => r.fio + ';' + r.company).join('\n')
     try {
-      const res = await api.saveEmployeesCsv(csv)
+      const res = await api.saveEmployeesAll(all)
       if (res.ok) {
         notify('Сохранено ' + all.length + ' сотрудников', 'success')
         await loadEmployees()
