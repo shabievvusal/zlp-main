@@ -729,6 +729,35 @@ const handleAddRow = () => {
   }
 
   const [companyFilter, setCompanyFilter] = useState('__all__')
+  const [scanResult, setScanResult] = useState(null)   // null | [{executorId, fio}]
+  const [scanning, setScanning]     = useState(false)
+
+  const handleScan = useCallback(async () => {
+    setScanning(true)
+    setScanResult(null)
+    try {
+      const data = await api.findUnregisteredEmployees()
+      setScanResult(data.employees || [])
+    } catch (err) {
+      notify('Ошибка сканирования: ' + err.message, 'error')
+    } finally {
+      setScanning(false)
+    }
+  }, [notify])
+
+  const handleScanAdd = useCallback(async () => {
+    if (!scanResult?.length) return
+    try {
+      const data = await api.addNewEmployees(scanResult)
+      if (!data?.ok) throw new Error(data?.error || 'Ошибка добавления')
+      notify(`Добавлено: ${data.added}`, 'success')
+      setScanResult(null)
+      await loadEmployees()
+      loadFromServer()
+    } catch (err) {
+      notify('Ошибка: ' + err.message, 'error')
+    }
+  }, [scanResult, notify, loadEmployees, loadFromServer])
 
   // Фильтруем по снимку (baseRowsRef), не по live-данным — иначе строка пропадает при редактировании
   const baseFiltered = new Set(
@@ -847,8 +876,28 @@ const handleAddRow = () => {
             </label>
             <button className="btn btn-secondary btn-sm" style={{display:'inline-flex',alignItems:'center',gap:5}} onClick={handleExportCsv}><Download size={13} strokeWidth={2}/>Экспорт</button>
 
+            <button className="btn btn-secondary btn-sm" onClick={handleScan} disabled={scanning}>
+              {scanning ? 'Сканирование...' : 'Найти из всех смен'}
+            </button>
             <button className="btn btn-primary btn-sm" onClick={handleSave}>Сохранить</button>
           </div>
+
+          {scanResult !== null && (
+            <div className={s.scanResultBanner}>
+              {scanResult.length === 0 ? (
+                <span className={s.scanResultEmpty}>Все исполнители из всех смен уже в списке</span>
+              ) : (
+                <>
+                  <span className={s.scanResultCount}>{scanResult.length} незарегистрированных из истории смен:</span>
+                  <span className={s.scanResultList}>{scanResult.map(e => e.fio).join(', ')}</span>
+                  <div className={s.scanResultActions}>
+                    <button className="btn btn-primary btn-sm" onClick={handleScanAdd}>Добавить всех</button>
+                    <button className="btn btn-secondary btn-sm" onClick={() => setScanResult(null)}>Закрыть</button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
 
           {allCompanies.length > 0 && (
             <div className={s.emplCompanyFilter}>

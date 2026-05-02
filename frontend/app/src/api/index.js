@@ -325,6 +325,10 @@ export async function addNewEmployees(executors) {
   })
 }
 
+export async function findUnregisteredEmployees() {
+  return req('/api/empl/find-unregistered')
+}
+
 export async function getLiveMonitor() {
   const r = await fetch('/api/monitor/live', { credentials })
   const text = await r.text()

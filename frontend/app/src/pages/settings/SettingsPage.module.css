@@ -290,6 +290,21 @@
 
 .emplSearch { flex: 1; min-width: 160px; max-width: 260px; }
 
+.scanResultBanner {
+  margin: 0 20px 12px;
+  padding: 12px 14px;
+  background: var(--bg-secondary, #f8f9fa);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.scanResultEmpty { font-size: 13px; color: var(--text-muted); }
+.scanResultCount { font-size: 13px; font-weight: 600; }
+.scanResultList  { font-size: 12px; color: var(--text-muted); line-height: 1.5; }
+.scanResultActions { display: flex; gap: 8px; margin-top: 2px; }
+
 .emplCompanyFilter {
   display: flex;
   flex-wrap: wrap;

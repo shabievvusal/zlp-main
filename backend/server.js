@@ -1020,6 +1020,70 @@ app.post('/api/empl/add-new', async (req, res) => {
   }
 });
 
+// GET /api/empl/find-unregistered — найти исполнителей из всех смен, которых нет в списке сотрудников
+app.get('/api/empl/find-unregistered', async (req, res) => {
+  try {
+    // Собираем известные ID и нормализованные ФИО
+    const knownIds  = new Set();
+    const knownFios = new Set();
+    if (emplPg) {
+      const data = await emplPg.listEmployees();
+      for (const e of data.employees) {
+        if (e.executorId) knownIds.add(e.executorId);
+        if (e.fio) knownFios.add(normalizeFioForMatch(e.fio));
+      }
+    } else {
+      for (const k of getEmplMapFioToCompany().keys()) knownFios.add(k);
+    }
+    const knownFiosArr = [...knownFios];
+    const isFioKnown = norm =>
+      knownFiosArr.some(k => k === norm || k.includes(norm) || norm.includes(k));
+
+    // Сканируем все почасовые файлы
+    const seenKeys  = new Set(); // все уже проверенные ключи (не перепроверяем)
+    const found     = new Map(); // key -> { executorId, fio }
+
+    if (!fs.existsSync(DATA_DIR)) return res.json({ employees: [] });
+
+    let dateDirs;
+    try {
+      dateDirs = fs.readdirSync(DATA_DIR, { withFileTypes: true })
+        .filter(e => e.isDirectory() && /^\d{4}-\d{2}-\d{2}$/.test(e.name));
+    } catch { return res.json({ employees: [] }); }
+
+    for (const dir of dateDirs) {
+      const dirPath = path.join(DATA_DIR, dir.name);
+      let hourFiles;
+      try { hourFiles = fs.readdirSync(dirPath).filter(f => /^\d{2}\.json$/.test(f)); } catch { continue; }
+      for (const hf of hourFiles) {
+        let raw;
+        try { raw = JSON.parse(fs.readFileSync(path.join(dirPath, hf), 'utf8')); } catch { continue; }
+        const list = Array.isArray(raw.items) ? raw.items : Object.values(raw.items || {});
+        for (const item of list) {
+          const fio        = (item.executor   || '').trim();
+          const executorId = (item.executorId || '').trim();
+          if (!fio) continue;
+          const normFio = normalizeFioForMatch(fio);
+          const key = executorId || normFio;
+          if (seenKeys.has(key)) continue;
+          seenKeys.add(key);
+          if (executorId && knownIds.has(executorId)) continue;
+          if (isFioKnown(normFio)) continue;
+          const titled = fio.replace(/\S+/g, w =>
+            w.split('-').map(p => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join('-'));
+          found.set(key, { executorId: executorId || null, fio: titled });
+        }
+      }
+    }
+
+    const employees = [...found.values()].sort((a, b) => a.fio.localeCompare(b.fio, 'ru'));
+    res.json({ employees });
+  } catch (err) {
+    console.error('GET /api/empl/find-unregistered', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/empl/enrich-names — обогатить ФИО отчествами из сырых WMS-файлов
 app.post('/api/empl/enrich-names', async (req, res) => {
   try {
