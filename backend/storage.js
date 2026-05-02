@@ -475,8 +475,9 @@ function buildSummaryFromItems(items, opts = {}) {
   const byExecutor = new Map();
   for (const item of items) {
     const key = item.executor || 'Неизвестно';
-    if (!byExecutor.has(key)) byExecutor.set(key, { name: key, taskKeys: new Set(), qty: 0, firstAt: null, lastAt: null });
+    if (!byExecutor.has(key)) byExecutor.set(key, { name: key, executorId: null, taskKeys: new Set(), qty: 0, firstAt: null, lastAt: null });
     const e = byExecutor.get(key);
+    if (!e.executorId && item.executorId) e.executorId = item.executorId;
     e.taskKeys.add(getTaskKeySummary(item));
     e.qty += Number(item.quantity) || 0;
     const ts = item.completedAt || item.startedAt;
@@ -487,6 +488,7 @@ function buildSummaryFromItems(items, opts = {}) {
   }
   const executors = [...byExecutor.values()].map(e => ({
     name: e.name,
+    executorId: e.executorId || null,
     ops: e.taskKeys.size,
     qty: e.qty,
     firstAt: e.firstAt,

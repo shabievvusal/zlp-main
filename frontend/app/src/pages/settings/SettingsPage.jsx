@@ -628,7 +628,10 @@ function EmployeesCard() {
       const fio = (e.name || '').trim()
       if (!fio) continue
       const norm = normalizeFio(fio)
-      if (!hasMatchInEmplKeys(norm, emplMap)) fioToFull.set(norm, enrich(fio))
+      if (!hasMatchInEmplKeys(norm, emplMap)) {
+        fioToFull.set(norm, enrich(fio))
+        if (e.executorId && !idMap.has(norm)) idMap.set(norm, e.executorId)
+      }
     }
     return {
       noCompanyList: [...fioToFull.values()].sort((a, b) => a.localeCompare(b, 'ru')),
