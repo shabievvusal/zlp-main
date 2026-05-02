@@ -305,11 +305,11 @@ export async function putRollcall(shiftKey, present) {
   })
 }
 
-export async function saveEmplOne(fio, company) {
+export async function saveEmplOne(fio, company, executorId = null) {
   return req('/api/empl', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fio: (fio || '').trim(), company: (company != null ? String(company) : '').trim() }),
+    body: JSON.stringify({ fio: (fio || '').trim(), company: (company != null ? String(company) : '').trim(), executorId: executorId || undefined }),
   })
 }
 

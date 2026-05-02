@@ -635,12 +635,11 @@ function EmployeesCard() {
     [noCompanyList, localSaved]
   )
 
-  const doSaveEmpl = useCallback(async (fio, company) => {
+  const doSaveEmpl = useCallback(async (fio, company, executorId = null) => {
     try {
-      const data = await api.saveEmplOne(fio, company)
+      const data = await api.saveEmplOne(fio, company, executorId)
       if (data.ok) {
         notify('Сохранено', 'success')
-        // Optimistic: remove bubble immediately
         setLocalSaved(prev => new Set([...prev, normalizeFio(fio)]))
         await loadEmployees()
         loadFromServer()
@@ -653,9 +652,9 @@ function EmployeesCard() {
   }, [notify, loadEmployees, loadFromServer])
 
   const handleQuickAssignSave = async (company) => {
-    const { fio } = quickAssign
+    const { fio, executorId } = quickAssign
     setQuickAssign(null)
-    await doSaveEmpl(fio, company)
+    await doSaveEmpl(fio, company, executorId)
   }
 
 const handleAddRow = () => {
@@ -745,19 +744,15 @@ const handleAddRow = () => {
     }
   }, [notify])
 
-  const handleScanAdd = useCallback(async () => {
-    if (!scanResult?.length) return
-    try {
-      const data = await api.addNewEmployees(scanResult)
-      if (!data?.ok) throw new Error(data?.error || 'Ошибка добавления')
-      notify(`Добавлено: ${data.added}`, 'success')
-      setScanResult(null)
-      await loadEmployees()
-      loadFromServer()
-    } catch (err) {
-      notify('Ошибка: ' + err.message, 'error')
-    }
-  }, [scanResult, notify, loadEmployees, loadFromServer])
+  // Сотрудники из скана, которых ещё нет в noCompanyList и не сохранены
+  const noCompanyNorms = useMemo(() => new Set(noCompanyList.map(f => normalizeFio(f))), [noCompanyList])
+  const scanExtras = useMemo(() => {
+    if (!scanResult) return []
+    return scanResult.filter(e => {
+      const norm = normalizeFio(e.fio)
+      return !localSaved.has(norm) && !noCompanyNorms.has(norm)
+    })
+  }, [scanResult, localSaved, noCompanyNorms])
 
   // Фильтруем по снимку (baseRowsRef), не по live-данным — иначе строка пропадает при редактировании
   const baseFiltered = new Set(
@@ -805,11 +800,16 @@ const handleAddRow = () => {
         </datalist>
 
         {/* Без компании */}
-        {displayNoCompany.length > 0 && (
+        {(displayNoCompany.length > 0 || scanExtras.length > 0) && (
           <div className={s.emplNoCompanySection}>
             <div className={s.emplNoCompanyHeader}>
-              <span className={s.emplNoCompanyBadge}>{displayNoCompany.length}</span>
-              <span className={s.emplSubtitle}>Из статистики без компании</span>
+              <span className={s.emplNoCompanyBadge}>{displayNoCompany.length + scanExtras.length}</span>
+              <span className={s.emplSubtitle}>Без компании</span>
+              {scanResult !== null && (
+                <button className={s.scanDismiss} title="Закрыть результаты скана" onClick={() => setScanResult(null)}>
+                  <X size={13} />
+                </button>
+              )}
               <div className={s.noCompanyViewToggle}>
                 <button
                   className={`btn btn-sm ${noCompanyView === 'bubbles' ? 'btn-primary' : 'btn-secondary'}`}
@@ -832,8 +832,15 @@ const handleAddRow = () => {
               <ul className={s.emplNoCompanyList}>
                 {displayNoCompany.map(fio => (
                   <li key={fio}>
-                    <button className={s.btnEmplFio} onClick={() => setQuickAssign({ fio })}>
+                    <button className={s.btnEmplFio} onClick={() => setQuickAssign({ fio, executorId: null })}>
                       {fio}
+                    </button>
+                  </li>
+                ))}
+                {scanExtras.map(e => (
+                  <li key={e.executorId || e.fio}>
+                    <button className={`${s.btnEmplFio} ${s.btnEmplFioScan}`} onClick={() => setQuickAssign({ fio: e.fio, executorId: e.executorId })}>
+                      {e.fio}
                     </button>
                   </li>
                 ))}
@@ -882,21 +889,8 @@ const handleAddRow = () => {
             <button className="btn btn-primary btn-sm" onClick={handleSave}>Сохранить</button>
           </div>
 
-          {scanResult !== null && (
-            <div className={s.scanResultBanner}>
-              {scanResult.length === 0 ? (
-                <span className={s.scanResultEmpty}>Все исполнители из всех смен уже в списке</span>
-              ) : (
-                <>
-                  <span className={s.scanResultCount}>{scanResult.length} незарегистрированных из истории смен:</span>
-                  <span className={s.scanResultList}>{scanResult.map(e => e.fio).join(', ')}</span>
-                  <div className={s.scanResultActions}>
-                    <button className="btn btn-primary btn-sm" onClick={handleScanAdd}>Добавить всех</button>
-                    <button className="btn btn-secondary btn-sm" onClick={() => setScanResult(null)}>Закрыть</button>
-                  </div>
-                </>
-              )}
-            </div>
+          {scanResult !== null && scanResult.length === 0 && (
+            <div className={s.scanResultEmpty}>Все исполнители из всех смен уже в списке</div>
           )}
 
           {allCompanies.length > 0 && (
