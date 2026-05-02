@@ -392,7 +392,7 @@ function UsersCard({ roles = [] }) {
           roles={roles}
           emplCompanies={emplCompanies}
           onClose={() => setEditUser(null)}
-          onSaved={() => { setEditUser(null); load() }}
+          onSaved={() => { setEditUser(null); setSearch(''); setCompanyFilter(''); load() }}
         />
       )}
     </div>
@@ -585,7 +585,10 @@ function EmployeesCard() {
   const [quickAssign, setQuickAssign] = useState(null) // { fio } — открытый QuickAssignModal
   const [localSaved, setLocalSaved] = useState(() => new Set()) // optimistic: fio norms just saved
   const [noCompanyView, setNoCompanyView] = useState('bubbles') // 'bubbles' | 'table'
-  const fileInputRef = useRef(null)
+  const fileInputRef  = useRef(null)
+  const idCounterRef  = useRef(0)
+  const baseRowsRef   = useRef([])
+  const nextId = () => `_new_${++idCounterRef.current}`
 
   const loadFromServer = useCallback(async () => {
     try {
@@ -593,7 +596,9 @@ function EmployeesCard() {
       const employees = res.employees || []
       const companies = res.companies || emplCompanies
       setAllCompanies(companies)
-      setRows(employees.map(e => ({ fio: titleCaseFio(e.fio), company: e.company || '' })))
+      const withIds = employees.map(e => ({ fio: titleCaseFio(e.fio), company: e.company || '', _id: e.executorId || nextId() }))
+      baseRowsRef.current = withIds
+      setRows(withIds)
       setInfo(employees.length
         ? `${employees.length} сотрудников · ${companies.length} компаний`
         : 'Список пуст — добавьте вручную или загрузите CSV')
@@ -652,12 +657,19 @@ function EmployeesCard() {
     await doSaveEmpl(fio, company)
   }
 
-const handleAddRow = () => setRows(prev => [{ fio: '', company: '' }, ...prev])
+const handleAddRow = () => {
+    const newRow = { fio: '', company: '', _id: nextId() }
+    setRows(prev => [newRow, ...prev])
+    baseRowsRef.current = [newRow, ...baseRowsRef.current]
+  }
 
-  const handleRowChange = (idx, field, value) =>
-    setRows(prev => prev.map((r, i) => i === idx ? { ...r, [field]: value } : r))
+  const handleRowChange = (_id, field, value) =>
+    setRows(prev => prev.map(r => r._id === _id ? { ...r, [field]: value } : r))
 
-  const handleDeleteRow = idx => setRows(prev => prev.filter((_, i) => i !== idx))
+  const handleDeleteRow = _id => {
+    setRows(prev => prev.filter(r => r._id !== _id))
+    baseRowsRef.current = baseRowsRef.current.filter(r => r._id !== _id)
+  }
 
   const handleImportCsv = e => {
     const file = e.target.files?.[0]
@@ -672,8 +684,9 @@ const handleAddRow = () => setRows(prev => [{ fio: '', company: '' }, ...prev])
         const trimmed = line.trim()
         if (!trimmed) continue
         const cols = trimmed.split(sep).map(c => c.trim().replace(/^"|"$/g, ''))
-        if (cols[0]) imported.push({ fio: titleCaseFio(cols[0]), company: cols[1] || '' })
+        if (cols[0]) imported.push({ fio: titleCaseFio(cols[0]), company: cols[1] || '', _id: nextId() })
       }
+      baseRowsRef.current = imported
       setRows(imported)
       notify('Импортировано ' + imported.length + ' строк', 'info')
     }
@@ -716,16 +729,20 @@ const handleAddRow = () => setRows(prev => [{ fio: '', company: '' }, ...prev])
 
   const [companyFilter, setCompanyFilter] = useState('__all__')
 
-  const filteredRows = rows.filter(r => {
-    if (companyFilter === '__none__') {
-      if (r.company) return false
-    } else if (companyFilter !== '__all__') {
-      if (r.company !== companyFilter) return false
-    }
-    if (!search) return true
-    const q = search.toLowerCase()
-    return r.fio.toLowerCase().includes(q) || r.company.toLowerCase().includes(q)
-  })
+  // Фильтруем по снимку (baseRowsRef), не по live-данным — иначе строка пропадает при редактировании
+  const baseFiltered = new Set(
+    baseRowsRef.current.filter(r => {
+      if (companyFilter === '__none__') {
+        if (r.company) return false
+      } else if (companyFilter !== '__all__') {
+        if (r.company !== companyFilter) return false
+      }
+      if (!search) return true
+      const q = search.toLowerCase()
+      return r.fio.toLowerCase().includes(q) || r.company.toLowerCase().includes(q)
+    }).map(r => r._id)
+  )
+  const filteredRows = rows.filter(r => baseFiltered.has(r._id))
 
   return (
     <>
@@ -854,17 +871,14 @@ const handleAddRow = () => setRows(prev => [{ fio: '', company: '' }, ...prev])
                 </tr>
               </thead>
               <tbody>
-                {filteredRows.length ? filteredRows.map(r => {
-                  const origIdx = rows.indexOf(r)
-                  return (
-                    <EmplRow
-                      key={origIdx}
-                      row={r}
-                      onChange={(field, val) => handleRowChange(origIdx, field, val)}
-                      onDelete={() => handleDeleteRow(origIdx)}
-                    />
-                  )
-                }) : (
+                {filteredRows.length ? filteredRows.map(r => (
+                  <EmplRow
+                    key={r._id}
+                    row={r}
+                    onChange={(field, val) => handleRowChange(r._id, field, val)}
+                    onDelete={() => handleDeleteRow(r._id)}
+                  />
+                )) : (
                   <tr>
                     <td colSpan={3} className={s.emptyRow}>
                       {rows.length ? 'Ничего не найдено' : 'Нет сотрудников — добавьте вручную или загрузите CSV'}
