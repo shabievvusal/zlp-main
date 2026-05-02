@@ -740,6 +740,25 @@ const handleAddRow = () => {
   const [companyFilter, setCompanyFilter] = useState('__all__')
   const [scanResult, setScanResult] = useState(null)   // null | [{executorId, fio}]
   const [scanning, setScanning]     = useState(false)
+  const [upgrading, setUpgrading]   = useState(false)
+
+  const handleUpgradeIds = useCallback(async () => {
+    setUpgrading(true)
+    try {
+      const data = await api.upgradeFioIds()
+      if (data.ok) {
+        notify(data.upgraded > 0 ? `Обновлено UUID: ${data.upgraded}` : 'Все записи уже с реальными UUID', 'success')
+        await loadEmployees()
+        loadFromServer()
+      } else {
+        notify('Ошибка: ' + (data.error || 'неизвестная'), 'error')
+      }
+    } catch (err) {
+      notify('Ошибка: ' + err.message, 'error')
+    } finally {
+      setUpgrading(false)
+    }
+  }, [notify, loadEmployees, loadFromServer])
 
   const handleScan = useCallback(async () => {
     setScanning(true)
@@ -895,6 +914,9 @@ const handleAddRow = () => {
 
             <button className="btn btn-secondary btn-sm" onClick={handleScan} disabled={scanning}>
               {scanning ? 'Сканирование...' : 'Найти из всех смен'}
+            </button>
+            <button className="btn btn-secondary btn-sm" onClick={handleUpgradeIds} disabled={upgrading}>
+              {upgrading ? 'Привязка...' : 'Привязать UUID'}
             </button>
             <button className="btn btn-primary btn-sm" onClick={handleSave}>Сохранить</button>
           </div>

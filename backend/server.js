@@ -1084,6 +1084,66 @@ app.get('/api/empl/find-unregistered', async (req, res) => {
   }
 });
 
+// POST /api/empl/upgrade-fio-ids — привязать реальные UUID к записям с fio:xxx
+app.post('/api/empl/upgrade-fio-ids', async (req, res) => {
+  if (!emplPg) return res.json({ ok: true, upgraded: 0 });
+  try {
+    const data = await emplPg.listEmployees();
+    // Собираем fio:xxx записи: normFio → originalFio
+    const fioRecords = new Map();
+    for (const e of data.employees) {
+      if (e.executorId && e.executorId.startsWith('fio:') && e.fio) {
+        fioRecords.set(normalizeFioForMatch(e.fio), e.fio);
+      }
+    }
+    if (!fioRecords.size) return res.json({ ok: true, upgraded: 0 });
+
+    // Сканируем почасовые файлы в поисках реальных UUID для этих ФИО
+    const upgrades = new Map(); // normFio → executorId
+    if (fs.existsSync(DATA_DIR)) {
+      let dateDirs;
+      try {
+        dateDirs = fs.readdirSync(DATA_DIR, { withFileTypes: true })
+          .filter(e => e.isDirectory() && /^\d{4}-\d{2}-\d{2}$/.test(e.name));
+      } catch { dateDirs = []; }
+
+      for (const dir of dateDirs) {
+        if (upgrades.size === fioRecords.size) break;
+        const dirPath = path.join(DATA_DIR, dir.name);
+        let hourFiles;
+        try { hourFiles = fs.readdirSync(dirPath).filter(f => /^\d{2}\.json$/.test(f)); } catch { continue; }
+        for (const hf of hourFiles) {
+          let raw;
+          try { raw = JSON.parse(fs.readFileSync(path.join(dirPath, hf), 'utf8')); } catch { continue; }
+          const list = Array.isArray(raw.items) ? raw.items : Object.values(raw.items || {});
+          for (const item of list) {
+            const fio        = (item.executor   || '').trim();
+            const executorId = (item.executorId || '').trim();
+            if (!fio || !executorId) continue;
+            const norm = normalizeFioForMatch(fio);
+            if (fioRecords.has(norm) && !upgrades.has(norm)) {
+              upgrades.set(norm, executorId);
+            }
+          }
+        }
+      }
+    }
+
+    if (!upgrades.size) return res.json({ ok: true, upgraded: 0 });
+
+    const executors = [];
+    for (const [norm, executorId] of upgrades) {
+      executors.push({ executorId, fio: fioRecords.get(norm) });
+    }
+    const upgraded = await emplPg.addNewEmployees(executors);
+    const updated = await emplPg.listEmployees();
+    res.json({ ok: true, upgraded, ...updated });
+  } catch (err) {
+    console.error('POST /api/empl/upgrade-fio-ids', err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 // POST /api/empl/enrich-names — обогатить ФИО отчествами из сырых WMS-файлов
 app.post('/api/empl/enrich-names', async (req, res) => {
   try {

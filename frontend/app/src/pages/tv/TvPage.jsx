@@ -168,7 +168,7 @@ function useClock() {
 
 export default function TvPage() {
   const {
-    allItems, dateSummary, emplMap, emplIdMap, emplNameMap,
+    allItems, dateSummary, emplMap, emplIdMap, emplIdNameMap, emplNameMap,
     selectedDate, shiftFilter,
     idleThresholdMinutes, allowedIdleMinutes,
     loading, status,
@@ -211,7 +211,11 @@ export default function TvPage() {
   const [damageDisplay,     setDamageDisplay]     = useState(0)
 
   // ── Enrich FIO ─────────────────────────────────────────────────────────────
-  const enrich = (name) => {
+  const enrich = (name, executorId) => {
+    if (executorId) {
+      const byId = emplIdNameMap.get(executorId)
+      if (byId) return byId.split(/\s+/).length >= name.split(/\s+/).length ? byId : name
+    }
     const fromMap = emplNameMap.get(personKey(normalizeFio(name)))
     if (!fromMap) return name
     return fromMap.split(/\s+/).length >= name.split(/\s+/).length ? fromMap : name

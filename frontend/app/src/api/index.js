@@ -317,6 +317,10 @@ export async function enrichEmplNames() {
   return req('/api/empl/enrich-names', { method: 'POST' })
 }
 
+export async function upgradeFioIds() {
+  return req('/api/empl/upgrade-fio-ids', { method: 'POST' })
+}
+
 export async function addNewEmployees(executors) {
   return req('/api/empl/add-new', {
     method: 'POST',

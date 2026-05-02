@@ -248,7 +248,7 @@ export function calcHourlyByEmployee(items, shiftFilter = 'day', enrichFn = null
     if (!ts) continue
     const h = new Date(ts).getHours()
     const col = (h + 1) % 24
-    const name = resolveName(item.executor || 'Неизвестно')
+    const name = resolveName(item.executor || 'Неизвестно', item.executorId)
     if (!byEmployee.has(name)) byEmployee.set(name, { hourMap: new Map(), firstAt: null, lastAt: null, executorId: null })
     const emp = byEmployee.get(name)
     if (!emp.executorId && item.executorId) emp.executorId = item.executorId

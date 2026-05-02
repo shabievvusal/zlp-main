@@ -33,7 +33,7 @@ const HE_MODES = [
 
 export default function StatsPage() {
   const {
-    allItems, dateSummary, emplMap, emplIdMap, emplNameMap, emplCompanies,
+    allItems, dateSummary, emplMap, emplIdMap, emplIdNameMap, emplNameMap, emplCompanies,
     selectedDate, shiftFilter, filterCompany,
     heTableMode, setHeTableMode,
     idleThresholdMinutes, setIdleThresholdMinutes,
@@ -58,11 +58,15 @@ export default function StatsPage() {
   const isSummaryOnly = !allItems.length && !!dateSummary
 
   // ── Тяжёлые вычисления — только при смене items/shift/emplMap ──────────────
-  const enrich = useCallback((name) => {
+  const enrich = useCallback((name, executorId) => {
+    if (executorId) {
+      const byId = emplIdNameMap.get(executorId)
+      if (byId) return byId.split(/\s+/).length >= name.split(/\s+/).length ? byId : name
+    }
     const fromMap = emplNameMap.get(personKey(normalizeFio(name)))
     if (!fromMap) return name
     return fromMap.split(/\s+/).length >= name.split(/\s+/).length ? fromMap : name
-  }, [emplNameMap])
+  }, [emplIdNameMap, emplNameMap])
 
   const heDataAll = useMemo(() => {
     if (isSummaryOnly && dateSummary?.hourlyByEmployee) {
