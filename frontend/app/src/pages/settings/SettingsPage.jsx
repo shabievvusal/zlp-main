@@ -607,8 +607,9 @@ function EmployeesCard() {
 
   useEffect(() => { loadFromServer() }, [loadFromServer])
 
-  const noCompanyList = useMemo(() => {
+  const { noCompanyList, noCompanyIdMap } = useMemo(() => {
     const fioToFull = new Map()
+    const idMap = new Map() // normFio → executorId
     const enrich = (fio) => {
       const norm = normalizeFio(fio)
       return emplNameMap.get(personKey(norm)) || fio
@@ -618,7 +619,10 @@ function EmployeesCard() {
       if (!fio) continue
       if (emplIdMap && item.executorId && emplIdMap.has(item.executorId)) continue
       const norm = normalizeFio(fio)
-      if (!hasMatchInEmplKeys(norm, emplMap)) fioToFull.set(norm, enrich(fio))
+      if (!hasMatchInEmplKeys(norm, emplMap)) {
+        fioToFull.set(norm, enrich(fio))
+        if (item.executorId && !idMap.has(norm)) idMap.set(norm, item.executorId)
+      }
     }
     for (const e of (dateSummary?.executors || [])) {
       const fio = (e.name || '').trim()
@@ -626,7 +630,10 @@ function EmployeesCard() {
       const norm = normalizeFio(fio)
       if (!hasMatchInEmplKeys(norm, emplMap)) fioToFull.set(norm, enrich(fio))
     }
-    return [...fioToFull.values()].sort((a, b) => a.localeCompare(b, 'ru'))
+    return {
+      noCompanyList: [...fioToFull.values()].sort((a, b) => a.localeCompare(b, 'ru')),
+      noCompanyIdMap: idMap,
+    }
   }, [allItems, dateSummary, emplMap, emplIdMap, emplNameMap])
 
   // Filter out optimistically-saved fios so bubbles disappear immediately after save
@@ -832,7 +839,7 @@ const handleAddRow = () => {
               <ul className={s.emplNoCompanyList}>
                 {displayNoCompany.map(fio => (
                   <li key={fio}>
-                    <button className={s.btnEmplFio} onClick={() => setQuickAssign({ fio, executorId: null })}>
+                    <button className={s.btnEmplFio} onClick={() => setQuickAssign({ fio, executorId: noCompanyIdMap.get(normalizeFio(fio)) || null })}>
                       {fio}
                     </button>
                   </li>
