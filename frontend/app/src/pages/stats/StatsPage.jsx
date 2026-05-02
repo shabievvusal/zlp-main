@@ -33,7 +33,7 @@ const HE_MODES = [
 
 export default function StatsPage() {
   const {
-    allItems, dateSummary, emplMap, emplNameMap, emplCompanies,
+    allItems, dateSummary, emplMap, emplIdMap, emplNameMap, emplCompanies,
     selectedDate, shiftFilter, filterCompany,
     heTableMode, setHeTableMode,
     idleThresholdMinutes, setIdleThresholdMinutes,
@@ -91,16 +91,16 @@ export default function StatsPage() {
       return { hours: hours || [], allRows: [...merged.values()], byCompany: {}, companiesOrder: [] }
     }
     if (!items.length) return null
-    return getHourlyByEmployeeGroupedByCompany(items, shiftFilter, emplMap, selectedDate, enrich)
-  }, [isSummaryOnly, dateSummary, items, shiftFilter, emplMap, selectedDate, enrich])
+    return getHourlyByEmployeeGroupedByCompany(items, shiftFilter, emplMap, selectedDate, enrich, emplIdMap)
+  }, [isSummaryOnly, dateSummary, items, shiftFilter, emplMap, emplIdMap, selectedDate, enrich])
 
   const companySummaryAll = useMemo(() => {
     if (isSummaryOnly && dateSummary?.companySummary) {
       return dateSummary.companySummary
     }
     if (!items.length) return null
-    return getCompanySummaryTableData(items, shiftFilter, emplMap, selectedDate)
-  }, [isSummaryOnly, dateSummary, items, shiftFilter, emplMap, selectedDate])
+    return getCompanySummaryTableData(items, shiftFilter, emplMap, selectedDate, emplIdMap)
+  }, [isSummaryOnly, dateSummary, items, shiftFilter, emplMap, emplIdMap, selectedDate])
 
   const weightByEmployeeAll = useMemo(() => {
     let raw
@@ -200,8 +200,8 @@ export default function StatsPage() {
       }
     }
     if (!items.length) return null
-    return calcStats(items, emplMap, '__all__')
-  }, [items, dateSummary, emplMap, isSummaryOnly])
+    return calcStats(items, emplMap, '__all__', emplIdMap)
+  }, [items, dateSummary, emplMap, emplIdMap, isSummaryOnly])
 
   const missingWeightNames = statsAll?.missingWeightNames || []
   const missingWeightItems = statsAll?.missingWeightItems || []

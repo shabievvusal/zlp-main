@@ -27,6 +27,7 @@ export function AppProvider({ children }) {
   const [allItems, setAllItems] = useState([])
   const [dateSummary, setDateSummary] = useState(null)
   const [emplMap, setEmplMap] = useState(new Map())
+  const [emplIdMap, setEmplIdMap] = useState(new Map()) // executorId → company
   const [emplNameMap, setEmplNameMap] = useState(new Map()) // personKey → full original fio from empl.csv
   const [emplCompanies, setEmplCompanies] = useState([])
   const [status, setStatus] = useState(null)
@@ -67,9 +68,10 @@ export function AppProvider({ children }) {
       // Backend returns { employees: [{fio, company}], companies: [...] }
       if (data?.employees) {
         const map = new Map()
+        const idMap = new Map()
         const nameMap = new Map()
         const companySet = new Set()
-        for (const { fio, company } of data.employees) {
+        for (const { fio, company, executorId } of data.employees) {
           if (fio) {
             const norm = normalizeFio(fio)
             map.set(norm, company || '')
@@ -80,8 +82,10 @@ export function AppProvider({ children }) {
             }
             if (company) companySet.add(company)
           }
+          if (executorId) idMap.set(executorId, company || '')
         }
         setEmplMap(map)
+        setEmplIdMap(idMap)
         setEmplNameMap(nameMap)
         setEmplCompanies([...companySet].sort())
       } else {
@@ -352,7 +356,7 @@ export function AppProvider({ children }) {
       filterCompany, setFilterCompany,
       allItems, setAllItems,
       dateSummary, setDateSummary,
-      emplMap, emplNameMap, emplCompanies,
+      emplMap, emplIdMap, emplNameMap, emplCompanies,
       status, loading,
       heTableMode, setHeTableMode,
       idleThresholdMinutes, setIdleThresholdMinutes,

@@ -1,4 +1,4 @@
-import { normalizeFio, getCompanyByFio, hasMatchInEmplKeys } from './emplUtils.js'
+import { normalizeFio, getCompanyByEmployee, hasMatchInEmplKeys } from './emplUtils.js'
 import { formatWeight, getTodayStr } from './format.js'
 
 export const ZONES = [
@@ -80,12 +80,15 @@ function getTaskKey(item) {
     : `op|${item.completedAt || item.startedAt || ''}|${item.executor || ''}|${item.cell || ''}`
 }
 
-export function filterByCompany(items, emplMap, filterCompany) {
+export function filterByCompany(items, emplMap, filterCompany, emplIdMap = null) {
   if (!emplMap || !filterCompany || filterCompany === '__all__') return items
   if (filterCompany === '__none__') {
-    return items.filter(i => !hasMatchInEmplKeys(normalizeFio(i.executor), emplMap))
+    return items.filter(i => {
+      if (emplIdMap && i.executorId && emplIdMap.has(i.executorId)) return false
+      return !hasMatchInEmplKeys(normalizeFio(i.executor), emplMap)
+    })
   }
-  return items.filter(i => getCompanyByFio(emplMap, normalizeFio(i.executor)) === filterCompany)
+  return items.filter(i => getCompanyByEmployee(emplMap, emplIdMap, normalizeFio(i.executor), i.executorId) === filterCompany)
 }
 
 // ─── DAY/NIGHT hours ─────────────────────────────────────────────────────────
@@ -95,8 +98,8 @@ export const NIGHT_HOURS = [22, 23, 0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  10]
 
 // ─── Core stats calculation ──────────────────────────────────────────────────
 
-export function calcStats(items, emplMap, filterCompany) {
-  const filtered = filterByCompany(items, emplMap, filterCompany)
+export function calcStats(items, emplMap, filterCompany, emplIdMap = null) {
+  const filtered = filterByCompany(items, emplMap, filterCompany, emplIdMap)
 
   const totalTaskKeys = new Set(filtered.map(i => getTaskKey(i)))
   const totalOps = totalTaskKeys.size
@@ -109,8 +112,9 @@ export function calcStats(items, emplMap, filterCompany) {
   const byExecutor = new Map()
   for (const item of filtered) {
     const key = item.executor || 'Неизвестно'
-    if (!byExecutor.has(key)) byExecutor.set(key, { name: key, taskKeys: new Set(), qty: 0, firstAt: null, lastAt: null })
+    if (!byExecutor.has(key)) byExecutor.set(key, { name: key, executorId: item.executorId || null, taskKeys: new Set(), qty: 0, firstAt: null, lastAt: null })
     const e = byExecutor.get(key)
+    if (!e.executorId && item.executorId) e.executorId = item.executorId
     e.taskKeys.add(getTaskKey(item))
     e.qty += Number(item.quantity) || 0
     const ts = item.completedAt || item.startedAt
@@ -122,7 +126,7 @@ export function calcStats(items, emplMap, filterCompany) {
   const executors = [...byExecutor.values()].map(e => ({
     ...e,
     ops: e.taskKeys.size,
-    company: emplMap ? (getCompanyByFio(emplMap, normalizeFio(e.name)) || '—') : '—',
+    company: emplMap ? (getCompanyByEmployee(emplMap, emplIdMap, normalizeFio(e.name), e.executorId) || '—') : '—',
   })).sort((a, b) => b.ops - a.ops)
 
   const byHour = new Map()
@@ -245,8 +249,9 @@ export function calcHourlyByEmployee(items, shiftFilter = 'day', enrichFn = null
     const h = new Date(ts).getHours()
     const col = (h + 1) % 24
     const name = resolveName(item.executor || 'Неизвестно')
-    if (!byEmployee.has(name)) byEmployee.set(name, { hourMap: new Map(), firstAt: null, lastAt: null })
+    if (!byEmployee.has(name)) byEmployee.set(name, { hourMap: new Map(), firstAt: null, lastAt: null, executorId: null })
     const emp = byEmployee.get(name)
+    if (!emp.executorId && item.executorId) emp.executorId = item.executorId
     if (!emp.firstAt || ts < emp.firstAt) emp.firstAt = ts
     if (!emp.lastAt  || ts > emp.lastAt)  emp.lastAt  = ts
     const hourMap = emp.hourMap
@@ -312,18 +317,18 @@ export function calcHourlyByEmployee(items, shiftFilter = 'day', enrichFn = null
       }
       total += sz
     }
-    rows.push({ name, byHour, weightByHour, byHourZone, byZone, total, firstAt, lastAt })
+    rows.push({ name, executorId: emp.executorId || null, byHour, weightByHour, byHourZone, byZone, total, firstAt, lastAt })
   }
   return { hours: order, rows }
 }
 
 // ─── Company summary ──────────────────────────────────────────────────────────
 
-export function getHourlyByEmployeeGroupedByCompany(items, shiftFilter, emplMap, selectedDate, enrichFn = null) {
+export function getHourlyByEmployeeGroupedByCompany(items, shiftFilter, emplMap, selectedDate, enrichFn = null, emplIdMap = null) {
   const { rows } = calcHourlyByEmployee(items, shiftFilter, enrichFn)
   const hours = getHoursPassedIncludingCurrent(selectedDate, shiftFilter)
-  const getCompany = name => emplMap && name ? (getCompanyByFio(emplMap, normalizeFio(name)) || '—') : '—'
-  const withCompany = rows.map(r => ({ ...r, company: getCompany(r.name) }))
+  const getCompany = r => emplMap && r.name ? (getCompanyByEmployee(emplMap, emplIdMap, normalizeFio(r.name), r.executorId) || '—') : '—'
+  const withCompany = rows.map(r => ({ ...r, company: getCompany(r) }))
   const byCompany = new Map()
   for (const r of withCompany) {
     const c = r.company || '—'
@@ -338,8 +343,8 @@ export function getHourlyByEmployeeGroupedByCompany(items, shiftFilter, emplMap,
   return { hours, byCompany: Object.fromEntries(byCompany), allRows, companiesOrder }
 }
 
-export function getCompanySummaryTableData(items, shiftFilter, emplMap, selectedDate) {
-  const { hours, byCompany, companiesOrder } = getHourlyByEmployeeGroupedByCompany(items, shiftFilter, emplMap, selectedDate)
+export function getCompanySummaryTableData(items, shiftFilter, emplMap, selectedDate, emplIdMap = null) {
+  const { hours, byCompany, companiesOrder } = getHourlyByEmployeeGroupedByCompany(items, shiftFilter, emplMap, selectedDate, null, emplIdMap)
   const hoursDisplay = getHoursPassedIncludingCurrent(selectedDate, shiftFilter)
   const passedHours = hours.length
   const weightByCompany = new Map()
@@ -349,7 +354,7 @@ export function getCompanySummaryTableData(items, shiftFilter, emplMap, selected
     const type = (item.operationType || '').toUpperCase()
     const isKdk = type === 'PICK_BY_LINE'
     if (!isKdk && type !== 'PIECE_SELECTION_PICKING') continue
-    const company = emplMap ? (getCompanyByFio(emplMap, normalizeFio(item.executor)) || '—') : '—'
+    const company = emplMap ? (getCompanyByEmployee(emplMap, emplIdMap, normalizeFio(item.executor), item.executorId) || '—') : '—'
     if (!szByCompany.has(company)) szByCompany.set(company, { storage: 0, kdk: 0 })
     const szEntry = szByCompany.get(company)
     if (isKdk) szEntry.kdk += 1; else szEntry.storage += 1

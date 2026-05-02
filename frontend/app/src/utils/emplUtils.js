@@ -9,12 +9,24 @@ export function personKey(norm) {
   return (parts[0] + ' ' + initial).trim()
 }
 
+function fioMatch(normA, normB) {
+  if (normA === normB) return true
+  const a = normA.split(/\s+/).filter(Boolean)
+  const b = normB.split(/\s+/).filter(Boolean)
+  if (!a[0] || a[0] !== b[0]) return false   // фамилии должны совпадать точно
+  const fnA = a[1] || '', fnB = b[1] || ''
+  if (fnA === fnB) return true                // имена совпадают точно
+  // Инициальное сравнение только когда одна сторона — одна буква
+  if (fnA.length === 1 && fnB.startsWith(fnA)) return true
+  if (fnB.length === 1 && fnA.startsWith(fnB)) return true
+  return false
+}
+
 export function hasMatchInEmplKeys(dataNorm, emplMap) {
   if (!dataNorm || !emplMap) return false
   if (emplMap.has(dataNorm)) return true
-  const pk = personKey(dataNorm)
   for (const k of emplMap.keys()) {
-    if (personKey(k) === pk) return true
+    if (fioMatch(dataNorm, k)) return true
   }
   return false
 }
@@ -23,11 +35,18 @@ export function getCompanyByFio(emplMap, dataNorm) {
   if (!emplMap || !dataNorm) return undefined
   const exact = emplMap.get(dataNorm)
   if (exact !== undefined) return exact
-  const pk = personKey(dataNorm)
   for (const [k, v] of emplMap) {
-    if (personKey(k) === pk) return v
+    if (fioMatch(dataNorm, k)) return v
   }
   return undefined
+}
+
+export function getCompanyByEmployee(emplMap, emplIdMap, norm, executorId) {
+  if (emplIdMap && executorId) {
+    const byId = emplIdMap.get(executorId)
+    if (byId !== undefined) return byId
+  }
+  return getCompanyByFio(emplMap, norm)
 }
 
 export function parseEmplCsv(csv) {

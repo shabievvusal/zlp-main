@@ -168,7 +168,7 @@ function useClock() {
 
 export default function TvPage() {
   const {
-    allItems, dateSummary, emplMap, emplNameMap,
+    allItems, dateSummary, emplMap, emplIdMap, emplNameMap,
     selectedDate, shiftFilter,
     idleThresholdMinutes, allowedIdleMinutes,
     loading, status,
@@ -229,8 +229,8 @@ export default function TvPage() {
   const companySummary = useMemo(() => {
     if (isSummaryOnly && dateSummary?.companySummary) return dateSummary.companySummary
     if (!items.length) return null
-    return getCompanySummaryTableData(items, shiftFilter, emplMap, selectedDate)
-  }, [isSummaryOnly, dateSummary, items, shiftFilter, emplMap, selectedDate])
+    return getCompanySummaryTableData(items, shiftFilter, emplMap, selectedDate, emplIdMap)
+  }, [isSummaryOnly, dateSummary, items, shiftFilter, emplMap, emplIdMap, selectedDate])
 
   // ── Hourly by employee ──────────────────────────────────────────────────────
   const heDataAll = useMemo(() => {
@@ -253,8 +253,8 @@ export default function TvPage() {
       return { hours: hours || [], allRows: [...merged.values()] }
     }
     if (!items.length) return null
-    return getHourlyByEmployeeGroupedByCompany(items, shiftFilter, emplMap, selectedDate, enrich)
-  }, [isSummaryOnly, dateSummary, items, shiftFilter, emplMap, selectedDate])
+    return getHourlyByEmployeeGroupedByCompany(items, shiftFilter, emplMap, selectedDate, enrich, emplIdMap)
+  }, [isSummaryOnly, dateSummary, items, shiftFilter, emplMap, emplIdMap, selectedDate])
 
   // ── Idles ───────────────────────────────────────────────────────────────────
   const idlesByEmployee = useMemo(() => {

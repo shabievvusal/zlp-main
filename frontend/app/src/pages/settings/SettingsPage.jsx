@@ -577,7 +577,7 @@ function EmplRow({ row, onChange, onDelete }) {
 
 function EmployeesCard() {
   const notify = useNotify()
-  const { emplMap, emplNameMap, emplCompanies, dateSummary, allItems, loadEmployees } = useApp()
+  const { emplMap, emplIdMap, emplNameMap, emplCompanies, dateSummary, allItems, loadEmployees } = useApp()
   const [rows, setRows] = useState([])
   const [allCompanies, setAllCompanies] = useState([])
   const [search, setSearch] = useState('')
@@ -616,6 +616,7 @@ function EmployeesCard() {
     for (const item of allItems) {
       const fio = (item.executor || '').trim()
       if (!fio) continue
+      if (emplIdMap && item.executorId && emplIdMap.has(item.executorId)) continue
       const norm = normalizeFio(fio)
       if (!hasMatchInEmplKeys(norm, emplMap)) fioToFull.set(norm, enrich(fio))
     }
@@ -626,7 +627,7 @@ function EmployeesCard() {
       if (!hasMatchInEmplKeys(norm, emplMap)) fioToFull.set(norm, enrich(fio))
     }
     return [...fioToFull.values()].sort((a, b) => a.localeCompare(b, 'ru'))
-  }, [allItems, dateSummary, emplMap, emplNameMap])
+  }, [allItems, dateSummary, emplMap, emplIdMap, emplNameMap])
 
   // Filter out optimistically-saved fios so bubbles disappear immediately after save
   const displayNoCompany = useMemo(
