@@ -72,12 +72,18 @@ Parallel.ForEach(dates, dateStr =>
             if (string.IsNullOrEmpty(ds.ExecutorId) && !string.IsNullOrEmpty(executorId))
                 ds.ExecutorId = executorId;
 
-            // Task deduplication: KDK — по (executor|cell|product), хранение — по id
+            // Task deduplication: KDK — по (cell|product|час МСК), хранение — по id или (time|executor|cell)
             var nomenclature = item.NomenclatureCode ?? "";
             var productName  = item.ProductName ?? "";
+            var moscowHour = -1;
+            if (!string.IsNullOrEmpty(item.CompletedAt) &&
+                DateTime.TryParse(item.CompletedAt, null, System.Globalization.DateTimeStyles.AdjustToUniversal, out var tsH))
+                moscowHour = (tsH.Hour + 3) % 24;
             string taskKey = isKdk
-                ? $"task|{executor}|{cell}|{(string.IsNullOrEmpty(nomenclature) ? productName : nomenclature)}"
-                : $"id|{item.Id ?? ""}";
+                ? $"task|{cell}|{(string.IsNullOrEmpty(nomenclature) ? productName : nomenclature)}|{moscowHour}"
+                : !string.IsNullOrEmpty(item.Id)
+                    ? $"id|{item.Id}"
+                    : $"op|{item.CompletedAt ?? ""}|{executor}|{cell}";
             ds.TaskKeys.Add(taskKey);
 
             if (!string.IsNullOrEmpty(item.CompletedAt) &&
