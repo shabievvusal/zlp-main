@@ -2602,6 +2602,7 @@ app.get('/api/stats/monthly-employees', vsSessionRequired, async (req, res) => {
     const dateFrom = String(req.query.dateFrom || '').slice(0, 10);
     const dateTo   = String(req.query.dateTo   || '').slice(0, 10);
     const shift    = req.query.shift || null;
+    const zone     = req.query.zone  || null;
     if (!dateFrom || !dateTo) {
       return res.status(400).json({ error: 'Нужны dateFrom и dateTo (YYYY-MM-DD)' });
     }
@@ -2610,6 +2611,7 @@ app.get('/api/stats/monthly-employees', vsSessionRequired, async (req, res) => {
 
     const cmdArgs = [...cmd.args, '--data-dir', DATA_DIR, '--date-from', dateFrom, '--date-to', dateTo];
     if (shift) cmdArgs.push('--shift', shift);
+    if (zone)  cmdArgs.push('--zone',  zone);
 
     const { stdout } = await execFileAsync(cmd.exe, cmdArgs, { maxBuffer: 32 * 1024 * 1024 });
     const result = JSON.parse(stdout);

@@ -186,9 +186,10 @@ export async function getMonthlyCompany(year, month, shift) {
   return req(`/api/stats/monthly-company?${params}`)
 }
 
-export async function getMonthlyEmployees(dateFrom, dateTo, shift) {
+export async function getMonthlyEmployees(dateFrom, dateTo, shift, zone) {
   const params = new URLSearchParams({ dateFrom, dateTo })
   if (shift) params.set('shift', shift)
+  if (zone)  params.set('zone',  zone)
   return req(`/api/stats/monthly-employees?${params}`)
 }
 

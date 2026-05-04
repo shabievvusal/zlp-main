@@ -30,8 +30,9 @@ export default function MonthlyEmployeeTable() {
   const [dateFrom,    setDateFrom]    = useState(getMonthStartStr)
   const [dateTo,      setDateTo]      = useState(getTodayStr)
   const [shift,       setShift]       = useState('')
+  const [zone,        setZone]        = useState('')
   const [rows,        setRows]        = useState(null)
-  const [loadedRange, setLoadedRange] = useState(null) // { from, to } после загрузки
+  const [loadedRange, setLoadedRange] = useState(null)
   const [loading,     setLoading]     = useState(false)
   const [sortCol,     setSortCol]     = useState('total')
   const [sortDir,     setSortDir]     = useState('desc')
@@ -40,7 +41,7 @@ export default function MonthlyEmployeeTable() {
     if (!dateFrom || !dateTo) return
     setLoading(true)
     try {
-      const res = await api.getMonthlyEmployees(dateFrom, dateTo, shift || undefined)
+      const res = await api.getMonthlyEmployees(dateFrom, dateTo, shift || undefined, zone || undefined)
       setRows(enrichRows(res.rows || []))
       setLoadedRange({ from: dateFrom, to: dateTo })
     } catch (e) {
@@ -63,22 +64,23 @@ export default function MonthlyEmployeeTable() {
     else if (sortCol === 'name')      { va = a.name;      vb = b.name }
     else if (sortCol === 'total')     { va = a.total;     vb = b.total }
     else if (sortCol === 'szPerHour') { va = a.szPerHour ?? -1; vb = b.szPerHour ?? -1 }
-    else if (sortCol === 'szPerMin')  { va = a.szPerMin  ?? -1; vb = b.szPerMin  ?? -1 }
-    else { va = a.byZone?.[sortCol] ?? -1; vb = b.byZone?.[sortCol] ?? -1 }
+    else                              { va = a.szPerMin  ?? -1; vb = b.szPerMin  ?? -1 }
     if (typeof va === 'string') return sortDir === 'asc' ? va.localeCompare(vb, 'ru') : vb.localeCompare(va, 'ru')
     return sortDir === 'asc' ? va - vb : vb - va
   }) : null
 
-  const th = (col, label, title, extraStyle) => (
+  const th = (col, label, title) => (
     <th
       className={styles.tdCenter}
       onClick={() => handleSort(col)}
-      style={{ cursor: 'pointer', whiteSpace: 'nowrap', ...extraStyle }}
+      style={{ cursor: 'pointer', whiteSpace: 'nowrap' }}
       title={title}
     >
       {label}{arrow(col)}
     </th>
   )
+
+  const selectedZone = ZONES.find(z => z.key === zone)
 
   return (
     <>
@@ -94,6 +96,20 @@ export default function MonthlyEmployeeTable() {
           <option value="">Все смены</option>
           <option value="day">День (9–21)</option>
           <option value="night">Ночь (21–9)</option>
+        </select>
+        <select
+          className={styles.selectControl}
+          style={{
+            fontSize: 13,
+            background: selectedZone ? selectedZone.bg : undefined,
+            color:      selectedZone ? selectedZone.text : undefined,
+          }}
+          value={zone} onChange={e => setZone(e.target.value)}
+        >
+          <option value="">Все зоны</option>
+          {ZONES.map(z => (
+            <option key={z.key} value={z.key}>{z.label}</option>
+          ))}
         </select>
         <button className="btn btn-secondary btn-sm"
           onClick={load} disabled={loading || !dateFrom || !dateTo}>
@@ -123,42 +139,18 @@ export default function MonthlyEmployeeTable() {
                 {th('total',     'Итого СЗ', 'Суммарное кол-во СЗ за период')}
                 {th('szPerHour', 'СЗ/ч',     'СЗ в час = Итого ÷ суммарное отработанное время (ч)')}
                 {th('szPerMin',  'СЗ/мин',   'СЗ в минуту = Итого ÷ суммарное отработанное время (мин)')}
-                {ZONES.map(z => (
-                  <th key={z.key} className={styles.tdCenter}
-                    onClick={() => handleSort(z.key)}
-                    style={{ cursor: 'pointer', whiteSpace: 'nowrap', background: z.bg, color: z.text }}
-                    title={z.label}>
-                    {z.label}{arrow(z.key)}
-                  </th>
-                ))}
               </tr>
             </thead>
             <tbody>
-              {sorted.map((r, i) => {
-                const domZone = ZONES.reduce((best, z) => {
-                  const cnt = r.byZone?.[z.key] || 0
-                  return cnt > (best?.cnt || 0) ? { z, cnt } : best
-                }, null)
-                return (
-                  <tr key={i}>
-                    <td>{r.company}</td>
-                    <td className={styles.tdBold}>{r.name}</td>
-                    <td className={styles.tdCenter}>{r.total}</td>
-                    <td className={styles.tdCenter}>{r.szPerHour ?? '—'}</td>
-                    <td className={styles.tdCenter}>{r.szPerMin  ?? '—'}</td>
-                    {ZONES.map(z => {
-                      const cnt = r.byZone?.[z.key] || 0
-                      const isDom = domZone?.z?.key === z.key && cnt > 0
-                      return (
-                        <td key={z.key} className={styles.tdCenter}
-                          style={cnt > 0 ? { background: z.bg + (isDom ? '55' : '22'), color: isDom ? z.text : undefined } : {}}>
-                          {cnt > 0 ? cnt : '—'}
-                        </td>
-                      )
-                    })}
-                  </tr>
-                )
-              })}
+              {sorted.map((r, i) => (
+                <tr key={i}>
+                  <td>{r.company}</td>
+                  <td className={styles.tdBold}>{r.name}</td>
+                  <td className={styles.tdCenter}>{r.total}</td>
+                  <td className={styles.tdCenter}>{r.szPerHour ?? '—'}</td>
+                  <td className={styles.tdCenter}>{r.szPerMin  ?? '—'}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>

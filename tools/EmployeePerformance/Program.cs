@@ -3,14 +3,15 @@ using System.Text.Json;
 
 // ─── Args ──────────────────────────────────────────────────────────────────────
 
-var dataDir  = GetArg("--data-dir",  "backend/data");
-var dateFrom = GetArg("--date-from", "");
-var dateTo   = GetArg("--date-to",   "");
-var shift    = GetArg("--shift",     ""); // "day" | "night" | "" = все смены
+var dataDir    = GetArg("--data-dir",  "backend/data");
+var dateFrom   = GetArg("--date-from", "");
+var dateTo     = GetArg("--date-to",   "");
+var shift      = GetArg("--shift",     ""); // "day" | "night" | "" = все смены
+var zoneFilter = GetArg("--zone",      ""); // "HH" | "KDH" | "SH" | "KDS" | "MH" | "KDM" | "" = все зоны
 
 if (string.IsNullOrWhiteSpace(dateFrom) || string.IsNullOrWhiteSpace(dateTo))
 {
-    Console.Error.WriteLine("Usage: EmployeePerformance --data-dir <path> --date-from YYYY-MM-DD --date-to YYYY-MM-DD [--shift day|night]");
+    Console.Error.WriteLine("Usage: EmployeePerformance --data-dir <path> --date-from YYYY-MM-DD --date-to YYYY-MM-DD [--shift day|night] [--zone HH|KDH|SH|KDS|MH|KDM]");
     Environment.Exit(2);
 }
 
@@ -62,6 +63,9 @@ Parallel.ForEach(dates, dateStr =>
             var cell       = item.Cell ?? "";
             var zoneKey    = GetZonePrefix(cell);
 
+            if (!string.IsNullOrEmpty(zoneFilter) &&
+                !zoneKey.Equals(zoneFilter, StringComparison.OrdinalIgnoreCase)) continue;
+
             var normKey = NormFio(executor);
             if (!dayMap.TryGetValue(normKey, out var ds))
                 dayMap[normKey] = ds = new DailyEmplStats { Name = executor, ExecutorId = executorId };
@@ -75,9 +79,6 @@ Parallel.ForEach(dates, dateStr =>
                 ? $"task|{executor}|{cell}|{(string.IsNullOrEmpty(nomenclature) ? productName : nomenclature)}"
                 : $"id|{item.Id ?? ""}";
             ds.TaskKeys.Add(taskKey);
-
-            if (!string.IsNullOrEmpty(zoneKey))
-                ds.ByZone[zoneKey] = ds.ByZone.GetValueOrDefault(zoneKey, 0) + 1;
 
             if (!string.IsNullOrEmpty(item.CompletedAt) &&
                 DateTime.TryParse(item.CompletedAt, null, System.Globalization.DateTimeStyles.AdjustToUniversal, out var ts))
@@ -113,9 +114,6 @@ foreach (var dayMap in dailyResults)
 
         es.Total         += taskCount;
         es.WorkedMinutes += dayWorkedMin;
-
-        foreach (var (zk, cnt) in ds.ByZone)
-            es.ByZone[zk] = es.ByZone.GetValueOrDefault(zk, 0) + cnt;
     }
 }
 
@@ -126,11 +124,10 @@ var rows = byEmployee.Values
     .OrderByDescending(es => es.Total)
     .Select(es => new
     {
-        name         = es.Name,
-        executorId   = es.ExecutorId,
-        total        = es.Total,
+        name          = es.Name,
+        executorId    = es.ExecutorId,
+        total         = es.Total,
         workedMinutes = Math.Round(es.WorkedMinutes, 1),
-        byZone       = es.ByZone,
     })
     .ToList();
 
@@ -139,6 +136,7 @@ Console.WriteLine(JsonSerializer.Serialize(new
     ok       = true,
     dateFrom,
     dateTo,
+    zone     = zoneFilter,
     count    = rows.Count,
     rows,
 }, new JsonSerializerOptions
@@ -180,21 +178,19 @@ string GetArg(string key, string defaultValue)
 
 class DailyEmplStats
 {
-    public string            Name       { get; set; } = "";
-    public string            ExecutorId { get; set; } = "";
-    public HashSet<string>   TaskKeys   { get; }      = new();
-    public DateTime?         FirstAt    { get; set; }
-    public DateTime?         LastAt     { get; set; }
-    public Dictionary<string, int> ByZone { get; }   = new();
+    public string          Name       { get; set; } = "";
+    public string          ExecutorId { get; set; } = "";
+    public HashSet<string> TaskKeys   { get; }      = new();
+    public DateTime?       FirstAt    { get; set; }
+    public DateTime?       LastAt     { get; set; }
 }
 
 class EmployeeStats
 {
-    public string            Name         { get; set; } = "";
-    public string            ExecutorId   { get; set; } = "";
-    public int               Total        { get; set; }
-    public double            WorkedMinutes { get; set; }
-    public Dictionary<string, int> ByZone { get; }     = new();
+    public string  Name          { get; set; } = "";
+    public string  ExecutorId    { get; set; } = "";
+    public int     Total         { get; set; }
+    public double  WorkedMinutes { get; set; }
 }
 
 record LightItem
