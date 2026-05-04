@@ -817,6 +817,8 @@ export default function ConsolidationPage() {
   const [exportFrom, setExportFrom] = useState(getTodayStr)
   const [exportTo,   setExportTo]   = useState(getTodayStr)
   const [exporting,  setExporting]  = useState(null) // null | 1 | 2
+  const [companyFilter,        setCompanyFilter]        = useState('')
+  const [violatorPersonFilter, setViolatorPersonFilter] = useState('')
 
   const handleExport = useCallback(async (reportNum) => {
     setExporting(reportNum)
@@ -857,7 +859,7 @@ export default function ConsolidationPage() {
   useEffect(() => { load() }, [load])
 
   // ─── Derived ──────────────────────────────────────────────────────────────
-  const filtered = complaints.filter(c => {
+  const preFiltered = complaints.filter(c => {
     if (violatorFilter === 'found' && !c.violator) return false
     if (violatorFilter === 'not_found' && c.violator) return false
     if (dateFrom && c.createdAt < new Date(dateFrom).toISOString()) return false
@@ -866,6 +868,25 @@ export default function ConsolidationPage() {
       toDate.setSeconds(59, 999)
       if (c.createdAt > toDate.toISOString()) return false
     }
+    return true
+  })
+
+  const companyOptions = [...new Set(preFiltered.map(c => c.company || '').filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b, 'ru'))
+
+  const violatorOptions = (() => {
+    const vm = new Map()
+    for (const c of preFiltered) {
+      if (companyFilter && c.company !== companyFilter) continue
+      if (!c.violator) continue
+      vm.set(c.violator, (vm.get(c.violator) || 0) + 1)
+    }
+    return [...vm.entries()].sort((a, b) => b[1] - a[1]).map(([fio, count]) => ({ fio, count }))
+  })()
+
+  const filtered = preFiltered.filter(c => {
+    if (companyFilter && c.company !== companyFilter) return false
+    if (violatorPersonFilter && c.violator !== violatorPersonFilter) return false
     return true
   })
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize))
@@ -1135,6 +1156,42 @@ export default function ConsolidationPage() {
               <button
                 className="btn btn-secondary btn-sm"
                 onClick={() => { setDateFrom(''); setDateTo(''); setPage(1) }}
+              >✕</button>
+            )}
+          </div>
+        </div>
+
+        {/* Строка 4: фильтр по компании и нарушителю */}
+        <div className={s.toolbarRow}>
+          <div className={s.toolbarLeft} style={{ alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 12, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Компания:</span>
+            <select
+              className={s.statusSelect}
+              value={companyFilter}
+              onChange={e => { setCompanyFilter(e.target.value); setViolatorPersonFilter(''); setPage(1) }}
+            >
+              <option value="">Все</option>
+              {companyOptions.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+            {companyFilter && (
+              <>
+                <span style={{ fontSize: 12, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Нарушитель:</span>
+                <select
+                  className={s.statusSelect}
+                  value={violatorPersonFilter}
+                  onChange={e => { setViolatorPersonFilter(e.target.value); setPage(1) }}
+                >
+                  <option value="">Все</option>
+                  {violatorOptions.map(({ fio, count }) => (
+                    <option key={fio} value={fio}>{fio} ({count})</option>
+                  ))}
+                </select>
+              </>
+            )}
+            {(companyFilter || violatorPersonFilter) && (
+              <button
+                className="btn btn-secondary btn-sm"
+                onClick={() => { setCompanyFilter(''); setViolatorPersonFilter(''); setPage(1) }}
               >✕</button>
             )}
           </div>
