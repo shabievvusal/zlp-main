@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback, useEffect } from 'react'
+import { useMemo, useState, useCallback, useEffect, useRef } from 'react'
 import { useApp } from '../../context/AppContext.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
 import {
@@ -49,6 +49,7 @@ export default function StatsPage() {
   const [showHours, setShowHours] = useState(false)
   const [missingWeightTotal, setMissingWeightTotal] = useState(null)
   const notify = useNotify()
+  const monthlyExportRef = useRef(null)
 
   const items = useMemo(() => {
     if (allItems.length) return allItems
@@ -636,8 +637,8 @@ export default function StatsPage() {
             <button
               type="button"
               className="btn btn-secondary btn-sm"
-              onClick={heTableMode === 'idles' ? handleExportIdles : handleExportHourly}
-              disabled={!hourlyByEmployee?.allRows?.length || heTableMode === 'monthly'}
+              onClick={heTableMode === 'idles' ? handleExportIdles : heTableMode === 'monthly' ? () => monthlyExportRef.current?.() : handleExportHourly}
+              disabled={heTableMode !== 'monthly' && !hourlyByEmployee?.allRows?.length}
               title="Выгрузить таблицу в Excel"
             >
               <Download size={13} strokeWidth={2} style={{marginRight:4}}/>XLSX
@@ -682,7 +683,7 @@ export default function StatsPage() {
           </div>
         </div>
         {heTableMode === 'monthly'
-          ? <MonthlyEmployeeTable />
+          ? <MonthlyEmployeeTable exportRef={monthlyExportRef} />
           : hourlyByEmployee
             ? <HourlyEmployeeTable
                 allRows={hourlyByEmployee.allRows}

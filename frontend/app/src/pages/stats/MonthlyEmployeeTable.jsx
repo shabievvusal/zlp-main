@@ -1,7 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import * as api from '../../api/index.js'
 import { ZONES } from '../../utils/statsCalc.js'
-import { Download } from 'lucide-react'
 import styles from './StatsPage.module.css'
 
 function getTodayStr() {
@@ -27,7 +26,7 @@ function enrichRows(rows) {
   }))
 }
 
-export default function MonthlyEmployeeTable() {
+export default function MonthlyEmployeeTable({ exportRef }) {
   const [dateFrom,    setDateFrom]    = useState(getMonthStartStr)
   const [dateTo,      setDateTo]      = useState(getTodayStr)
   const [shift,       setShift]       = useState('')
@@ -82,6 +81,10 @@ export default function MonthlyEmployeeTable() {
   )
 
   const selectedZone = ZONES.find(z => z.key === zone)
+
+  useEffect(() => {
+    if (exportRef) exportRef.current = handleExport
+  })
 
   async function handleExport() {
     if (!sorted?.length) return
@@ -186,11 +189,6 @@ export default function MonthlyEmployeeTable() {
         <button className="btn btn-secondary btn-sm"
           onClick={load} disabled={loading || !dateFrom || !dateTo}>
           {loading ? 'Загрузка...' : 'Загрузить'}
-        </button>
-        <button className="btn btn-secondary btn-sm"
-          onClick={handleExport} disabled={!sorted?.length}
-          title="Выгрузить в Excel">
-          <Download size={13} strokeWidth={2} style={{ marginRight: 4 }} />XLSX
         </button>
         {loadedRange && (
           <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
