@@ -137,7 +137,7 @@ async function generateReport1(complaints, companyFullNames, photoBaseUrl) {
 
     const ws = wb.addWorksheet(sanitizeSheetName(company));
     ws.columns = [
-      { header: 'Дата',           key: 'date',     width: 12 },
+      { header: 'Дата',           key: 'date',     width: 12, style: { numFmt: 'DD.MM.YYYY' } },
       { header: 'Время',          key: 'time',     width: 10 },
       { header: 'Ячейка',         key: 'cell',     width: 16 },
       { header: 'ФИО нарушителя', key: 'violator', width: 28 },
@@ -154,7 +154,7 @@ async function generateReport1(complaints, companyFullNames, photoBaseUrl) {
         : '';
 
       const row = ws.addRow({
-        date:     formatDate(c.createdAt),
+        date:     c.createdAt ? new Date(c.createdAt) : '',
         time:     formatTime(c.createdAt),
         cell:     c.cell || '',
         violator: c.violator || '',
@@ -234,7 +234,7 @@ async function generateReport2(complaints, companyFullNames, fineAmount, employe
   // ── Лист «Анализ» ─────────────────────────────────────────────────────────
   const analysisWs = wb.addWorksheet('Анализ');
   analysisWs.columns = [
-    { header: 'Дата',                 key: 'date',       width: 14 },
+    { header: 'Дата',                 key: 'date',       width: 14, style: { numFmt: 'DD.MM.YYYY' } },
     { header: 'Компания',             key: 'company',    width: 34 },
     { header: 'Сотрудников',          key: 'employees',  width: 16 },
     { header: 'Количество ошибок',    key: 'violations', width: 20 },
@@ -285,7 +285,7 @@ async function generateReport2(complaints, companyFullNames, fineAmount, employe
         : '—';
 
       analysisWs.addRow({
-        date:       formatDate(dateStr + 'T00:00:00'),
+        date:       new Date(dateStr + 'T00:00:00'),
         company,
         employees,
         violations,
