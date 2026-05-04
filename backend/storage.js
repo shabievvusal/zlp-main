@@ -465,7 +465,7 @@ function buildSummaryFromItems(items, opts = {}) {
     const emp = item.executor || 'Неизвестно';
     addWeight(weightByEmployee, emp, grams, isKdk);
     if (getCompany) {
-      const c = getCompany(emp) || '—';
+      const c = getCompany(emp, item.executorId) || '—';
       addWeight(weightByCompany, c, grams, isKdk);
     }
     if (isKdk) totalWeightKdkGrams += grams;
@@ -570,7 +570,7 @@ function buildSummaryFromItems(items, opts = {}) {
 
   if (shift && dateStr) {
     const order = shift === 'night' ? NIGHT_HOURS_SUMMARY : DAY_HOURS_SUMMARY;
-    const resolveCompany = (name) => (getCompany && name ? (getCompany(name) || '—') : '—');
+    const resolveCompany = (name, executorId) => (getCompany && name ? (getCompany(name, executorId) || '—') : '—');
 
     const byEmployeeHour = new Map();
     for (const item of items) {
@@ -647,7 +647,7 @@ function buildSummaryFromItems(items, opts = {}) {
         total += sz;
       }
       const execInfo = byExecutor.get(name) || {};
-      heRows.push({ name, company: resolveCompany(name), byHour: byHourRow, weightByHour, byHourZone, byZone, total, firstAt: execInfo.firstAt || null, lastAt: execInfo.lastAt || null });
+      heRows.push({ name, company: resolveCompany(name, execInfo.executorId), byHour: byHourRow, weightByHour, byHourZone, byZone, total, firstAt: execInfo.firstAt || null, lastAt: execInfo.lastAt || null });
     }
 
     hourlyByEmployee = { hours: order, rows: heRows };
@@ -668,7 +668,7 @@ function buildSummaryFromItems(items, opts = {}) {
       const type = (item.operationType || '').toUpperCase();
       const isKdk = type === 'PICK_BY_LINE';
       if (!isKdk && type !== 'PIECE_SELECTION_PICKING') continue;
-      const c = resolveCompany(item.executor || 'Неизвестно');
+      const c = resolveCompany(item.executor || 'Неизвестно', item.executorId);
       if (!szByCompany.has(c)) szByCompany.set(c, { storage: 0, kdk: 0 });
       const entry = szByCompany.get(c);
       if (isKdk) entry.kdk += 1; else entry.storage += 1;

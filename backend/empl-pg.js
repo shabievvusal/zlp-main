@@ -21,17 +21,21 @@ const pool = new Pool({
 // ─── In-memory cache ───────────────────────────────────────────────────────────
 // Позволяет вызывать getEmplMapFioToCompany() синхронно во всех route-хэндлерах.
 
-let _cache = new Map(); // normFio → company
+let _cache   = new Map(); // normFio    → company
+let _idCache = new Map(); // executorId → company
 
 async function refreshCache() {
   try {
-    const { rows } = await pool.query('SELECT fio, company FROM employees');
-    const map = new Map();
+    const { rows } = await pool.query('SELECT executor_id, fio, company FROM employees');
+    const map   = new Map();
+    const idMap = new Map();
     for (const row of rows) {
       const key = normFio(row.fio);
       if (key && !map.has(key)) map.set(key, row.company || '');
+      if (row.executor_id) idMap.set(row.executor_id, row.company || '');
     }
-    _cache = map;
+    _cache   = map;
+    _idCache = idMap;
   } catch (err) {
     console.error('empl-pg refreshCache:', err.message);
   }
@@ -70,6 +74,13 @@ function normPkForRegistry(fio) {
 }
 
 // ─── Чтение ────────────────────────────────────────────────────────────────────
+
+/** Точный поиск компании по executorId (UUID). */
+function getCompanyById(executorId) {
+  if (!executorId) return null;
+  const c = _idCache.get(String(executorId).trim());
+  return c != null ? c : null;
+}
 
 /** Нечёткий поиск компании по ФИО (точное совпадение / подстрока) */
 function getCompanyByFio(emplMap, executorFio) {
@@ -211,4 +222,4 @@ async function saveAll(employees) {
   await refreshCache();
 }
 
-module.exports = { init, getEmplMapFioToCompany, getCompanyByFio, listEmployees, upsertEmployee, addNewEmployees, enrichNames, saveAll };
+module.exports = { init, getEmplMapFioToCompany, getCompanyById, getCompanyByFio, listEmployees, upsertEmployee, addNewEmployees, enrichNames, saveAll };

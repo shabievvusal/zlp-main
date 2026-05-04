@@ -834,6 +834,16 @@ function getCompanyByFio(emplMap, executorFio) {
   return null;
 }
 
+/** Приоритет: UUID → нечёткое ФИО. Используется везде, где доступен executorId. */
+function getCompanyByIdOrFio(executorId, executorFio) {
+  if (executorId && emplPg) {
+    const c = emplPg.getCompanyById(executorId);
+    if (c != null) return c;
+  }
+  const emplMap = getEmplMapFioToCompany();
+  return getCompanyByFio(emplMap, executorFio);
+}
+
 // Веса товаров из Excel для фронтенда (article -> grams)
 app.get('/api/product-weights', (req, res) => {
   try {
@@ -1725,7 +1735,7 @@ app.get('/api/date/:date/items', vsSessionOptional, (req, res) => {
       const emplMap = getEmplMapFioToCompany();
       const allowed = new Set(session.companyIds.map(c => c.trim().toLowerCase()));
       items = items.filter(it => {
-        const company = getCompanyByFio(emplMap, it.executor);
+        const company = getCompanyByIdOrFio(it.executorId, it.executor);
         return company && allowed.has(company.trim().toLowerCase());
       });
     }
@@ -1738,7 +1748,7 @@ app.get('/api/date/:date/items', vsSessionOptional, (req, res) => {
       const emplMapForItems = getEmplMapFioToCompany();
       const allowed = new Set(userForItems.visibleCompanies.map(c => c.trim().toLowerCase()));
       items = items.filter(it => {
-        const company = getCompanyByFio(emplMapForItems, it.executor);
+        const company = getCompanyByIdOrFio(it.executorId, it.executor);
         return company && allowed.has(company.trim().toLowerCase());
       });
     }
@@ -1769,8 +1779,7 @@ app.get('/api/date/:date/summary', vsSessionOptional, (req, res) => {
       }
       shift = session.shiftType;
     }
-    const emplMap = getEmplMapFioToCompany();
-    const getCompany = (fio) => getCompanyByFio(emplMap, fio);
+    const getCompany = (fio, id) => getCompanyByIdOrFio(id, fio);
     const userForSummary = session ? vsAuth.findUserByLogin(session.login) : null;
     const filterExecutorNorm = userForSummary?.selfOnly && userForSummary?.name
       ? normalizeFioForMatch(userForSummary.name)
@@ -1844,8 +1853,7 @@ app.get('/api/analysis/employee-rates', vsSessionOptional, (req, res) => {
     if (!dates.length) return res.status(400).json({ error: 'Неверный диапазон дат' });
 
     const totals = new Map(); // name -> { tasksCount, hoursWorked, peakPerHour, byZone }
-    const emplMap = getEmplMapFioToCompany();
-    const getCompany = (fio) => getCompanyByFio(emplMap, fio);
+    const getCompany = (fio, id) => getCompanyByIdOrFio(id, fio);
     const sessionForRates = req.vsSession;
     const userForRates = sessionForRates ? vsAuth.findUserByLogin(sessionForRates.login) : null;
     const filterExecutorNormRates = userForRates?.selfOnly && userForRates?.name
@@ -2213,8 +2221,7 @@ app.post('/api/consolidation/export/report1', vsSessionRequired, async (req, res
 app.post('/api/consolidation/export/report2', vsSessionRequired, async (req, res) => {
   try {
     const { dateFrom, dateTo, companyFullNames = {}, fineAmount = 0 } = req.body || {};
-    const emplMap = getEmplMapFioToCompany();
-    const getComp = fio => getCompanyByFio(emplMap, fio) || '—';
+    const getComp = (fio, id) => getCompanyByIdOrFio(id, fio) || '—';
 
     let list = loadComplaints().map(c => ({
       ...c,
@@ -2478,7 +2485,7 @@ function computeCompanyDay(dateStr, shift, getComp) {
     const isStorage = op === 'PIECE_SELECTION_PICKING';
     if (!isKdk && !isPallet && !isStorage) continue;
 
-    const company = getComp(item.executor);
+    const company = getComp(item.executor, item.executorId);
     const taskKey = isKdk
       ? `task|${item.executor||''}|${item.cell||''}|${item.nomenclatureCode||item.productName||''}`
       : `id|${item.id||''}`;
@@ -2518,8 +2525,7 @@ app.get('/api/stats/monthly-company', vsSessionRequired, (req, res) => {
     if (!year || !month || month < 1 || month > 12) {
       return res.status(400).json({ error: 'Нужны year и month (1–12)' });
     }
-    const emplMap  = getEmplMapFioToCompany();
-    const getComp  = fio => getCompanyByFio(emplMap, fio) || '—';
+    const getComp  = (fio, id) => getCompanyByIdOrFio(id, fio) || '—';
     const daysInMonth = new Date(year, month, 0).getDate();
     const todayStr = new Date().toISOString().slice(0, 10);
 
@@ -2577,6 +2583,68 @@ app.get('/api/stats/monthly-company', vsSessionRequired, (req, res) => {
     res.json({ year, month, daysInMonth, companies });
   } catch (err) {
     console.error('GET /api/stats/monthly-company', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/stats/monthly-employees — производительность по сотрудникам за месяц
+app.get('/api/stats/monthly-employees', vsSessionRequired, (req, res) => {
+  try {
+    const year  = parseInt(req.query.year,  10);
+    const month = parseInt(req.query.month, 10);
+    const shift = req.query.shift || null;
+    if (!year || !month || month < 1 || month > 12) {
+      return res.status(400).json({ error: 'Нужны year и month (1–12)' });
+    }
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const todayStr    = new Date().toISOString().slice(0, 10);
+    const rows = [];
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dateStr = `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+      if (dateStr > todayStr) continue;
+
+      const items = storage.getDateItems(dateStr, { shift: shift || undefined });
+      if (!items.length) continue;
+
+      const byEmpl = new Map(); // normFio → { name, executorId, taskKeys, firstAt, lastAt }
+      for (const item of items) {
+        const op = (item.operationType || '').toUpperCase();
+        const isKdk     = op === 'PICK_BY_LINE';
+        const isStorage = op === 'PIECE_SELECTION_PICKING';
+        if (!isKdk && !isStorage) continue;
+        const fio  = item.executor || 'Неизвестно';
+        const norm = normalizeFioForMatch(fio);
+        if (!byEmpl.has(norm)) byEmpl.set(norm, { name: fio, executorId: null, taskKeys: new Set(), firstAt: null, lastAt: null });
+        const e = byEmpl.get(norm);
+        if (!e.executorId && item.executorId) e.executorId = item.executorId;
+        const tk = isKdk
+          ? `task|${fio}|${item.cell||''}|${item.nomenclatureCode||item.productName||''}`
+          : `id|${item.id||''}`;
+        e.taskKeys.add(tk);
+        const ts = item.completedAt;
+        if (ts) {
+          if (!e.firstAt || ts < e.firstAt) e.firstAt = ts;
+          if (!e.lastAt  || ts > e.lastAt)  e.lastAt  = ts;
+        }
+      }
+
+      for (const e of byEmpl.values()) {
+        if (!e.taskKeys.size) continue;
+        rows.push({
+          date:    dateStr,
+          name:    e.name,
+          company: getCompanyByIdOrFio(e.executorId, e.name) || '—',
+          total:   e.taskKeys.size,
+          firstAt: e.firstAt,
+          lastAt:  e.lastAt,
+        });
+      }
+    }
+
+    res.json({ year, month, rows });
+  } catch (err) {
+    console.error('GET /api/stats/monthly-employees', err);
     res.status(500).json({ error: err.message });
   }
 });

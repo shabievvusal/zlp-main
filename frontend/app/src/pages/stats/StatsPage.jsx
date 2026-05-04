@@ -20,15 +20,16 @@ import CompanyFilter from './CompanyFilter.jsx'
 import HourlyChart from './HourlyChart.jsx'
 import CompanySummaryTable, { CompanySummaryToggle } from './CompanySummaryTable.jsx'
 import MonthlyCompanySummaryTable from './MonthlyCompanySummaryTable.jsx'
+import MonthlyEmployeeTable from './MonthlyEmployeeTable.jsx'
 import HourlyEmployeeTable from './HourlyEmployeeTable.jsx'
 import { Download } from 'lucide-react'
 import styles from './StatsPage.module.css'
 
 const HE_MODES = [
-  { key: 'sz',     label: 'По СЗ' },
-  { key: 'hourly', label: 'По часам' },
-  { key: 'zones',  label: 'По зонам' },
-  { key: 'idles',  label: 'Простои' },
+  { key: 'sz',      label: 'По СЗ' },
+  { key: 'hourly',  label: 'По часам' },
+  { key: 'monthly', label: 'За месяц' },
+  { key: 'idles',   label: 'Простои' },
 ]
 
 export default function StatsPage() {
@@ -540,7 +541,7 @@ export default function StatsPage() {
               type="button"
               className="btn btn-secondary btn-sm"
               onClick={handleExportHourly}
-              disabled={!hourlyByEmployee?.allRows?.length || heTableMode === 'zones' || heTableMode === 'idles'}
+              disabled={!hourlyByEmployee?.allRows?.length || heTableMode === 'monthly' || heTableMode === 'idles'}
               title="Выгрузить таблицу в Excel"
             >
               <Download size={13} strokeWidth={2} style={{marginRight:4}}/>XLSX
@@ -584,18 +585,20 @@ export default function StatsPage() {
             </label>
           </div>
         </div>
-        {hourlyByEmployee
-          ? <HourlyEmployeeTable
-              allRows={hourlyByEmployee.allRows}
-              hours={hourlyByEmployee.hours}
-              mode={heTableMode}
-              idlesByEmployee={idlesByEmployee}
-              weightByEmployee={weightByEmployee}
-              allowedIdleMinutes={allowedIdleMinutes}
-              shiftFilter={shiftFilter}
-              selectedDate={selectedDate}
-            />
-          : <div className={styles.emptyRow}>Нет данных</div>
+        {heTableMode === 'monthly'
+          ? <MonthlyEmployeeTable />
+          : hourlyByEmployee
+            ? <HourlyEmployeeTable
+                allRows={hourlyByEmployee.allRows}
+                hours={hourlyByEmployee.hours}
+                mode={heTableMode}
+                idlesByEmployee={idlesByEmployee}
+                weightByEmployee={weightByEmployee}
+                allowedIdleMinutes={allowedIdleMinutes}
+                shiftFilter={shiftFilter}
+                selectedDate={selectedDate}
+              />
+            : <div className={styles.emptyRow}>Нет данных</div>
         }
       </div>
     </div>
