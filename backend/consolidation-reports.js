@@ -142,8 +142,8 @@ async function generateReport1(complaints, companyFullNames, photoBaseUrl) {
       { header: 'Ячейка',         key: 'cell',     width: 16 },
       { header: 'ФИО нарушителя', key: 'violator', width: 28 },
       { header: 'Товар',          key: 'product',  width: 34 },
+      { header: 'Артикул',        key: 'article',  width: 18 },
       { header: 'Штрихкод',       key: 'barcode',  width: 18 },
-      { header: 'Статус',         key: 'status',   width: 14 },
       { header: 'Ссылка на фото', key: 'photoUrl', width: 48 },
     ];
 
@@ -159,8 +159,8 @@ async function generateReport1(complaints, companyFullNames, photoBaseUrl) {
         cell:     c.cell || '',
         violator: c.violator || '',
         product:  c.productName || '',
+        article:  c.nomenclatureCode || '',
         barcode:  c.barcode || '',
-        status:   formatStatus(c.status),
         photoUrl: url,
       });
 
@@ -242,13 +242,16 @@ async function generateReport2(complaints, companyFullNames, fineAmount, employe
     { header: 'Сумма штрафа, руб.',   key: 'fine',       width: 22 },
   ];
 
-  // violations per officialCompany per date
-  const vMap = new Map(); // `dateStr|official` -> count
+  // violations and unique violators per officialCompany per date
+  const vMap = new Map(); // `dateStr|official` -> violations count
+  const uMap = new Map(); // `dateStr|official` -> Set<violator fio>
   for (const c of found) {
     const official = resolveOfficialName(c.company, companyFullNames);
     const dateKey  = (c.createdAt || '').slice(0, 10);
     const key = `${dateKey}|${official}`;
     vMap.set(key, (vMap.get(key) || 0) + 1);
+    if (!uMap.has(key)) uMap.set(key, new Set());
+    uMap.get(key).add(c.violator);
   }
 
   // All official companies that appear anywhere in the data
@@ -276,8 +279,9 @@ async function generateReport2(complaints, companyFullNames, fineAmount, employe
       const violations = vMap.get(`${dateStr}|${company}`) || 0;
       if (employees === 0 && violations === 0) continue;
 
+      const uniqueViolators = uMap.get(`${dateStr}|${company}`)?.size || 0;
       const pct = employees > 0
-        ? `${(violations / employees * 100).toFixed(1)}%`
+        ? `${(uniqueViolators / employees * 100).toFixed(1)}%`
         : '—';
 
       analysisWs.addRow({
