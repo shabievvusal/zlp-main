@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import * as api from '../../api/index.js'
 import { ZONES } from '../../utils/statsCalc.js'
+import { Download } from 'lucide-react'
 import styles from './StatsPage.module.css'
 
 function getTodayStr() {
@@ -82,6 +83,77 @@ export default function MonthlyEmployeeTable() {
 
   const selectedZone = ZONES.find(z => z.key === zone)
 
+  async function handleExport() {
+    if (!sorted?.length) return
+    try {
+      const ExcelJS = (await import('exceljs')).default
+      const wb = new ExcelJS.Workbook()
+      wb.creator = 'ВС'; wb.created = new Date()
+      const ws = wb.addWorksheet('Производительность')
+
+      const HEADER_FILL = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A5F' } }
+      const TOTAL_FILL  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE5E7EB' } }
+      const BORDER = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } }
+      const ALIGN  = { horizontal: 'center', vertical: 'middle' }
+
+      const zoneLbl = selectedZone ? ` • ${selectedZone.label}` : ''
+      const shiftLbl = shift === 'night' ? ' • Ночь' : shift === 'day' ? ' • День' : ''
+      const title = `Производительность • ${fmtDate(loadedRange?.from)} — ${fmtDate(loadedRange?.to)}${zoneLbl}${shiftLbl}`
+
+      const NCOLS = 5
+      ws.addRow([title])
+      ws.mergeCells(1, 1, 1, NCOLS)
+      ws.getRow(1).getCell(1).style = {
+        font: { bold: true, size: 13, color: { argb: 'FFFFFFFF' } },
+        fill: HEADER_FILL,
+        alignment: { horizontal: 'left', vertical: 'middle' },
+      }
+      ws.getRow(1).height = 26
+
+      const headers = ['Компания', 'ФИО', 'Итого СЗ', 'СЗ/ч', 'СЗ/мин']
+      const hdrRow = ws.addRow(headers)
+      hdrRow.height = 20
+      hdrRow.eachCell(cell => {
+        cell.style = { font: { bold: true, color: { argb: 'FFFFFFFF' } }, fill: HEADER_FILL, border: BORDER, alignment: ALIGN }
+      })
+      ws.views = [{ state: 'frozen', ySplit: 2 }]
+
+      for (const r of sorted) {
+        const row = ws.addRow([
+          r.company || '—',
+          r.name,
+          r.total,
+          r.szPerHour ?? '',
+          r.szPerMin  ?? '',
+        ])
+        row.height = 18
+        row.eachCell({ includeEmpty: true }, (cell, cn) => {
+          cell.style = {
+            border: BORDER,
+            alignment: ALIGN,
+            ...(cn >= 3 ? { fill: TOTAL_FILL } : {}),
+          }
+        })
+      }
+
+      ws.getColumn(1).width = 22
+      ws.getColumn(2).width = 34
+      ws.getColumn(3).width = 12
+      ws.getColumn(4).width = 10
+      ws.getColumn(5).width = 10
+
+      const buf = await wb.xlsx.writeBuffer()
+      const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a'); a.href = url
+      const fname = `производительность_${loadedRange?.from}_${loadedRange?.to}${zone ? '_' + zone : ''}.xlsx`
+      a.download = fname; a.click()
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+    } catch (err) {
+      console.error('Ошибка экспорта:', err)
+    }
+  }
+
   return (
     <>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', flexWrap: 'wrap' }}>
@@ -114,6 +186,11 @@ export default function MonthlyEmployeeTable() {
         <button className="btn btn-secondary btn-sm"
           onClick={load} disabled={loading || !dateFrom || !dateTo}>
           {loading ? 'Загрузка...' : 'Загрузить'}
+        </button>
+        <button className="btn btn-secondary btn-sm"
+          onClick={handleExport} disabled={!sorted?.length}
+          title="Выгрузить в Excel">
+          <Download size={13} strokeWidth={2} style={{ marginRight: 4 }} />XLSX
         </button>
         {loadedRange && (
           <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>

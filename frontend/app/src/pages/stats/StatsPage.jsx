@@ -383,6 +383,102 @@ export default function StatsPage() {
     } catch (err) { notify('Ошибка экспорта: ' + err.message, 'error') }
   }, [hourlyByEmployee, heTableMode, shiftFilter, selectedDate, idlesByEmployee, weightByEmployee, allowedIdleMinutes, notify])
 
+  const handleExportIdles = useCallback(async () => {
+    if (!hourlyByEmployee?.allRows?.length) { notify('Нет данных для экспорта', 'info'); return }
+    try {
+      const ExcelJS = (await import('exceljs')).default
+      const wb = new ExcelJS.Workbook()
+      wb.creator = 'ВС'; wb.created = new Date()
+      const ws = wb.addWorksheet('Простои')
+
+      const HEADER_FILL = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A5F' } }
+      const BORDER = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } }
+      const ALIGN  = { horizontal: 'center', vertical: 'middle' }
+
+      const shiftLbl = shiftFilter === 'night' ? 'Ночная смена' : 'Дневная смена'
+      const dateLbl  = selectedDate ? selectedDate.split('-').reverse().join('.') : ''
+
+      const NCOLS = 11
+      ws.addRow([`Простои • ${dateLbl} • ${shiftLbl}`])
+      ws.mergeCells(1, 1, 1, NCOLS)
+      ws.getRow(1).getCell(1).style = {
+        font: { bold: true, size: 13, color: { argb: 'FFFFFFFF' } },
+        fill: HEADER_FILL,
+        alignment: { horizontal: 'left', vertical: 'middle' },
+      }
+      ws.getRow(1).height = 26
+
+      const hdrRow = ws.addRow(['Компания', 'Сотрудник', 'Простои, мин', 'Интервалы', 'Отработано', 'Итого СЗ', 'Старт', 'Пик', 'Вес ХР, кг', 'Вес КДК, кг', 'Вес итог, кг'])
+      hdrRow.height = 20
+      hdrRow.eachCell(cell => {
+        cell.style = { font: { bold: true, color: { argb: 'FFFFFFFF' } }, fill: HEADER_FILL, border: BORDER, alignment: ALIGN }
+      })
+      ws.views = [{ state: 'frozen', ySplit: 2 }]
+
+      const { startMs, endMs } = getShiftBoundaryMs(selectedDate, shiftFilter)
+      const nowMs = Date.now()
+      const shiftMinutes = !selectedDate ? 12 * 60
+        : nowMs <= startMs ? 0 : nowMs >= endMs ? 12 * 60 : Math.floor((nowMs - startMs) / 60000)
+
+      const fmtT  = iso => iso ? new Date(iso).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : '—'
+      const fmtMm = m => { const mm = Math.round(m || 0); return `${String(Math.floor(mm/60)).padStart(2,'0')}:${String(mm%60).padStart(2,'0')}` }
+      const wgKg  = g => { const v = Number(g) || 0; return v > 0 ? +(v/1000).toFixed(1) : '' }
+
+      const sortedRows = [...hourlyByEmployee.allRows].sort((a, b) => {
+        const ia = idlesByEmployee[a.name]
+        const ib = idlesByEmployee[b.name]
+        const ma = typeof ia === 'object' ? (Number(ia?.totalMinutes)||0) : 0
+        const mb = typeof ib === 'object' ? (Number(ib?.totalMinutes)||0) : 0
+        return mb - ma
+      })
+
+      for (const r of sortedRows) {
+        const idleData  = idlesByEmployee[r.name] || {}
+        const idleMin   = typeof idleData === 'object' ? (Number(idleData.totalMinutes)||0) : 0
+        const intervals = typeof idleData === 'object' ? (idleData.intervals || '') : String(idleData || '')
+        const hasIdle   = r.name in idlesByEmployee
+        const workedMin = hasIdle ? computeWorkedMinutesInShift(idleMin, allowedIdleMinutes, shiftMinutes) : null
+        const w = weightByEmployee[r.name] || { storage: 0, kdk: 0, total: 0 }
+
+        const row = ws.addRow([
+          r.company || '—',
+          r.name,
+          idleMin > 0 ? idleMin : '',
+          intervals || '',
+          workedMin != null ? fmtMm(workedMin) : '—',
+          r.total || 0,
+          fmtT(r.firstAt),
+          fmtT(r.lastAt),
+          wgKg(w.storage) || '',
+          wgKg(w.kdk) || '',
+          wgKg(w.total) || '',
+        ])
+        row.height = 18
+        row.eachCell({ includeEmpty: true }, (cell, cn) => {
+          cell.style = { border: BORDER, alignment: { ...ALIGN, wrapText: cn === 4 } }
+        })
+        if (idleMin >= 60) {
+          row.getCell(3).style = { ...row.getCell(3).style, fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFECACA' } } }
+        } else if (idleMin >= 30) {
+          row.getCell(3).style = { ...row.getCell(3).style, fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFEF08A' } } }
+        }
+      }
+
+      ws.getColumn(1).width = 20; ws.getColumn(2).width = 32; ws.getColumn(3).width = 14
+      ws.getColumn(4).width = 42; ws.getColumn(5).width = 12; ws.getColumn(6).width = 10
+      ws.getColumn(7).width = 10; ws.getColumn(8).width = 10
+      ws.getColumn(9).width = 12; ws.getColumn(10).width = 12; ws.getColumn(11).width = 12
+
+      const buf = await wb.xlsx.writeBuffer()
+      const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a'); a.href = url
+      a.download = `простои_${selectedDate || 'дата'}.xlsx`; a.click()
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+      notify('Файл .xlsx загружен', 'success')
+    } catch (err) { notify('Ошибка экспорта: ' + err.message, 'error') }
+  }, [hourlyByEmployee, shiftFilter, selectedDate, idlesByEmployee, weightByEmployee, allowedIdleMinutes, notify])
+
   const handleExportMissingWeight = useCallback(async () => {
     try {
       if (missingWeightItems.length || withWeightKeys.length) {
@@ -540,8 +636,8 @@ export default function StatsPage() {
             <button
               type="button"
               className="btn btn-secondary btn-sm"
-              onClick={handleExportHourly}
-              disabled={!hourlyByEmployee?.allRows?.length || heTableMode === 'monthly' || heTableMode === 'idles'}
+              onClick={heTableMode === 'idles' ? handleExportIdles : handleExportHourly}
+              disabled={!hourlyByEmployee?.allRows?.length || heTableMode === 'monthly'}
               title="Выгрузить таблицу в Excel"
             >
               <Download size={13} strokeWidth={2} style={{marginRight:4}}/>XLSX
