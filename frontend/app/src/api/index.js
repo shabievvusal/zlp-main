@@ -589,6 +589,20 @@ export async function getConsolidationComplaints() {
   return req('/api/consolidation/complaints')
 }
 
+export async function exportConsolidationReport(reportNum, { dateFrom, dateTo, companyFullNames, fineAmount }) {
+  const r = await fetch(`/api/consolidation/export/report${reportNum}`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ dateFrom, dateTo, companyFullNames: companyFullNames || {}, fineAmount: fineAmount || 0 }),
+  })
+  if (!r.ok) {
+    const data = await r.json().catch(() => ({}))
+    throw new Error(data.error || `HTTP ${r.status}`)
+  }
+  return r.blob()
+}
+
 export async function updateComplaintStatus(id, status) {
   return req(`/api/consolidation/complaints/${encodeURIComponent(id)}/status`, {
     method: 'PUT',

@@ -18,6 +18,7 @@ const rkStorage = process.env.USE_PG === 'true'
 const emplPg = process.env.USE_PG === 'true' ? require('./empl-pg') : null;
 const s3Storage = require('./s3');
 const excelReports = require('./excel-reports');
+const consolidationReports = require('./consolidation-reports');
 
 const app = express();
 app.use(cookieParser());
@@ -2175,6 +2176,84 @@ app.get('/api/consolidation/complaints', (req, res) => {
     }));
     res.json(enriched);
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/consolidation/export/report1 — детальный Excel (нарушения по компаниям)
+app.post('/api/consolidation/export/report1', vsSessionRequired, async (req, res) => {
+  try {
+    const { dateFrom, dateTo, companyFullNames = {} } = req.body || {};
+    const emplMap = getEmplMapFioToCompany();
+    let list = loadComplaints().map(c => ({
+      ...c,
+      company: (c.company != null && String(c.company).trim() !== '')
+        ? c.company
+        : (getCompanyByFio(emplMap, c.violator) || ''),
+    }));
+    if (dateFrom) list = list.filter(c => c.createdAt >= new Date(dateFrom).toISOString());
+    if (dateTo)   { const t = new Date(dateTo); t.setHours(23, 59, 59, 999); list = list.filter(c => c.createdAt <= t.toISOString()); }
+
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+    const host     = req.headers['x-forwarded-host']  || req.get('host');
+    const photoBaseUrl = `${protocol}://${host}/api/consolidation/uploads/`;
+
+    const buffer = await consolidationReports.generateReport1(list, companyFullNames, photoBaseUrl);
+    const fn = `Нарушения_${dateFrom || 'все'}_${dateTo || 'все'}.xlsx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(fn)}`);
+    res.send(Buffer.from(buffer));
+  } catch (err) {
+    console.error('POST /api/consolidation/export/report1', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/consolidation/export/report2 — сводный Excel (по компаниям + анализ)
+app.post('/api/consolidation/export/report2', vsSessionRequired, async (req, res) => {
+  try {
+    const { dateFrom, dateTo, companyFullNames = {}, fineAmount = 0 } = req.body || {};
+    const emplMap = getEmplMapFioToCompany();
+    const getComp = fio => getCompanyByFio(emplMap, fio) || '—';
+
+    let list = loadComplaints().map(c => ({
+      ...c,
+      company: (c.company != null && String(c.company).trim() !== '')
+        ? c.company
+        : (getCompanyByFio(emplMap, c.violator) || ''),
+    }));
+    if (dateFrom) list = list.filter(c => c.createdAt >= new Date(dateFrom).toISOString());
+    if (dateTo)   { const t = new Date(dateTo); t.setHours(23, 59, 59, 999); list = list.filter(c => c.createdAt <= t.toISOString()); }
+
+    // Строим массив дат диапазона для листа «Анализ»
+    const dateRange = [];
+    const cur = new Date(dateFrom || list.reduce((m, c) => c.createdAt < m ? c.createdAt : m, new Date().toISOString()).slice(0, 10));
+    const end = new Date(dateTo   || new Date().toISOString().slice(0, 10));
+    while (cur <= end) {
+      dateRange.push(cur.toISOString().slice(0, 10));
+      cur.setDate(cur.getDate() + 1);
+    }
+
+    // Получаем данные по выходу сотрудников за каждый день диапазона
+    const employeesByCompanyByDay = {};
+    for (const dateStr of dateRange) {
+      const dayData = computeCompanyDay(dateStr, null, getComp);
+      // dayData: { rawCompany: { employees: string[] } }
+      // Нормализуем: храним кол-во уникальных сотрудников
+      const normalized = {};
+      for (const [comp, dc] of Object.entries(dayData)) {
+        normalized[comp] = { employees: Array.isArray(dc.employees) ? dc.employees.length : 0 };
+      }
+      employeesByCompanyByDay[dateStr] = normalized;
+    }
+
+    const buffer = await consolidationReports.generateReport2(list, companyFullNames, fineAmount, employeesByCompanyByDay, dateRange);
+    const fn = `Сводка_нарушений_${dateFrom || 'все'}_${dateTo || 'все'}.xlsx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(fn)}`);
+    res.send(Buffer.from(buffer));
+  } catch (err) {
+    console.error('POST /api/consolidation/export/report2', err);
     res.status(500).json({ error: err.message });
   }
 });

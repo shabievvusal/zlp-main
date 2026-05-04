@@ -1,8 +1,29 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import * as api from '../../api/index.js'
 import { formatDateTime } from '../../utils/format.js'
-import { X, Search, Pencil, RefreshCw, Send, Printer } from 'lucide-react'
+import { X, Search, Pencil, RefreshCw, Send, Printer, Download } from 'lucide-react'
 import s from './ConsolidationPage.module.css'
+
+const LS_COMPANY_FULL_NAMES = 'sz_company_full_names'
+const LS_FINE_AMOUNT        = 'sz_fine_amount'
+
+function getCompanyFullNames() {
+  try { return JSON.parse(localStorage.getItem(LS_COMPANY_FULL_NAMES) || '{}') } catch { return {} }
+}
+function getFineAmount() {
+  try { const v = localStorage.getItem(LS_FINE_AMOUNT); return v ? Number(v) : 0 } catch { return 0 }
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url; a.download = filename; a.click()
+  URL.revokeObjectURL(url)
+}
+
+function getTodayStr() {
+  return new Date().toISOString().slice(0, 10)
+}
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -792,6 +813,31 @@ export default function ConsolidationPage() {
   const [loaded, setLoaded] = useState(false)
   const [photoModal, setPhotoModal] = useState({ open: false, urls: [], idx: 0 })
   const [editModal, setEditModal] = useState({ open: false, complaint: null })
+  const [exportModal, setExportModal] = useState(false)
+  const [exportFrom, setExportFrom] = useState(getTodayStr)
+  const [exportTo,   setExportTo]   = useState(getTodayStr)
+  const [exporting,  setExporting]  = useState(null) // null | 1 | 2
+
+  const handleExport = useCallback(async (reportNum) => {
+    setExporting(reportNum)
+    try {
+      const blob = await api.exportConsolidationReport(reportNum, {
+        dateFrom: exportFrom,
+        dateTo:   exportTo,
+        companyFullNames: getCompanyFullNames(),
+        fineAmount: getFineAmount(),
+      })
+      const suffix = `${exportFrom}_${exportTo}`
+      const name = reportNum === 1
+        ? `Нарушения_${suffix}.xlsx`
+        : `Сводка_нарушений_${suffix}.xlsx`
+      downloadBlob(blob, name)
+    } catch (err) {
+      alert('Ошибка экспорта: ' + err.message)
+    } finally {
+      setExporting(null)
+    }
+  }, [exportFrom, exportTo])
   const lookingUpRef = useRef(false)
 
   const load = useCallback(async () => {
@@ -952,7 +998,63 @@ export default function ConsolidationPage() {
 
   return (
     <div style={{ padding: 24 }}>
+
+      {/* Export modal */}
+      {exportModal && (
+        <div className={s.editModalOverlay} onClick={e => { if (e.target === e.currentTarget) setExportModal(false) }}>
+          <div className={s.editModalInner} style={{ maxWidth: 440 }}>
+            <div className={s.editHeader}>
+              <h3>Выгрузить отчёт по нарушениям</h3>
+              <button className={s.editClose} onClick={() => setExportModal(false)}><X size={16} strokeWidth={2}/></button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 13, whiteSpace: 'nowrap' }}>Период:</span>
+                <input
+                  type="date"
+                  className={s.dateInput}
+                  value={exportFrom}
+                  onChange={e => setExportFrom(e.target.value)}
+                />
+                <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>—</span>
+                <input
+                  type="date"
+                  className={s.dateInput}
+                  value={exportTo}
+                  onChange={e => setExportTo(e.target.value)}
+                />
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                Учитываются только нарушения с найденным нарушителем.<br/>
+                Официальные названия и сумма штрафа берутся из Настройки → Документы.
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <button
+                  className="btn btn-primary"
+                  disabled={!!exporting || !exportFrom || !exportTo}
+                  onClick={() => handleExport(1)}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
+                >
+                  <Download size={15} strokeWidth={2}/>
+                  {exporting === 1 ? 'Формирование...' : 'Отчёт 1 — Детальный (нарушения)'}
+                </button>
+                <button
+                  className="btn btn-secondary"
+                  disabled={!!exporting || !exportFrom || !exportTo}
+                  onClick={() => handleExport(2)}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}
+                >
+                  <Download size={15} strokeWidth={2}/>
+                  {exporting === 2 ? 'Формирование...' : 'Отчёт 2 — Сводный (штрафы + анализ)'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Toolbar */}
+
       <div className={s.toolbarWrap}>
         {/* Строка 1: основные действия */}
         <div className={s.toolbarRow}>
@@ -968,6 +1070,9 @@ export default function ConsolidationPage() {
             </button>
             <button className="btn btn-secondary btn-sm" style={{display:'inline-flex',alignItems:'center',gap:6}} onClick={handlePrintSz}>
               <Printer size={14} strokeWidth={2}/>Создать СЗ
+            </button>
+            <button className="btn btn-secondary btn-sm" style={{display:'inline-flex',alignItems:'center',gap:6}} onClick={() => setExportModal(true)}>
+              <Download size={14} strokeWidth={2}/>Выгрузить отчёт
             </button>
           </div>
           <div className={s.toolbarRight}>

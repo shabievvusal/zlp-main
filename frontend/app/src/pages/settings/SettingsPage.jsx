@@ -1664,11 +1664,15 @@ function AccessContent() {
 // ─── Docs card ────────────────────────────────────────────────────────────────
 
 const LS_COMPANY_FULL_NAMES = 'sz_company_full_names'
+const LS_FINE_AMOUNT = 'sz_fine_amount'
 
 function DocsCard() {
   const [companies, setCompanies] = useState([])
   const [fullNames, setFullNames] = useState(() => {
     try { return JSON.parse(localStorage.getItem(LS_COMPANY_FULL_NAMES) || '{}') } catch { return {} }
+  })
+  const [fineAmount, setFineAmountState] = useState(() => {
+    try { const v = localStorage.getItem(LS_FINE_AMOUNT); return v !== null ? v : '' } catch { return '' }
   })
 
   useEffect(() => {
@@ -1683,10 +1687,29 @@ function DocsCard() {
     })
   }
 
+  const handleFineChange = e => {
+    const val = e.target.value
+    setFineAmountState(val)
+    try { localStorage.setItem(LS_FINE_AMOUNT, val) } catch { /* ignore */ }
+  }
+
   return (
     <div className={s.card}>
       <div className={s.cardTitle}>Полные названия компаний</div>
-      <div className={s.cardSub}>Используются при печати служебных записок (СЗ)</div>
+      <div className={s.cardSub}>Используются при печати служебных записок (СЗ) и в отчётах по нарушениям</div>
+      <div className="form-group" style={{ marginBottom: 20 }}>
+        <label style={{ fontWeight: 600 }}>Сумма штрафа за одну ошибку, руб.</label>
+        <input
+          type="number"
+          min="0"
+          step="1"
+          className="form-control"
+          style={{ maxWidth: 200, marginTop: 6 }}
+          value={fineAmount}
+          onChange={handleFineChange}
+          placeholder="0"
+        />
+      </div>
       <div className={s.tableWrap}>
         <table className={s.table}>
           <thead>
