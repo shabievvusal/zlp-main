@@ -18,11 +18,17 @@ function fmtDate(d) {
   return `${day}.${m}.${y}`
 }
 
-function enrichRows(rows) {
+function getNumDays(from, to) {
+  if (!from || !to) return 1
+  return Math.max(1, Math.round((new Date(to) - new Date(from)) / 86400000) + 1)
+}
+
+function enrichRows(rows, numDays) {
+  const shiftMinutes = numDays * 12 * 60
   return rows.map(r => ({
     ...r,
-    szPerHour: r.workedMinutes > 0 ? +(r.total * 60 / r.workedMinutes).toFixed(1) : null,
-    szPerMin:  r.workedMinutes > 0 ? +(r.total / r.workedMinutes).toFixed(2) : null,
+    szPerHour: +(r.total * 60 / shiftMinutes).toFixed(1),
+    szPerMin:  +(r.total / shiftMinutes).toFixed(2),
   }))
 }
 
@@ -42,7 +48,7 @@ export default function MonthlyEmployeeTable({ exportRef }) {
     setLoading(true)
     try {
       const res = await api.getMonthlyEmployees(dateFrom, dateTo, shift || undefined, zone || undefined)
-      setRows(enrichRows(res.rows || []))
+      setRows(enrichRows(res.rows || [], getNumDays(dateFrom, dateTo)))
       setLoadedRange({ from: dateFrom, to: dateTo })
     } catch (e) {
       console.error(e)
@@ -69,13 +75,13 @@ export default function MonthlyEmployeeTable({ exportRef }) {
     return sortDir === 'asc' ? va - vb : vb - va
   }) : null
 
-  const th = (col, label, title) => (
-    <th
-      className={styles.tdCenter}
-      onClick={() => handleSort(col)}
-      style={{ cursor: 'pointer', whiteSpace: 'nowrap' }}
-      title={title}
-    >
+  const thLeft = (col, label, title) => (
+    <th onClick={() => handleSort(col)} style={{ cursor: 'pointer', whiteSpace: 'nowrap' }} title={title}>
+      {label}{arrow(col)}
+    </th>
+  )
+  const thRight = (col, label, title) => (
+    <th onClick={() => handleSort(col)} style={{ cursor: 'pointer', whiteSpace: 'nowrap', textAlign: 'right', width: '1%' }} title={title}>
       {label}{arrow(col)}
     </th>
   )
@@ -209,11 +215,11 @@ export default function MonthlyEmployeeTable({ exportRef }) {
           <table className={styles.table}>
             <thead>
               <tr>
-                {th('company',   'Компания', 'Компания-подрядчик')}
-                {th('name',      'ФИО',      'ФИО сотрудника')}
-                {th('total',     'Итого СЗ', 'Суммарное кол-во СЗ за период')}
-                {th('szPerHour', 'СЗ/ч',     'СЗ в час = Итого ÷ суммарное отработанное время (ч)')}
-                {th('szPerMin',  'СЗ/мин',   'СЗ в минуту = Итого ÷ суммарное отработанное время (мин)')}
+                {thLeft ('company',   'Компания', 'Компания-подрядчик')}
+                {thLeft ('name',      'ФИО',      'ФИО сотрудника')}
+                {thRight('total',     'Итого СЗ', 'Суммарное кол-во СЗ за период')}
+                {thRight('szPerHour', 'СЗ/ч',     'СЗ в час = Итого ÷ (кол-во дней × 12 ч)')}
+                {thRight('szPerMin',  'СЗ/мин',   'СЗ в минуту = Итого ÷ (кол-во дней × 720 мин)')}
               </tr>
             </thead>
             <tbody>
@@ -221,9 +227,9 @@ export default function MonthlyEmployeeTable({ exportRef }) {
                 <tr key={i}>
                   <td>{r.company}</td>
                   <td className={styles.tdBold}>{r.name}</td>
-                  <td className={styles.tdCenter}>{r.total}</td>
-                  <td className={styles.tdCenter}>{r.szPerHour ?? '—'}</td>
-                  <td className={styles.tdCenter}>{r.szPerMin  ?? '—'}</td>
+                  <td className={styles.tdRight} style={{ whiteSpace: 'nowrap' }}>{r.total}</td>
+                  <td className={styles.tdRight} style={{ whiteSpace: 'nowrap' }}>{r.szPerHour ?? '—'}</td>
+                  <td className={styles.tdRight} style={{ whiteSpace: 'nowrap' }}>{r.szPerMin  ?? '—'}</td>
                 </tr>
               ))}
             </tbody>
