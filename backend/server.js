@@ -776,6 +776,14 @@ function getDotnetArticleSpeedsCmd() {
   return null;
 }
 
+function getDotnetEmployeePerformanceCmd() {
+  const toolDll = path.join(__dirname, '..', 'tools', 'EmployeePerformance', 'bin', 'Release', 'net9.0', 'EmployeePerformance.dll');
+  if (fs.existsSync(toolDll)) return { exe: 'dotnet', args: [toolDll] };
+  const toolProj = path.join(__dirname, '..', 'tools', 'EmployeePerformance', 'EmployeePerformance.csproj');
+  if (fs.existsSync(toolProj)) return { exe: 'dotnet', args: ['run', '--project', toolProj, '--'] };
+  return null;
+}
+
 function readEmplCsvText() {
   const buf = fs.readFileSync(EMPL_CSV_PATH);
   // UTF-8 BOM (EF BB BF) — сохранено через /api/employees
@@ -2587,62 +2595,33 @@ app.get('/api/stats/monthly-company', vsSessionRequired, (req, res) => {
   }
 });
 
-// GET /api/stats/monthly-employees — производительность по сотрудникам за месяц
-app.get('/api/stats/monthly-employees', vsSessionRequired, (req, res) => {
+// GET /api/stats/monthly-employees — производительность по сотрудникам за период (.NET)
+// ?dateFrom=YYYY-MM-DD&dateTo=YYYY-MM-DD[&shift=day|night]
+app.get('/api/stats/monthly-employees', vsSessionRequired, async (req, res) => {
   try {
-    const year  = parseInt(req.query.year,  10);
-    const month = parseInt(req.query.month, 10);
-    const shift = req.query.shift || null;
-    if (!year || !month || month < 1 || month > 12) {
-      return res.status(400).json({ error: 'Нужны year и month (1–12)' });
+    const dateFrom = String(req.query.dateFrom || '').slice(0, 10);
+    const dateTo   = String(req.query.dateTo   || '').slice(0, 10);
+    const shift    = req.query.shift || null;
+    if (!dateFrom || !dateTo) {
+      return res.status(400).json({ error: 'Нужны dateFrom и dateTo (YYYY-MM-DD)' });
     }
-    const daysInMonth = new Date(year, month, 0).getDate();
-    const todayStr    = new Date().toISOString().slice(0, 10);
-    const rows = [];
+    const cmd = getDotnetEmployeePerformanceCmd();
+    if (!cmd) return res.status(500).json({ error: 'EmployeePerformance tool не найден' });
 
-    for (let day = 1; day <= daysInMonth; day++) {
-      const dateStr = `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
-      if (dateStr > todayStr) continue;
+    const cmdArgs = [...cmd.args, '--data-dir', DATA_DIR, '--date-from', dateFrom, '--date-to', dateTo];
+    if (shift) cmdArgs.push('--shift', shift);
 
-      const items = storage.getDateItems(dateStr, { shift: shift || undefined });
-      if (!items.length) continue;
+    const { stdout } = await execFileAsync(cmd.exe, cmdArgs, { maxBuffer: 32 * 1024 * 1024 });
+    const result = JSON.parse(stdout);
 
-      const byEmpl = new Map(); // normFio → { name, executorId, taskKeys, firstAt, lastAt }
-      for (const item of items) {
-        const op = (item.operationType || '').toUpperCase();
-        const isKdk     = op === 'PICK_BY_LINE';
-        const isStorage = op === 'PIECE_SELECTION_PICKING';
-        if (!isKdk && !isStorage) continue;
-        const fio  = item.executor || 'Неизвестно';
-        const norm = normalizeFioForMatch(fio);
-        if (!byEmpl.has(norm)) byEmpl.set(norm, { name: fio, executorId: null, taskKeys: new Set(), firstAt: null, lastAt: null });
-        const e = byEmpl.get(norm);
-        if (!e.executorId && item.executorId) e.executorId = item.executorId;
-        const tk = isKdk
-          ? `task|${fio}|${item.cell||''}|${item.nomenclatureCode||item.productName||''}`
-          : `id|${item.id||''}`;
-        e.taskKeys.add(tk);
-        const ts = item.completedAt;
-        if (ts) {
-          if (!e.firstAt || ts < e.firstAt) e.firstAt = ts;
-          if (!e.lastAt  || ts > e.lastAt)  e.lastAt  = ts;
-        }
-      }
-
-      for (const e of byEmpl.values()) {
-        if (!e.taskKeys.size) continue;
-        rows.push({
-          date:    dateStr,
-          name:    e.name,
-          company: getCompanyByIdOrFio(e.executorId, e.name) || '—',
-          total:   e.taskKeys.size,
-          firstAt: e.firstAt,
-          lastAt:  e.lastAt,
-        });
+    // Обогащаем компанией из БД (инструмент не имеет доступа к PostgreSQL)
+    if (Array.isArray(result.rows)) {
+      for (const row of result.rows) {
+        row.company = getCompanyByIdOrFio(row.executorId, row.name) || '—';
       }
     }
 
-    res.json({ year, month, rows });
+    res.json(result);
   } catch (err) {
     console.error('GET /api/stats/monthly-employees', err);
     res.status(500).json({ error: err.message });

@@ -1,10 +1,15 @@
 import { useState } from 'react'
 import * as api from '../../api/index.js'
+import { ZONES } from '../../utils/statsCalc.js'
 import styles from './StatsPage.module.css'
 
-function getDefaultMonth() {
+function getTodayStr() {
+  return new Date().toISOString().slice(0, 10)
+}
+
+function getMonthStartStr() {
   const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`
 }
 
 function fmtDate(d) {
@@ -14,34 +19,30 @@ function fmtDate(d) {
 }
 
 function enrichRows(rows) {
-  return rows.map(r => {
-    const firstMs = r.firstAt ? new Date(r.firstAt).getTime() : null
-    const lastMs  = r.lastAt  ? new Date(r.lastAt).getTime()  : null
-    const workedMin = (firstMs && lastMs && lastMs > firstMs) ? (lastMs - firstMs) / 60000 : null
-    return {
-      ...r,
-      workedMin,
-      szPerHour: workedMin ? +(r.total * 60 / workedMin).toFixed(1) : null,
-      szPerMin:  workedMin ? +(r.total / workedMin).toFixed(2) : null,
-    }
-  })
+  return rows.map(r => ({
+    ...r,
+    szPerHour: r.workedMinutes > 0 ? +(r.total * 60 / r.workedMinutes).toFixed(1) : null,
+    szPerMin:  r.workedMinutes > 0 ? +(r.total / r.workedMinutes).toFixed(2) : null,
+  }))
 }
 
 export default function MonthlyEmployeeTable() {
-  const [month,   setMonth]   = useState(getDefaultMonth)
-  const [shift,   setShift]   = useState('')
-  const [rows,    setRows]    = useState(null)
-  const [loading, setLoading] = useState(false)
-  const [sortCol, setSortCol] = useState('date')
-  const [sortDir, setSortDir] = useState('asc')
+  const [dateFrom,    setDateFrom]    = useState(getMonthStartStr)
+  const [dateTo,      setDateTo]      = useState(getTodayStr)
+  const [shift,       setShift]       = useState('')
+  const [rows,        setRows]        = useState(null)
+  const [loadedRange, setLoadedRange] = useState(null) // { from, to } после загрузки
+  const [loading,     setLoading]     = useState(false)
+  const [sortCol,     setSortCol]     = useState('total')
+  const [sortDir,     setSortDir]     = useState('desc')
 
   async function load() {
-    if (!month) return
-    const [year, mon] = month.split('-')
+    if (!dateFrom || !dateTo) return
     setLoading(true)
     try {
-      const res = await api.getMonthlyEmployees(year, mon, shift || undefined)
+      const res = await api.getMonthlyEmployees(dateFrom, dateTo, shift || undefined)
       setRows(enrichRows(res.rows || []))
+      setLoadedRange({ from: dateFrom, to: dateTo })
     } catch (e) {
       console.error(e)
     } finally {
@@ -51,29 +52,28 @@ export default function MonthlyEmployeeTable() {
 
   const handleSort = col => {
     if (sortCol === col) setSortDir(d => d === 'desc' ? 'asc' : 'desc')
-    else { setSortCol(col); setSortDir('asc') }
+    else { setSortCol(col); setSortDir(col === 'name' || col === 'company' ? 'asc' : 'desc') }
   }
 
   const arrow = col => sortCol === col ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ' ↕'
 
   const sorted = rows ? [...rows].sort((a, b) => {
     let va, vb
-    if      (sortCol === 'date')      { va = a.date;      vb = b.date }
-    else if (sortCol === 'company')   { va = a.company;   vb = b.company }
+    if      (sortCol === 'company')   { va = a.company;   vb = b.company }
     else if (sortCol === 'name')      { va = a.name;      vb = b.name }
     else if (sortCol === 'total')     { va = a.total;     vb = b.total }
     else if (sortCol === 'szPerHour') { va = a.szPerHour ?? -1; vb = b.szPerHour ?? -1 }
     else if (sortCol === 'szPerMin')  { va = a.szPerMin  ?? -1; vb = b.szPerMin  ?? -1 }
-    else return 0
+    else { va = a.byZone?.[sortCol] ?? -1; vb = b.byZone?.[sortCol] ?? -1 }
     if (typeof va === 'string') return sortDir === 'asc' ? va.localeCompare(vb, 'ru') : vb.localeCompare(va, 'ru')
     return sortDir === 'asc' ? va - vb : vb - va
   }) : null
 
-  const th = (col, label, title) => (
+  const th = (col, label, title, extraStyle) => (
     <th
       className={styles.tdCenter}
       onClick={() => handleSort(col)}
-      style={{ cursor: 'pointer', whiteSpace: 'nowrap' }}
+      style={{ cursor: 'pointer', whiteSpace: 'nowrap', ...extraStyle }}
       title={title}
     >
       {label}{arrow(col)}
@@ -83,59 +83,82 @@ export default function MonthlyEmployeeTable() {
   return (
     <>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', flexWrap: 'wrap' }}>
-        <input
-          type="month"
-          className={styles.selectControl}
-          style={{ fontSize: 13 }}
-          value={month}
-          onChange={e => setMonth(e.target.value)}
-        />
-        <select
-          className={styles.selectControl}
-          style={{ fontSize: 13 }}
-          value={shift}
-          onChange={e => setShift(e.target.value)}
-        >
+        <span style={{ fontSize: 12, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Период:</span>
+        <input type="date" className={styles.selectControl} style={{ fontSize: 13 }}
+          value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>—</span>
+        <input type="date" className={styles.selectControl} style={{ fontSize: 13 }}
+          value={dateTo} onChange={e => setDateTo(e.target.value)} />
+        <select className={styles.selectControl} style={{ fontSize: 13 }}
+          value={shift} onChange={e => setShift(e.target.value)}>
           <option value="">Все смены</option>
           <option value="day">День (9–21)</option>
           <option value="night">Ночь (21–9)</option>
         </select>
-        <button className="btn btn-secondary btn-sm" onClick={load} disabled={loading}>
-          {loading ? '...' : 'Загрузить'}
+        <button className="btn btn-secondary btn-sm"
+          onClick={load} disabled={loading || !dateFrom || !dateTo}>
+          {loading ? 'Загрузка...' : 'Загрузить'}
         </button>
-        {rows && <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{rows.length} строк</span>}
+        {loadedRange && (
+          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+            {fmtDate(loadedRange.from)} — {fmtDate(loadedRange.to)}
+            {rows ? ` · ${rows.length} сотрудников` : ''}
+          </span>
+        )}
       </div>
 
       {rows === null && (
-        <div className={styles.emptyRow}>Выберите месяц и нажмите «Загрузить»</div>
+        <div className={styles.emptyRow}>Выберите период и нажмите «Загрузить»</div>
       )}
-      {rows !== null && sorted.length === 0 && (
+      {rows !== null && (!sorted || sorted.length === 0) && (
         <div className={styles.emptyRow}>Нет данных за выбранный период</div>
       )}
-      {sorted !== null && sorted.length > 0 && (
+      {sorted && sorted.length > 0 && (
         <div className={styles.heScrollWrap}>
           <table className={styles.table}>
             <thead>
               <tr>
-                {th('date',      'Дата',     'Дата смены')}
                 {th('company',   'Компания', 'Компания-подрядчик')}
                 {th('name',      'ФИО',      'ФИО сотрудника')}
-                {th('total',     'Итого СЗ', 'Суммарное количество складских заданий за смену')}
-                {th('szPerHour', 'СЗ/ч',     'СЗ в час = Итого ÷ отработанное время (ч)')}
-                {th('szPerMin',  'СЗ/мин',   'СЗ в минуту = Итого ÷ отработанное время (мин)')}
+                {th('total',     'Итого СЗ', 'Суммарное кол-во СЗ за период')}
+                {th('szPerHour', 'СЗ/ч',     'СЗ в час = Итого ÷ суммарное отработанное время (ч)')}
+                {th('szPerMin',  'СЗ/мин',   'СЗ в минуту = Итого ÷ суммарное отработанное время (мин)')}
+                {ZONES.map(z => (
+                  <th key={z.key} className={styles.tdCenter}
+                    onClick={() => handleSort(z.key)}
+                    style={{ cursor: 'pointer', whiteSpace: 'nowrap', background: z.bg, color: z.text }}
+                    title={z.label}>
+                    {z.label}{arrow(z.key)}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {sorted.map((r, i) => (
-                <tr key={i}>
-                  <td className={styles.tdCenter}>{fmtDate(r.date)}</td>
-                  <td>{r.company}</td>
-                  <td className={styles.tdBold}>{r.name}</td>
-                  <td className={styles.tdCenter}>{r.total}</td>
-                  <td className={styles.tdCenter}>{r.szPerHour ?? '—'}</td>
-                  <td className={styles.tdCenter}>{r.szPerMin  ?? '—'}</td>
-                </tr>
-              ))}
+              {sorted.map((r, i) => {
+                const domZone = ZONES.reduce((best, z) => {
+                  const cnt = r.byZone?.[z.key] || 0
+                  return cnt > (best?.cnt || 0) ? { z, cnt } : best
+                }, null)
+                return (
+                  <tr key={i}>
+                    <td>{r.company}</td>
+                    <td className={styles.tdBold}>{r.name}</td>
+                    <td className={styles.tdCenter}>{r.total}</td>
+                    <td className={styles.tdCenter}>{r.szPerHour ?? '—'}</td>
+                    <td className={styles.tdCenter}>{r.szPerMin  ?? '—'}</td>
+                    {ZONES.map(z => {
+                      const cnt = r.byZone?.[z.key] || 0
+                      const isDom = domZone?.z?.key === z.key && cnt > 0
+                      return (
+                        <td key={z.key} className={styles.tdCenter}
+                          style={cnt > 0 ? { background: z.bg + (isDom ? '55' : '22'), color: isDom ? z.text : undefined } : {}}>
+                          {cnt > 0 ? cnt : '—'}
+                        </td>
+                      )
+                    })}
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>

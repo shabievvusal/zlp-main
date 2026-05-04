@@ -32,6 +32,9 @@ RUN dotnet publish SaveFetchedData/SaveFetchedData.csproj \
         --self-contained false && \
     dotnet publish ArticleSpeeds/ArticleSpeeds.csproj \
         -c Release -o /out/ArticleSpeeds \
+        --self-contained false && \
+    dotnet publish EmployeePerformance/EmployeePerformance.csproj \
+        -c Release -o /out/EmployeePerformance \
         --self-contained false
 
 
@@ -83,10 +86,11 @@ COPY --from=frontend-builder /build/dist ./frontend/app/dist/
 # ───────────────────────────────────────────────────────────────
 # .NET tools
 # ───────────────────────────────────────────────────────────────
-COPY --from=dotnet-builder /out/SaveFetchedData      ./tools/SaveFetchedData/bin/Release/net9.0/
-COPY --from=dotnet-builder /out/MissingWeightRebuild ./tools/MissingWeightRebuild/bin/Release/net9.0/
-COPY --from=dotnet-builder /out/WeightScan           ./tools/WeightScan/bin/Release/net9.0/
-COPY --from=dotnet-builder /out/ArticleSpeeds        ./tools/ArticleSpeeds/bin/Release/net9.0/
+COPY --from=dotnet-builder /out/SaveFetchedData       ./tools/SaveFetchedData/bin/Release/net9.0/
+COPY --from=dotnet-builder /out/MissingWeightRebuild  ./tools/MissingWeightRebuild/bin/Release/net9.0/
+COPY --from=dotnet-builder /out/WeightScan            ./tools/WeightScan/bin/Release/net9.0/
+COPY --from=dotnet-builder /out/ArticleSpeeds         ./tools/ArticleSpeeds/bin/Release/net9.0/
+COPY --from=dotnet-builder /out/EmployeePerformance   ./tools/EmployeePerformance/bin/Release/net9.0/
 
 
 # ───────────────────────────────────────────────────────────────
