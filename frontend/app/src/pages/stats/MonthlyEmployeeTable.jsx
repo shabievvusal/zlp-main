@@ -18,18 +18,22 @@ function fmtDate(d) {
   return `${day}.${m}.${y}`
 }
 
-function getNumDays(from, to) {
-  if (!from || !to) return 1
-  return Math.max(1, Math.round((new Date(to) - new Date(from)) / 86400000) + 1)
+function fmtWorked(min) {
+  if (!min || min <= 0) return '—'
+  const h = Math.floor(min / 60)
+  const m = Math.round(min % 60)
+  return h > 0 ? `${h}ч ${m}м` : `${m}м`
 }
 
-function enrichRows(rows, numDays) {
-  const shiftMinutes = numDays * 12 * 60
-  return rows.map(r => ({
-    ...r,
-    szPerHour: +(r.total * 60 / shiftMinutes).toFixed(1),
-    szPerMin:  +(r.total / shiftMinutes).toFixed(2),
-  }))
+function enrichRows(rows) {
+  return rows.map(r => {
+    const wm = r.workedMinutes || 0
+    return {
+      ...r,
+      szPerHour: wm > 0 ? +(r.total * 60 / wm).toFixed(1) : null,
+      szPerMin:  wm > 0 ? +(r.total / wm).toFixed(2)       : null,
+    }
+  })
 }
 
 export default function MonthlyEmployeeTable({ exportRef }) {
@@ -48,7 +52,7 @@ export default function MonthlyEmployeeTable({ exportRef }) {
     setLoading(true)
     try {
       const res = await api.getMonthlyEmployees(dateFrom, dateTo, shift || undefined, zone || undefined)
-      setRows(enrichRows(res.rows || [], getNumDays(dateFrom, dateTo)))
+      setRows(enrichRows(res.rows || []))
       setLoadedRange({ from: dateFrom, to: dateTo })
     } catch (e) {
       console.error(e)
@@ -59,18 +63,21 @@ export default function MonthlyEmployeeTable({ exportRef }) {
 
   const handleSort = col => {
     if (sortCol === col) setSortDir(d => d === 'desc' ? 'asc' : 'desc')
-    else { setSortCol(col); setSortDir(col === 'name' || col === 'company' ? 'asc' : 'desc') }
+    else { setSortCol(col); setSortDir(col === 'name' || col === 'company' || col === 'date' ? 'asc' : 'desc') }
   }
 
   const arrow = col => sortCol === col ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ' ↕'
 
   const sorted = rows ? [...rows].sort((a, b) => {
     let va, vb
-    if      (sortCol === 'company')   { va = a.company;   vb = b.company }
+    if      (sortCol === 'date')      { va = a.date;      vb = b.date }
+    else if (sortCol === 'company')   { va = a.company;   vb = b.company }
     else if (sortCol === 'name')      { va = a.name;      vb = b.name }
     else if (sortCol === 'total')     { va = a.total;     vb = b.total }
-    else if (sortCol === 'szPerHour') { va = a.szPerHour ?? -1; vb = b.szPerHour ?? -1 }
-    else                              { va = a.szPerMin  ?? -1; vb = b.szPerMin  ?? -1 }
+    else if (sortCol === 'szPerHour') { va = a.szPerHour ?? -1;       vb = b.szPerHour ?? -1 }
+    else if (sortCol === 'szPerMin')  { va = a.szPerMin  ?? -1;       vb = b.szPerMin  ?? -1 }
+    else if (sortCol === 'worked')    { va = a.workedMinutes ?? 0;    vb = b.workedMinutes ?? 0 }
+    else                              { va = a.total;                 vb = b.total }
     if (typeof va === 'string') return sortDir === 'asc' ? va.localeCompare(vb, 'ru') : vb.localeCompare(va, 'ru')
     return sortDir === 'asc' ? va - vb : vb - va
   }) : null
@@ -109,7 +116,7 @@ export default function MonthlyEmployeeTable({ exportRef }) {
       const shiftLbl = shift === 'night' ? ' • Ночь' : shift === 'day' ? ' • День' : ''
       const title = `Производительность • ${fmtDate(loadedRange?.from)} — ${fmtDate(loadedRange?.to)}${zoneLbl}${shiftLbl}`
 
-      const NCOLS = 5
+      const NCOLS = 7
       ws.addRow([title])
       ws.mergeCells(1, 1, 1, NCOLS)
       ws.getRow(1).getCell(1).style = {
@@ -119,7 +126,7 @@ export default function MonthlyEmployeeTable({ exportRef }) {
       }
       ws.getRow(1).height = 26
 
-      const headers = ['Компания', 'ФИО', 'Итого СЗ', 'СЗ/ч', 'СЗ/мин']
+      const headers = ['Дата', 'Компания', 'ФИО', 'Итого СЗ', 'В работе', 'СЗ/ч', 'СЗ/мин']
       const hdrRow = ws.addRow(headers)
       hdrRow.height = 20
       hdrRow.eachCell(cell => {
@@ -129,9 +136,11 @@ export default function MonthlyEmployeeTable({ exportRef }) {
 
       for (const r of sorted) {
         const row = ws.addRow([
+          fmtDate(r.date),
           r.company || '—',
           r.name,
           r.total,
+          fmtWorked(r.workedMinutes),
           r.szPerHour ?? '',
           r.szPerMin  ?? '',
         ])
@@ -140,16 +149,18 @@ export default function MonthlyEmployeeTable({ exportRef }) {
           cell.style = {
             border: BORDER,
             alignment: ALIGN,
-            ...(cn >= 3 ? { fill: TOTAL_FILL } : {}),
+            ...(cn >= 4 ? { fill: TOTAL_FILL } : {}),
           }
         })
       }
 
-      ws.getColumn(1).width = 22
-      ws.getColumn(2).width = 34
-      ws.getColumn(3).width = 12
-      ws.getColumn(4).width = 10
-      ws.getColumn(5).width = 10
+      ws.getColumn(1).width = 12
+      ws.getColumn(2).width = 22
+      ws.getColumn(3).width = 34
+      ws.getColumn(4).width = 12
+      ws.getColumn(5).width = 11
+      ws.getColumn(6).width = 10
+      ws.getColumn(7).width = 10
 
       const buf = await wb.xlsx.writeBuffer()
       const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
@@ -199,7 +210,7 @@ export default function MonthlyEmployeeTable({ exportRef }) {
         {loadedRange && (
           <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
             {fmtDate(loadedRange.from)} — {fmtDate(loadedRange.to)}
-            {rows ? ` · ${rows.length} сотрудников` : ''}
+            {rows ? ` · ${rows.length} строк` : ''}
           </span>
         )}
       </div>
@@ -215,19 +226,23 @@ export default function MonthlyEmployeeTable({ exportRef }) {
           <table className={styles.table}>
             <thead>
               <tr>
+                {thLeft ('date',      'Дата',     'Дата смены')}
                 {thLeft ('company',   'Компания', 'Компания-подрядчик')}
                 {thLeft ('name',      'ФИО',      'ФИО сотрудника')}
-                {thRight('total',     'Итого СЗ', 'Суммарное кол-во СЗ за период')}
-                {thRight('szPerHour', 'СЗ/ч',     'СЗ в час = Итого ÷ (кол-во дней × 12 ч)')}
-                {thRight('szPerMin',  'СЗ/мин',   'СЗ в минуту = Итого ÷ (кол-во дней × 720 мин)')}
+                {thRight('total',     'Итого СЗ', 'Суммарное кол-во СЗ за смену')}
+                {thRight('worked',    'В работе', 'Время от первой до последней операции')}
+                {thRight('szPerHour', 'СЗ/ч',     'СЗ в час = Итого ÷ время в работе')}
+                {thRight('szPerMin',  'СЗ/мин',   'СЗ в минуту = Итого ÷ время в работе')}
               </tr>
             </thead>
             <tbody>
               {sorted.map((r, i) => (
                 <tr key={i}>
+                  <td style={{ whiteSpace: 'nowrap' }}>{fmtDate(r.date)}</td>
                   <td>{r.company}</td>
                   <td className={styles.tdBold}>{r.name}</td>
                   <td className={styles.tdRight} style={{ whiteSpace: 'nowrap' }}>{r.total}</td>
+                  <td className={styles.tdRight} style={{ whiteSpace: 'nowrap' }}>{fmtWorked(r.workedMinutes)}</td>
                   <td className={styles.tdRight} style={{ whiteSpace: 'nowrap' }}>{r.szPerHour ?? '—'}</td>
                   <td className={styles.tdRight} style={{ whiteSpace: 'nowrap' }}>{r.szPerMin  ?? '—'}</td>
                 </tr>

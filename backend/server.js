@@ -2613,7 +2613,7 @@ app.get('/api/stats/monthly-employees', vsSessionRequired, (req, res) => {
     const end = new Date(dateTo   + 'T12:00:00Z');
     while (cur <= end) { dates.push(cur.toISOString().slice(0, 10)); cur.setUTCDate(cur.getUTCDate() + 1); }
 
-    const byEmployee = new Map(); // normKey -> { name, executorId, total, workedMinutes }
+    const allRows = [];
 
     for (const dateStr of dates) {
       const opts = shift ? { shift } : {};
@@ -2661,7 +2661,7 @@ app.get('/api/stats/monthly-employees', vsSessionRequired, (req, res) => {
         }
       }
 
-      for (const [normKey, emp] of dayMap) {
+      for (const [, emp] of dayMap) {
         let kdkCount = 0;
         for (const set of emp.hourMap.values()) kdkCount += set.size;
         const total = kdkCount + emp.storageCount;
@@ -2670,27 +2670,20 @@ app.get('/api/stats/monthly-employees', vsSessionRequired, (req, res) => {
         const workedMin = (emp.firstAt && emp.lastAt && emp.lastAt > emp.firstAt)
           ? (new Date(emp.lastAt) - new Date(emp.firstAt)) / 60000 : 0;
 
-        if (!byEmployee.has(normKey))
-          byEmployee.set(normKey, { name: emp.name, executorId: emp.executorId, total: 0, workedMinutes: 0 });
-        const es = byEmployee.get(normKey);
-        if (!es.executorId && emp.executorId) es.executorId = emp.executorId;
-        es.total         += total;
-        es.workedMinutes += workedMin;
+        allRows.push({
+          date:          dateStr,
+          name:          emp.name,
+          executorId:    emp.executorId,
+          total,
+          workedMinutes: Math.round(workedMin * 10) / 10,
+          company:       getCompanyByIdOrFio(emp.executorId, emp.name) || '—',
+        });
       }
     }
 
-    const rows = [...byEmployee.values()]
-      .filter(es => es.total > 0)
-      .sort((a, b) => b.total - a.total)
-      .map(es => ({
-        name:          es.name,
-        executorId:    es.executorId,
-        total:         es.total,
-        workedMinutes: Math.round(es.workedMinutes * 10) / 10,
-        company:       getCompanyByIdOrFio(es.executorId, es.name) || '—',
-      }));
+    allRows.sort((a, b) => a.date.localeCompare(b.date) || b.total - a.total);
 
-    res.json({ ok: true, dateFrom, dateTo, zone: zoneFilter, count: rows.length, rows });
+    res.json({ ok: true, dateFrom, dateTo, zone: zoneFilter, count: allRows.length, rows: allRows });
   } catch (err) {
     console.error('GET /api/stats/monthly-employees', err);
     res.status(500).json({ error: err.message });
