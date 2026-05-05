@@ -86,6 +86,24 @@ export default function MonthlyEmployeeTable({ exportRef }) {
     return sortDir === 'asc' ? va - vb : vb - va
   }) : null
 
+  const avg = sorted && sorted.length > 0 ? (() => {
+    const n = sorted.length
+    const avgTotal    = +(sorted.reduce((s, r) => s + r.total, 0) / n).toFixed(1)
+    const withHour    = sorted.filter(r => r.szPerHour != null)
+    const withMin     = sorted.filter(r => r.szPerMin  != null)
+    const avgSzPerHour = withHour.length ? +(withHour.reduce((s, r) => s + r.szPerHour, 0) / withHour.length).toFixed(1) : null
+    const avgSzPerMin  = withMin.length  ? +(withMin.reduce((s, r)  => s + r.szPerMin,  0) / withMin.length).toFixed(2)  : null
+    return { avgTotal, avgSzPerHour, avgSzPerMin }
+  })() : null
+
+  const avgChipStyle = {
+    display: 'flex', flexDirection: 'column', alignItems: 'center',
+    background: 'var(--bg-secondary, #f3f4f6)', borderRadius: 8,
+    padding: '4px 14px', minWidth: 80,
+  }
+  const avgLabelStyle = { fontSize: 11, color: 'var(--text-muted)', whiteSpace: 'nowrap' }
+  const avgValStyle   = { fontSize: 16, fontWeight: 600, color: 'var(--text)' }
+
   const thLeft = (col, label, title) => (
     <th onClick={() => handleSort(col)} style={{ cursor: 'pointer', whiteSpace: 'nowrap' }} title={title}>
       {label}{arrow(col)}
@@ -121,6 +139,9 @@ export default function MonthlyEmployeeTable({ exportRef }) {
       const title = `Производительность • ${fmtDate(loadedRange?.from)} — ${fmtDate(loadedRange?.to)}${zoneLbl}${shiftLbl}`
 
       const NCOLS = 7
+      const AVG_FILL = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDBEAFE' } }
+
+      // Строка 1: заголовок таблицы (A1:G1) + средние справа (I1:J1 labels, K1 values)
       ws.addRow([title])
       ws.mergeCells(1, 1, 1, NCOLS)
       ws.getRow(1).getCell(1).style = {
@@ -130,6 +151,18 @@ export default function MonthlyEmployeeTable({ exportRef }) {
       }
       ws.getRow(1).height = 26
 
+      // Средние — правее таблицы, начиная с колонки 9 (I)
+      const avgLabels = ['Ср. СЗ', 'Ср. СЗ/ч', 'Ср. СЗ/мин']
+      const avgValues = [avg?.avgTotal ?? '', avg?.avgSzPerHour ?? '', avg?.avgSzPerMin ?? '']
+      avgLabels.forEach((lbl, i) => {
+        const labelCell = ws.getRow(1).getCell(9 + i * 2)
+        labelCell.value = lbl
+        labelCell.style = { font: { bold: true, size: 11 }, fill: AVG_FILL, border: BORDER, alignment: ALIGN }
+        const valCell = ws.getRow(1).getCell(10 + i * 2)
+        valCell.value = avgValues[i]
+        valCell.style = { font: { bold: true, size: 13 }, fill: AVG_FILL, border: BORDER, alignment: ALIGN }
+      })
+
       const headers = ['Дата', 'Компания', 'ФИО', 'Итого СЗ', 'В работе', 'СЗ/ч', 'СЗ/мин']
       const hdrRow = ws.addRow(headers)
       hdrRow.height = 20
@@ -137,6 +170,14 @@ export default function MonthlyEmployeeTable({ exportRef }) {
         cell.style = { font: { bold: true, color: { argb: 'FFFFFFFF' } }, fill: HEADER_FILL, border: BORDER, alignment: ALIGN }
       })
       ws.views = [{ state: 'frozen', ySplit: 2 }]
+
+      // Ширины колонок средних
+      ws.getColumn(9).width  = 12
+      ws.getColumn(10).width = 10
+      ws.getColumn(11).width = 12
+      ws.getColumn(12).width = 10
+      ws.getColumn(13).width = 14
+      ws.getColumn(14).width = 10
 
       for (const r of sorted) {
         const row = ws.addRow([
@@ -224,6 +265,22 @@ export default function MonthlyEmployeeTable({ exportRef }) {
       )}
       {rows !== null && (!sorted || sorted.length === 0) && (
         <div className={styles.emptyRow}>Нет данных за выбранный период</div>
+      )}
+      {avg && (
+        <div style={{ display: 'flex', gap: 8, padding: '6px 12px', flexWrap: 'wrap' }}>
+          <div style={avgChipStyle}>
+            <span style={avgLabelStyle}>Ср. СЗ</span>
+            <span style={avgValStyle}>{avg.avgTotal}</span>
+          </div>
+          <div style={avgChipStyle}>
+            <span style={avgLabelStyle}>Ср. СЗ/ч</span>
+            <span style={avgValStyle}>{avg.avgSzPerHour ?? '—'}</span>
+          </div>
+          <div style={avgChipStyle}>
+            <span style={avgLabelStyle}>Ср. СЗ/мин</span>
+            <span style={avgValStyle}>{avg.avgSzPerMin ?? '—'}</span>
+          </div>
+        </div>
       )}
       {sorted && sorted.length > 0 && (
         <div className={styles.heScrollWrap}>
