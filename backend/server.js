@@ -2623,8 +2623,8 @@ app.get('/api/stats/monthly-employees', vsSessionRequired, (req, res) => {
       const dayMap = new Map(); // normKey -> { name, executorId, hourMap, storageCount, timestamps[] }
 
       for (const item of items) {
-        const opType   = (item.operationType || '').toUpperCase();
-        const isKdk    = opType === 'PICK_BY_LINE';
+        const opType    = (item.operationType || '').toUpperCase();
+        const isKdk     = opType === 'PICK_BY_LINE';
         const isStorage = opType === 'PIECE_SELECTION_PICKING';
         if (!isKdk && !isStorage) continue;
 
@@ -2644,14 +2644,14 @@ app.get('/api/stats/monthly-employees', vsSessionRequired, (req, res) => {
         const emp = dayMap.get(normKey);
         if (!emp.executorId && executorId) emp.executorId = executorId;
 
-        const ts = item.completedAt;
+        const ts  = item.completedAt;
+        const col = ts ? ((new Date(ts).getHours() + 1) % 24) : -1;
         if (ts) emp.timestamps.push(new Date(ts).getTime());
 
         if (isStorage) {
           emp.storageCount++;
         } else {
           // KDK: дедуп по {product}||{cell} на час — идентично calcHourlyByEmployee
-          const col     = ts ? ((new Date(ts).getHours() + 1) % 24) : -1;
           const product = item.nomenclatureCode || item.productName || '';
           const cell    = item.cell || '';
           if (!emp.hourMap.has(col)) emp.hourMap.set(col, new Set());
@@ -2665,7 +2665,7 @@ app.get('/api/stats/monthly-employees', vsSessionRequired, (req, res) => {
         const total = kdkCount + emp.storageCount;
         if (total === 0) continue;
 
-        let workedMin = 0;
+        let workedMinutes = 0;
         if (emp.timestamps.length > 1) {
           const times = emp.timestamps.slice().sort((a, b) => a - b);
           let idleMs = 0;
@@ -2673,16 +2673,16 @@ app.get('/api/stats/monthly-employees', vsSessionRequired, (req, res) => {
             const gap = times[i] - times[i - 1];
             if (gap >= IDLE_THRESHOLD_MS) idleMs += gap;
           }
-          workedMin = Math.max(0, (times[times.length - 1] - times[0]) - idleMs) / 60000;
+          workedMinutes = Math.max(0, (times[times.length - 1] - times[0]) - idleMs) / 60000;
         }
 
         allRows.push({
-          date:          dateStr,
-          name:          emp.name,
-          executorId:    emp.executorId,
+          date:         dateStr,
+          name:         emp.name,
+          executorId:   emp.executorId,
           total,
-          workedMinutes: Math.round(workedMin * 10) / 10,
-          company:       getCompanyByIdOrFio(emp.executorId, emp.name) || '—',
+          workedMinutes: Math.round(workedMinutes * 10) / 10,
+          company:      getCompanyByIdOrFio(emp.executorId, emp.name) || '—',
         });
       }
     }

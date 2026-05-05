@@ -20,9 +20,13 @@ function fmtDate(d) {
 
 function fmtWorked(min) {
   if (!min || min <= 0) return '—'
-  const h = Math.floor(min / 60)
-  const m = Math.round(min % 60)
-  return h > 0 ? `${h}ч ${m}м` : `${m}м`
+  const totalSec = Math.round(min * 60)
+  const h = Math.floor(totalSec / 3600)
+  const m = Math.floor((totalSec % 3600) / 60)
+  const s = totalSec % 60
+  if (h > 0) return `${h}ч ${m}м ${s}с`
+  if (m > 0) return `${m}м ${s}с`
+  return `${s}с`
 }
 
 function enrichRows(rows) {
@@ -230,9 +234,9 @@ export default function MonthlyEmployeeTable({ exportRef }) {
                 {thLeft ('company',   'Компания', 'Компания-подрядчик')}
                 {thLeft ('name',      'ФИО',      'ФИО сотрудника')}
                 {thRight('total',     'Итого СЗ', 'Суммарное кол-во СЗ за смену')}
-                {thRight('worked',    'В работе', 'Время от первой до последней операции')}
-                {thRight('szPerHour', 'СЗ/ч',     'СЗ в час = Итого ÷ время в работе')}
-                {thRight('szPerMin',  'СЗ/мин',   'СЗ в минуту = Итого ÷ время в работе')}
+                {thRight('worked',    'В работе', 'Время в работе (span − простои ≥ 5 мин)')}
+                {thRight('szPerHour', 'СЗ/ч',    'СЗ в час = Итого ÷ время в работе')}
+                {thRight('szPerMin',  'СЗ/мин',  'СЗ в минуту = Итого ÷ время в работе')}
               </tr>
             </thead>
             <tbody>
