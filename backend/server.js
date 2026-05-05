@@ -2186,10 +2186,15 @@ app.get('/api/consolidation/complaints', (req, res) => {
   try {
     const list = loadComplaints();
     const emplMap = getEmplMapFioToCompany();
-    const enriched = list.map(c => ({
-      ...c,
-      company: (c.company != null && String(c.company).trim() !== '') ? c.company : (getCompanyByFio(emplMap, c.violator) || ''),
-    }));
+    let changed = false;
+    const enriched = list.map(c => {
+      if (c.company != null && String(c.company).trim() !== '') return c;
+      const resolved = getCompanyByFio(emplMap, c.violator) || '';
+      if (!resolved) return c;
+      changed = true;
+      return { ...c, company: resolved };
+    });
+    if (changed) saveComplaints(enriched);
     res.json(enriched);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -2229,6 +2234,7 @@ app.post('/api/consolidation/export/report1', vsSessionRequired, async (req, res
 app.post('/api/consolidation/export/report2', vsSessionRequired, async (req, res) => {
   try {
     const { dateFrom, dateTo, companyFullNames = {}, fineAmount = 0 } = req.body || {};
+    const emplMap = getEmplMapFioToCompany();
     const getComp = (fio, id) => getCompanyByIdOrFio(id, fio) || '—';
 
     let list = loadComplaints().map(c => ({
