@@ -2595,35 +2595,102 @@ app.get('/api/stats/monthly-company', vsSessionRequired, (req, res) => {
   }
 });
 
-// GET /api/stats/monthly-employees — производительность по сотрудникам за период (.NET)
-// ?dateFrom=YYYY-MM-DD&dateTo=YYYY-MM-DD[&shift=day|night]
-app.get('/api/stats/monthly-employees', vsSessionRequired, async (req, res) => {
+// GET /api/stats/monthly-employees — производительность по сотрудникам за период (JS)
+// ?dateFrom=YYYY-MM-DD&dateTo=YYYY-MM-DD[&shift=day|night][&zone=HH|KDH|...]
+app.get('/api/stats/monthly-employees', vsSessionRequired, (req, res) => {
   try {
-    const dateFrom = String(req.query.dateFrom || '').slice(0, 10);
-    const dateTo   = String(req.query.dateTo   || '').slice(0, 10);
-    const shift    = req.query.shift || null;
-    const zone     = req.query.zone  || null;
+    const dateFrom  = String(req.query.dateFrom || '').slice(0, 10);
+    const dateTo    = String(req.query.dateTo   || '').slice(0, 10);
+    const shift     = (req.query.shift === 'day' || req.query.shift === 'night') ? req.query.shift : null;
+    const zoneFilter = (req.query.zone || '').toUpperCase();
     if (!dateFrom || !dateTo) {
       return res.status(400).json({ error: 'Нужны dateFrom и dateTo (YYYY-MM-DD)' });
     }
-    const cmd = getDotnetEmployeePerformanceCmd();
-    if (!cmd) return res.status(500).json({ error: 'EmployeePerformance tool не найден' });
 
-    const cmdArgs = [...cmd.args, '--data-dir', DATA_DIR, '--date-from', dateFrom, '--date-to', dateTo];
-    if (shift) cmdArgs.push('--shift', shift);
-    if (zone)  cmdArgs.push('--zone',  zone);
+    // Строим список дат
+    const dates = [];
+    let cur = new Date(dateFrom + 'T12:00:00Z');
+    const end = new Date(dateTo   + 'T12:00:00Z');
+    while (cur <= end) { dates.push(cur.toISOString().slice(0, 10)); cur.setUTCDate(cur.getUTCDate() + 1); }
 
-    const { stdout } = await execFileAsync(cmd.exe, cmdArgs, { maxBuffer: 32 * 1024 * 1024 });
-    const result = JSON.parse(stdout);
+    const byEmployee = new Map(); // normKey -> { name, executorId, total, workedMinutes }
 
-    // Обогащаем компанией из БД (инструмент не имеет доступа к PostgreSQL)
-    if (Array.isArray(result.rows)) {
-      for (const row of result.rows) {
-        row.company = getCompanyByIdOrFio(row.executorId, row.name) || '—';
+    for (const dateStr of dates) {
+      const opts = shift ? { shift } : {};
+      const items = storage.getDateItems(dateStr, opts);
+
+      const dayMap = new Map(); // normKey -> { name, executorId, hourMap, storageCount, firstAt, lastAt }
+
+      for (const item of items) {
+        const opType   = (item.operationType || '').toUpperCase();
+        const isKdk    = opType === 'PICK_BY_LINE';
+        const isStorage = opType === 'PIECE_SELECTION_PICKING';
+        if (!isKdk && !isStorage) continue;
+
+        if (zoneFilter) {
+          const cell = item.cell || '';
+          const dash = cell.indexOf('-');
+          const zk   = dash > 0 ? cell.slice(0, dash).toUpperCase() : cell.toUpperCase();
+          if (zk !== zoneFilter) continue;
+        }
+
+        const executor   = (item.executor || '').trim() || 'Неизвестно';
+        const executorId = item.executorId || '';
+        const normKey    = executor.replace(/\s+/g, ' ').toLowerCase();
+
+        if (!dayMap.has(normKey))
+          dayMap.set(normKey, { name: executor, executorId, hourMap: new Map(), storageCount: 0, firstAt: null, lastAt: null });
+        const emp = dayMap.get(normKey);
+        if (!emp.executorId && executorId) emp.executorId = executorId;
+
+        const ts = item.completedAt;
+        if (ts) {
+          if (!emp.firstAt || ts < emp.firstAt) emp.firstAt = ts;
+          if (!emp.lastAt  || ts > emp.lastAt)  emp.lastAt  = ts;
+        }
+
+        if (isStorage) {
+          emp.storageCount++;
+        } else {
+          // KDK: дедуп по {product}||{cell} на час — идентично calcHourlyByEmployee
+          const col     = ts ? ((new Date(ts).getHours() + 1) % 24) : -1;
+          const product = item.nomenclatureCode || item.productName || '';
+          const cell    = item.cell || '';
+          if (!emp.hourMap.has(col)) emp.hourMap.set(col, new Set());
+          emp.hourMap.get(col).add(`${product}||${cell}`);
+        }
+      }
+
+      for (const [normKey, emp] of dayMap) {
+        let kdkCount = 0;
+        for (const set of emp.hourMap.values()) kdkCount += set.size;
+        const total = kdkCount + emp.storageCount;
+        if (total === 0) continue;
+
+        const workedMin = (emp.firstAt && emp.lastAt && emp.lastAt > emp.firstAt)
+          ? (new Date(emp.lastAt) - new Date(emp.firstAt)) / 60000 : 0;
+
+        if (!byEmployee.has(normKey))
+          byEmployee.set(normKey, { name: emp.name, executorId: emp.executorId, total: 0, workedMinutes: 0 });
+        const es = byEmployee.get(normKey);
+        if (!es.executorId && emp.executorId) es.executorId = emp.executorId;
+        es.total         += total;
+        es.workedMinutes += workedMin;
       }
     }
 
-    res.json(result);
+    const rows = [...byEmployee.values()]
+      .filter(es => es.total > 0)
+      .sort((a, b) => b.total - a.total)
+      .map(es => ({
+        name:          es.name,
+        executorId:    es.executorId,
+        total:         es.total,
+        workedMinutes: Math.round(es.workedMinutes * 10) / 10,
+        company:       getCompanyByIdOrFio(es.executorId, es.name) || '—',
+      }));
+
+    res.json({ ok: true, dateFrom, dateTo, zone: zoneFilter, count: rows.length, rows });
   } catch (err) {
     console.error('GET /api/stats/monthly-employees', err);
     res.status(500).json({ error: err.message });
