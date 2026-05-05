@@ -2524,7 +2524,7 @@ function computeCompanyDay(dateStr, shift, getComp) {
   return result;
 }
 
-// GET /api/stats/monthly-company — сводка по компаниям за месяц
+// GET /api/stats/monthly-company — сводка по компаниям за период
 app.get('/api/stats/monthly-company', vsSessionRequired, (req, res) => {
   try {
     const year  = parseInt(req.query.year,  10);

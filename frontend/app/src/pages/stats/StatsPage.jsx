@@ -27,8 +27,8 @@ import styles from './StatsPage.module.css'
 
 const HE_MODES = [
   { key: 'sz',      label: 'По СЗ' },
-  { key: 'hourly',  label: 'По часам' },
-  { key: 'monthly', label: 'За месяц' },
+  { key: 'hourly',  label: 'По зонам' },
+  { key: 'monthly', label: 'За период' },
   { key: 'idles',   label: 'Простои' },
 ]
 
