@@ -2619,7 +2619,8 @@ app.get('/api/stats/monthly-employees', vsSessionRequired, (req, res) => {
       const opts = shift ? { shift } : {};
       const items = storage.getDateItems(dateStr, opts);
 
-      const dayMap = new Map(); // normKey -> { name, executorId, hourMap, storageCount, firstAt, lastAt }
+      const IDLE_THRESHOLD_MS = 5 * 60 * 1000;
+      const dayMap = new Map(); // normKey -> { name, executorId, hourMap, storageCount, timestamps[] }
 
       for (const item of items) {
         const opType   = (item.operationType || '').toUpperCase();
@@ -2639,15 +2640,12 @@ app.get('/api/stats/monthly-employees', vsSessionRequired, (req, res) => {
         const normKey    = executor.replace(/\s+/g, ' ').toLowerCase();
 
         if (!dayMap.has(normKey))
-          dayMap.set(normKey, { name: executor, executorId, hourMap: new Map(), storageCount: 0, firstAt: null, lastAt: null });
+          dayMap.set(normKey, { name: executor, executorId, hourMap: new Map(), storageCount: 0, timestamps: [] });
         const emp = dayMap.get(normKey);
         if (!emp.executorId && executorId) emp.executorId = executorId;
 
         const ts = item.completedAt;
-        if (ts) {
-          if (!emp.firstAt || ts < emp.firstAt) emp.firstAt = ts;
-          if (!emp.lastAt  || ts > emp.lastAt)  emp.lastAt  = ts;
-        }
+        if (ts) emp.timestamps.push(new Date(ts).getTime());
 
         if (isStorage) {
           emp.storageCount++;
@@ -2667,8 +2665,16 @@ app.get('/api/stats/monthly-employees', vsSessionRequired, (req, res) => {
         const total = kdkCount + emp.storageCount;
         if (total === 0) continue;
 
-        const workedMin = (emp.firstAt && emp.lastAt && emp.lastAt > emp.firstAt)
-          ? (new Date(emp.lastAt) - new Date(emp.firstAt)) / 60000 : 0;
+        let workedMin = 0;
+        if (emp.timestamps.length > 1) {
+          const times = emp.timestamps.slice().sort((a, b) => a - b);
+          let idleMs = 0;
+          for (let i = 1; i < times.length; i++) {
+            const gap = times[i] - times[i - 1];
+            if (gap >= IDLE_THRESHOLD_MS) idleMs += gap;
+          }
+          workedMin = Math.max(0, (times[times.length - 1] - times[0]) - idleMs) / 60000;
+        }
 
         allRows.push({
           date:          dateStr,
