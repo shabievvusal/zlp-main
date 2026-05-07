@@ -12,12 +12,14 @@ function parseDatePart(str) {
   if (!str) return null
   const date = str.split(' ')[0].split('T')[0]
   const [y, m, d] = date.split('-').map(Number)
+  if (!y || !m || !d) return null
   return { y, m, d }
 }
 
 function parseTimePart(str) {
   if (!str) return { h: 0, min: 0 }
-  const parts = str.split(' ')
+  const sep = str.includes('T') ? 'T' : ' '
+  const parts = str.split(sep)
   if (parts.length < 2) return { h: 0, min: 0 }
   const [h, min] = parts[1].split(':').map(Number)
   return { h: h || 0, min: min || 0 }
@@ -38,7 +40,6 @@ function getTodayStr() {
 
 function getDaysInMonth(y, m) { return new Date(y, m, 0).getDate() }
 function getFirstWeekday(y, m) { return (new Date(y, m - 1, 1).getDay() + 6) % 7 }
-
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)) }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -52,9 +53,11 @@ export default function DatePicker({
   placeholder = 'Выберите дату',
   id,
 }) {
-  const [open, setOpen] = useState(false)
-  const wrapRef         = useRef(null)
-  const todayStr        = getTodayStr()
+  const [open, setOpen]     = useState(false)
+  const [above, setAbove]   = useState(false)
+  const [alignRight, setAlignRight] = useState(false)
+  const wrapRef             = useRef(null)
+  const todayStr            = getTodayStr()
 
   const parsed   = parseDatePart(value)
   const timePart = showTime ? parseTimePart(value) : null
@@ -75,6 +78,16 @@ export default function DatePicker({
       setHour(t.h); setMin(t.min)
     }
   }, [value, showTime])
+
+  // Smart placement: flip above/right if not enough space
+  useEffect(() => {
+    if (!open || !wrapRef.current) return
+    const rect = wrapRef.current.getBoundingClientRect()
+    const estimatedHeight = showTime ? 380 : 310
+    const popupWidth = 256
+    setAbove(window.innerHeight - rect.bottom < estimatedHeight)
+    setAlignRight(rect.left + popupWidth > window.innerWidth - 8)
+  }, [open, showTime])
 
   // Close on outside click / Escape
   useEffect(() => {
@@ -110,21 +123,20 @@ export default function DatePicker({
   }
 
   const changeHour = v => {
-    const h = clamp(v, 0, 23)
+    const h = clamp(isNaN(v) ? 0 : v, 0, 23)
     setHour(h)
     if (parsed) emit(toDateStr(parsed.y, parsed.m, parsed.d), h, minute)
   }
 
   const changeMin = v => {
-    const m = clamp(v, 0, 59)
+    const m = clamp(isNaN(v) ? 0 : v, 0, 59)
     setMin(m)
     if (parsed) emit(toDateStr(parsed.y, parsed.m, parsed.d), hour, m)
   }
 
-  // Label
   const dateLabel = parsed
     ? `${String(parsed.d).padStart(2,'0')} ${MONTHS_SHORT[parsed.m - 1]} ${parsed.y}`
-    : placeholder
+    : null
   const timeLabel = showTime
     ? `${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')}`
     : null
@@ -145,19 +157,28 @@ export default function DatePicker({
         aria-haspopup="true"
       >
         <Calendar size={13} className={styles.calIcon} />
-        <span className={value ? styles.label : styles.placeholder}>{dateLabel}</span>
-        {showTime && value && (
+        {dateLabel ? (
           <>
-            <span className={styles.timeSep}>·</span>
-            <Clock size={12} className={styles.calIcon} />
-            <span className={styles.label}>{timeLabel}</span>
+            <span className={styles.label}>{dateLabel}</span>
+            {showTime && (
+              <>
+                <span className={styles.timeSep}>·</span>
+                <Clock size={12} className={styles.calIcon} />
+                <span className={styles.label}>{timeLabel}</span>
+              </>
+            )}
           </>
+        ) : (
+          <span className={styles.placeholder}>{placeholder}</span>
         )}
         <ChevronDown size={12} className={`${styles.chevron} ${open ? styles.chevronOpen : ''}`} />
       </button>
 
       {open && (
-        <div className={styles.popup} role="dialog">
+        <div
+          className={[styles.popup, above ? styles.popupAbove : '', alignRight ? styles.popupRight : ''].join(' ')}
+          role="dialog"
+        >
           {/* Month header */}
           <div className={styles.header}>
             <button type="button" className={styles.navBtn} onClick={prevMonth} aria-label="Предыдущий месяц">
@@ -200,30 +221,22 @@ export default function DatePicker({
           {/* Time picker */}
           {showTime && (
             <div className={styles.timePicker}>
-              <Clock size={13} className={styles.timeIcon} />
-              <div className={styles.timeUnit}>
-                <button type="button" className={styles.timeBtn} onClick={() => changeHour(hour + 1)}>▲</button>
-                <input
-                  className={styles.timeInput}
-                  type="number"
-                  min={0} max={23}
-                  value={String(hour).padStart(2,'0')}
-                  onChange={e => changeHour(parseInt(e.target.value) || 0)}
-                />
-                <button type="button" className={styles.timeBtn} onClick={() => changeHour(hour - 1)}>▼</button>
-              </div>
+              <Clock size={14} className={styles.timeIcon} />
+              <input
+                className={styles.timeInput}
+                type="number"
+                min={0} max={23}
+                value={String(hour).padStart(2,'0')}
+                onChange={e => changeHour(parseInt(e.target.value, 10))}
+              />
               <span className={styles.timeColon}>:</span>
-              <div className={styles.timeUnit}>
-                <button type="button" className={styles.timeBtn} onClick={() => changeMin(minute + 1)}>▲</button>
-                <input
-                  className={styles.timeInput}
-                  type="number"
-                  min={0} max={59}
-                  value={String(minute).padStart(2,'0')}
-                  onChange={e => changeMin(parseInt(e.target.value) || 0)}
-                />
-                <button type="button" className={styles.timeBtn} onClick={() => changeMin(minute - 1)}>▼</button>
-              </div>
+              <input
+                className={styles.timeInput}
+                type="number"
+                min={0} max={59}
+                value={String(minute).padStart(2,'0')}
+                onChange={e => changeMin(parseInt(e.target.value, 10))}
+              />
             </div>
           )}
 

@@ -863,9 +863,9 @@ export default function ConsolidationPage() {
   const preFiltered = complaints.filter(c => {
     if (violatorFilter === 'found' && !c.violator) return false
     if (violatorFilter === 'not_found' && c.violator) return false
-    if (dateFrom && c.createdAt < new Date(dateFrom).toISOString()) return false
+    if (dateFrom && c.createdAt < new Date(dateFrom.replace(' ', 'T')).toISOString()) return false
     if (dateTo) {
-      const toDate = new Date(dateTo)
+      const toDate = new Date(dateTo.replace(' ', 'T'))
       toDate.setSeconds(59, 999)
       if (c.createdAt > toDate.toISOString()) return false
     }
@@ -1130,16 +1130,14 @@ export default function ConsolidationPage() {
         <div className={s.toolbarRow}>
           <div className={s.toolbarLeft} style={{ alignItems: 'center', gap: 6 }}>
             <span style={{ fontSize: 12, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Дата подачи:</span>
-            <input
-              type="datetime-local"
-              className={s.dateInput}
+            <DatePicker
+              showTime
               value={dateFrom}
               onChange={e => { setDateFrom(e.target.value); setPage(1) }}
             />
             <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>—</span>
-            <input
-              type="datetime-local"
-              className={s.dateInput}
+            <DatePicker
+              showTime
               value={dateTo}
               onChange={e => { setDateTo(e.target.value); setPage(1) }}
             />
