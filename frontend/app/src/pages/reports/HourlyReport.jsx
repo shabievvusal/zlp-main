@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import * as api from '../../api/index.js'
+import DatePicker from '../../components/ui/DatePicker.jsx'
 import s from './HourlyReport.module.css'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -363,12 +364,7 @@ export default function HourlyReport() {
       <div className={s.toolbar}>
         <div className={s.field}>
           <label>Дата</label>
-          <input
-            type="date"
-            value={date}
-            onChange={e => setDate(e.target.value)}
-            className={s.dateInput}
-          />
+          <DatePicker value={date} onChange={e => setDate(e.target.value)} />
         </div>
         {availableHours.length > 0 && (
           <div className={s.field}>

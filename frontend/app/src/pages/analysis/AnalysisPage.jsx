@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useAuth } from '../../context/AuthContext.jsx'
 import * as api from '../../api/index.js'
 import { RefreshCw } from 'lucide-react'
+import DatePicker from '../../components/ui/DatePicker.jsx'
 import s from './AnalysisPage.module.css'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -441,7 +442,7 @@ export default function AnalysisPage() {
         <div className={s.controls}>
           <label className={s.field}>
             <span className={s.fieldLabel}>Дата</span>
-            <input type="date" value={date} onChange={e => setDate(e.target.value)} className={s.input} />
+            <DatePicker value={date} onChange={e => setDate(e.target.value)} />
           </label>
           <label className={s.field}>
             <span className={s.fieldLabel}>Конец смены</span>

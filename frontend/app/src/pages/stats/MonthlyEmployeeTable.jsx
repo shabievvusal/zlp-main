@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import * as api from '../../api/index.js'
 import { ZONES } from '../../utils/statsCalc.js'
+import DatePicker from '../../components/ui/DatePicker.jsx'
 import styles from './StatsPage.module.css'
 
 function getTodayStr() {
@@ -223,11 +224,9 @@ export default function MonthlyEmployeeTable({ exportRef }) {
     <>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', flexWrap: 'wrap' }}>
         <span style={{ fontSize: 12, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Период:</span>
-        <input type="date" className={styles.selectControl} style={{ fontSize: 13 }}
-          value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+        <DatePicker value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
         <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>—</span>
-        <input type="date" className={styles.selectControl} style={{ fontSize: 13 }}
-          value={dateTo} onChange={e => setDateTo(e.target.value)} />
+        <DatePicker value={dateTo} max={new Date().toISOString().slice(0,10)} onChange={e => setDateTo(e.target.value)} />
         <select className={styles.selectControl} style={{ fontSize: 13 }}
           value={shift} onChange={e => setShift(e.target.value)}>
           <option value="">Все смены</option>

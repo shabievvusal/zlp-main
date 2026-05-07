@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import * as api from '../../api/index.js'
 import { formatDateTime } from '../../utils/format.js'
 import { X, Search, Pencil, RefreshCw, Send, Printer, Download } from 'lucide-react'
+import DatePicker from '../../components/ui/DatePicker.jsx'
 import s from './ConsolidationPage.module.css'
 
 const LS_COMPANY_FULL_NAMES = 'sz_company_full_names'
@@ -1031,19 +1032,9 @@ export default function ConsolidationPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <span style={{ fontSize: 13, whiteSpace: 'nowrap' }}>Период:</span>
-                <input
-                  type="date"
-                  className={s.dateInput}
-                  value={exportFrom}
-                  onChange={e => setExportFrom(e.target.value)}
-                />
+                <DatePicker value={exportFrom} onChange={e => setExportFrom(e.target.value)} />
                 <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>—</span>
-                <input
-                  type="date"
-                  className={s.dateInput}
-                  value={exportTo}
-                  onChange={e => setExportTo(e.target.value)}
-                />
+                <DatePicker value={exportTo} onChange={e => setExportTo(e.target.value)} />
               </div>
               <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                 Учитываются только нарушения с найденным нарушителем.<br/>

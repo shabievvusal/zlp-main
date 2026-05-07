@@ -3,6 +3,7 @@ import * as api from '../../api/index.js'
 import styles from './ShipmentsPage.module.css'
 import { useNotify } from '../../context/NotifyContext.jsx'
 import { shortFio } from '../../utils/format.js'
+import DatePicker from '../../components/ui/DatePicker.jsx'
 import {
   X, Check, Pencil, Search, Trash2, AlertTriangle, Download, Upload,
   Camera, Truck, PackageOpen, Car, CheckCircle2,
@@ -1142,11 +1143,11 @@ function FetchModal({ onClose, onDone }) {
         <div className={styles.fetchForm}>
           <label className={styles.fetchFormLabel}>
             С
-            <input type="date" className={styles.shInput} value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+            <DatePicker value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
           </label>
           <label className={styles.fetchFormLabel}>
             По
-            <input type="date" className={styles.shInput} value={dateTo} onChange={e => setDateTo(e.target.value)} />
+            <DatePicker value={dateTo} onChange={e => setDateTo(e.target.value)} />
           </label>
         </div>
         <div className={styles.modalResult}>{result}</div>
@@ -1915,11 +1916,11 @@ function ReportModal({ onClose }) {
         <div className={styles.reportForm}>
           <label className={styles.reportFormLabel}>
             С
-            <input type="date" className={styles.shInput} value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
+            <DatePicker value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
           </label>
           <label className={styles.reportFormLabel}>
             По
-            <input type="date" className={styles.shInput} value={dateTo} onChange={e => setDateTo(e.target.value)} />
+            <DatePicker value={dateTo} onChange={e => setDateTo(e.target.value)} />
           </label>
         </div>
         <div className={styles.modalResult}>{result}</div>
@@ -2130,21 +2131,9 @@ export default function ShipmentsPage() {
               >{f.label}</button>
             ))}
             <div className={styles.dateFilter}>
-              <input
-                type="date"
-                className={styles.dateInput}
-                value={routesDateFrom}
-                onChange={e => setRoutesDateFrom(e.target.value)}
-                title="Дата от"
-              />
+              <DatePicker value={routesDateFrom} onChange={e => setRoutesDateFrom(e.target.value)} />
               <span className={styles.dateSep}>—</span>
-              <input
-                type="date"
-                className={styles.dateInput}
-                value={routesDateTo}
-                onChange={e => setRoutesDateTo(e.target.value)}
-                title="Дата до"
-              />
+              <DatePicker value={routesDateTo} onChange={e => setRoutesDateTo(e.target.value)} />
               {(routesDateFrom || routesDateTo) && (
                 <button
                   className={styles.dateClear}

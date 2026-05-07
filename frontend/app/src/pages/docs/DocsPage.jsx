@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react'
 import { Settings2 } from 'lucide-react'
+import DatePicker from '../../components/ui/DatePicker.jsx'
 import s from './DocsPage.module.css'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -489,7 +490,7 @@ export default function DocsPage() {
             <div className={`${s.row} ${s.rowTwo}`}>
               <div>
                 <label className={s.formLabel}>Дата</label>
-                <input className={s.input} type="date" value={date} onChange={e => setDate(e.target.value)} />
+                <DatePicker value={date} onChange={e => setDate(e.target.value)} />
               </div>
               <div>
                 <label className={s.formLabel}>Должность</label>
@@ -585,11 +586,11 @@ export default function DocsPage() {
                 <div className={`${s.row} ${s.rowTwo}`}>
                   <div>
                     <label className={s.formLabel}>Дата нарушения</label>
-                    <input className={s.input} type="date" value={tcDateIncident} onChange={e => setTcDateIncident(e.target.value)} />
+                    <DatePicker value={tcDateIncident} onChange={e => setTcDateIncident(e.target.value)} />
                   </div>
                   <div>
                     <label className={s.formLabel}>Дата служебной записки</label>
-                    <input className={s.input} type="date" value={tcDateMemo} onChange={e => setTcDateMemo(e.target.value)} />
+                    <DatePicker value={tcDateMemo} onChange={e => setTcDateMemo(e.target.value)} />
                   </div>
                 </div>
                 <div className={s.row}><div>

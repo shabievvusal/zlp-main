@@ -3,6 +3,7 @@ import { useApp } from '../../context/AppContext.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { getTodayStr, formatDateTime } from '../../utils/format.js'
 import { RefreshCw, Radio, RotateCcw } from 'lucide-react'
+import DatePicker from '../../components/ui/DatePicker.jsx'
 import styles from './StatsPage.module.css'
 
 export default function StatsToolbar() {
@@ -44,11 +45,8 @@ export default function StatsToolbar() {
   return (
     <div className={styles.toolbar}>
       <div className={styles.shiftSelectWrap}>
-        <label htmlFor="date-picker-stats">Дата:</label>
-        <input
-          type="date"
-          id="date-picker-stats"
-          className={styles.selectControl}
+        <label>Дата:</label>
+        <DatePicker
           value={selectedDate}
           max={getTodayStr()}
           onChange={e => setSelectedDate(e.target.value)}
