@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { ChevronLeft, ChevronRight, ChevronDown, Calendar, Clock } from 'lucide-react'
 import styles from './DatePicker.module.css'
 
@@ -53,11 +54,13 @@ export default function DatePicker({
   placeholder = 'Выберите дату',
   id,
 }) {
-  const [open, setOpen]     = useState(false)
-  const [above, setAbove]   = useState(false)
+  const [open, setOpen]         = useState(false)
+  const [above, setAbove]       = useState(false)
   const [alignRight, setAlignRight] = useState(false)
-  const wrapRef             = useRef(null)
-  const todayStr            = getTodayStr()
+  const [popupPos, setPopupPos] = useState({})
+  const triggerRef              = useRef(null)
+  const popupRef                = useRef(null)
+  const todayStr                = getTodayStr()
 
   const parsed   = parseDatePart(value)
   const timePart = showTime ? parseTimePart(value) : null
@@ -67,7 +70,6 @@ export default function DatePicker({
   const [hour,  setHour]  = useState(() => timePart?.h   ?? 0)
   const [minute, setMin]  = useState(() => timePart?.min ?? 0)
 
-  // Sync view when value changes externally
   useEffect(() => {
     if (parsed) { setViewY(parsed.y); setViewM(parsed.m) }
   }, [value])
@@ -79,24 +81,51 @@ export default function DatePicker({
     }
   }, [value, showTime])
 
-  // Smart placement: flip above/right if not enough space
+  // Compute fixed position from trigger rect
   useEffect(() => {
-    if (!open || !wrapRef.current) return
-    const rect = wrapRef.current.getBoundingClientRect()
+    if (!open || !triggerRef.current) return
+    const rect = triggerRef.current.getBoundingClientRect()
+    const popupWidth      = 256
     const estimatedHeight = showTime ? 380 : 310
-    const popupWidth = 256
-    setAbove(window.innerHeight - rect.bottom < estimatedHeight)
-    setAlignRight(rect.left + popupWidth > window.innerWidth - 8)
+
+    const _above = window.innerHeight - rect.bottom < estimatedHeight
+    const _right = rect.left + popupWidth > window.innerWidth - 8
+
+    setAbove(_above)
+    setAlignRight(_right)
+
+    const pos = {}
+    if (_above) {
+      pos.bottom = window.innerHeight - rect.top + 6
+    } else {
+      pos.top = rect.bottom + 6
+    }
+    if (_right) {
+      pos.right = window.innerWidth - rect.right
+    } else {
+      pos.left = rect.left
+    }
+    setPopupPos(pos)
   }, [open, showTime])
 
-  // Close on outside click / Escape
+  // Close on outside click, Escape, or scroll
   useEffect(() => {
     if (!open) return
-    const onDown = e => { if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false) }
-    const onKey  = e => { if (e.key === 'Escape') setOpen(false) }
+    const onDown = e => {
+      if (triggerRef.current?.contains(e.target)) return
+      if (popupRef.current?.contains(e.target)) return
+      setOpen(false)
+    }
+    const onKey    = e => { if (e.key === 'Escape') setOpen(false) }
+    const onScroll = () => setOpen(false)
     document.addEventListener('mousedown', onDown)
     document.addEventListener('keydown', onKey)
-    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey) }
+    window.addEventListener('scroll', onScroll, { passive: true, capture: true })
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+      window.removeEventListener('scroll', onScroll, { capture: true })
+    }
   }, [open])
 
   const prevMonth = () => viewM === 1  ? (setViewM(12), setViewY(y => y - 1)) : setViewM(m => m - 1)
@@ -146,9 +175,16 @@ export default function DatePicker({
   const cells       = [...Array(firstDay).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)]
   const selectedDateStr = parsed ? toDateStr(parsed.y, parsed.m, parsed.d) : null
 
+  const popupClassName = [
+    styles.popup,
+    above      ? styles.popupAbove : '',
+    alignRight ? styles.popupRight : '',
+  ].join(' ')
+
   return (
-    <div className={styles.wrap} ref={wrapRef}>
+    <div className={styles.wrap}>
       <button
+        ref={triggerRef}
         id={id}
         type="button"
         className={`${styles.trigger} ${open ? styles.triggerOpen : ''}`}
@@ -174,9 +210,11 @@ export default function DatePicker({
         <ChevronDown size={12} className={`${styles.chevron} ${open ? styles.chevronOpen : ''}`} />
       </button>
 
-      {open && (
+      {open && createPortal(
         <div
-          className={[styles.popup, above ? styles.popupAbove : '', alignRight ? styles.popupRight : ''].join(' ')}
+          ref={popupRef}
+          className={popupClassName}
+          style={{ position: 'fixed', ...popupPos }}
           role="dialog"
         >
           {/* Month header */}
@@ -251,7 +289,8 @@ export default function DatePicker({
               </button>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )
