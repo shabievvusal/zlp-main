@@ -455,7 +455,7 @@
 }
 .shInput:focus { outline: none; border-color: #4f8ef7; }
 .inputSm { width: 100px; }
-.inputRk { width: 80px; text-align: center; font-weight: 600; }
+.inputRk { width: 70px; text-align: center; font-weight: 600; }
 
 /* ── Type cards (step 2) ─────────────────────────────── */
 .typeCards { display: flex; gap: 12px; }
@@ -501,12 +501,13 @@
 .formCfzRow {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
   padding: 6px 8px;
   background: var(--bg, #f5f7fa);
   border-radius: 8px;
 }
-.formCfzAddr  { flex: 1; font-size: 13px; }
+.formCfzAddr  { flex: 1 1 180px; min-width: 0; font-size: 13px; }
 .formCfzHint  { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
 .hintClear { font-size: 11px; font-weight: 400; color: var(--text-muted); }
 

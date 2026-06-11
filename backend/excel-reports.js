@@ -73,9 +73,9 @@ const MONTH_NAMES_RU = ['Январь','Февраль','Март','Апрель
 function addReportSheet(wb, sheetName, summaryByAddress, sortedDates, allAddresses, mode) {
   const codes = loadCodes();
 
-  // mode: 'rk' | 'boxes'
-  const getShipped  = rec => mode === 'boxes' ? rec.shippedBoxes  : rec.shipped;
-  const getReceived = rec => mode === 'boxes' ? rec.receivedBoxes : rec.received;
+  // mode: 'rk' | 'boxes' | 'thermalCovers'
+  const getShipped  = rec => mode === 'boxes' ? rec.shippedBoxes  : mode === 'thermalCovers' ? rec.shippedThermalCovers  : rec.shipped;
+  const getReceived = rec => mode === 'boxes' ? rec.receivedBoxes : mode === 'thermalCovers' ? rec.receivedThermalCovers : rec.received;
 
   const dataByAddress = new Map();
   for (const entry of summaryByAddress) dataByAddress.set(entry.address, entry.records);
@@ -249,6 +249,7 @@ async function generateReport(summaryByAddress, dates, dateFrom, knownAddresses 
 
   addReportSheet(wb, monthLabel,          summaryByAddress, sortedDates, allAddresses, 'rk');
   addReportSheet(wb, `Ящики ${monthLabel}`, summaryByAddress, sortedDates, allAddresses, 'boxes');
+  addReportSheet(wb, `ТЧ ${monthLabel}`, summaryByAddress, sortedDates, allAddresses, 'thermalCovers');
 
   return wb.xlsx.writeBuffer();
 }

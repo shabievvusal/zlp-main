@@ -81,6 +81,21 @@ function shippedBoxesTotal(route) {
 function receivedBoxesTotal(route) {
   return (route.receiving?.items || []).reduce((s, i) => s + (i.boxes || 0), 0);
 }
+function shippedThermalCoversTotal(route) {
+  return (route.shipment?.items || []).reduce((s, i) => s + (i.thermalCovers || 0), 0);
+}
+function receivedThermalCoversTotal(route) {
+  return (route.receiving?.items || []).reduce((s, i) => s + (i.thermalCovers || 0), 0);
+}
+function normalizeItem(i) {
+  return {
+    address: String(i.address),
+    rk: Number(i.rk),
+    pallets: i.pallets != null ? Number(i.pallets) : 0,
+    boxes: i.boxes != null ? Number(i.boxes) : 0,
+    thermalCovers: i.thermalCovers != null ? Number(i.thermalCovers) : 0,
+  };
+}
 function calcDiff(route) {
   if (!route.shipment || !route.receiving) return null;
   return receivedTotal(route) - shippedTotal(route);
@@ -111,6 +126,8 @@ function withTotals(route) {
     receivedPallets: route.receiving ? receivedPalletsTotal(route) : null,
     shippedBoxes:    route.shipment  ? shippedBoxesTotal(route)    : null,
     receivedBoxes:   route.receiving ? receivedBoxesTotal(route)   : null,
+    shippedThermalCovers:  route.shipment  ? shippedThermalCoversTotal(route)  : null,
+    receivedThermalCovers: route.receiving ? receivedThermalCoversTotal(route) : null,
     shippedAt:  route.shipment?.at  || null,
     receivedAt: route.receiving?.at || null,
     diff:        calcDiff(route),
@@ -230,7 +247,7 @@ async function submitShipment(routeId, { by, gate, tempBefore, tempAfter, rokhly
     at: new Date().toISOString(),
     confirmed: false, confirmedAt: null,
     photos: photos || [],
-    items: (items || []).map(i => ({ address: String(i.address), rk: Number(i.rk), pallets: i.pallets != null ? Number(i.pallets) : 0, boxes: i.boxes != null ? Number(i.boxes) : 0 })),
+    items: (items || []).map(normalizeItem),
   };
   const { rows } = await pool.query(
     'UPDATE routes SET shipment=$2 WHERE route_id=$1 RETURNING *',
@@ -247,7 +264,7 @@ async function submitReceiving(routeId, { by, gate, rokhlya, items, photos }) {
     at: new Date().toISOString(),
     confirmed: false, confirmedAt: null,
     photos: photos || [],
-    items: (items || []).map(i => ({ address: String(i.address), rk: Number(i.rk), pallets: i.pallets != null ? Number(i.pallets) : 0, boxes: i.boxes != null ? Number(i.boxes) : 0 })),
+    items: (items || []).map(normalizeItem),
   };
   const { rows } = await pool.query(
     'UPDATE routes SET receiving=$2 WHERE route_id=$1 RETURNING *',
@@ -278,7 +295,7 @@ async function updateShipment(routeId, { by, gate, tempBefore, tempAfter, rokhly
     confirmedAt: ex.confirmedAt || null,
     updatedAt:  new Date().toISOString(),
     photos: photos != null ? photos : (ex.photos || []),
-    items: items.map(i => ({ address: String(i.address), rk: Number(i.rk), pallets: i.pallets != null ? Number(i.pallets) : 0, boxes: i.boxes != null ? Number(i.boxes) : 0 })),
+    items: items.map(normalizeItem),
   };
   const { rows } = await pool.query('UPDATE routes SET shipment=$2 WHERE route_id=$1 RETURNING *', [routeId, JSON.stringify(shipment)]);
   return withTotals(rowToRoute(rows[0]));
@@ -303,7 +320,7 @@ async function updateReceiving(routeId, { by, gate, rokhlya, items, photos }) {
     confirmedAt: ex.confirmedAt || null,
     updatedAt:   new Date().toISOString(),
     photos: photos != null ? photos : (ex.photos || []),
-    items: items.map(i => ({ address: String(i.address), rk: Number(i.rk), pallets: i.pallets != null ? Number(i.pallets) : 0, boxes: i.boxes != null ? Number(i.boxes) : 0 })),
+    items: items.map(normalizeItem),
   };
   const { rows } = await pool.query('UPDATE routes SET receiving=$2 WHERE route_id=$1 RETURNING *', [routeId, JSON.stringify(receiving)]);
   return withTotals(rowToRoute(rows[0]));
@@ -401,12 +418,40 @@ async function getByDriver({ q } = {}) {
     const route = withTotals(rowToRoute(raw));
     const name  = route.driver?.name || '(без водителя)';
     if (ql && !name.toLowerCase().includes(ql)) continue;
-    if (!map.has(name)) map.set(name, { name, routes: [] });
-    map.get(name).routes.push(route);
+    if (!map.has(name)) {
+      map.set(name, { name, phone: route.driver?.phone || '', routeCount: 0, shippedTotal: 0, receivedTotal: 0, shippedPallets: 0, receivedPallets: 0, shippedBoxes: 0, receivedBoxes: 0, shippedThermalCovers: 0, receivedThermalCovers: 0, shippedRokhlya: 0, receivedRokhlya: 0, routes: [] });
+    }
+    const d = map.get(name);
+    d.routeCount++;
+    if (route.shippedRK  != null) d.shippedTotal  += route.shippedRK;
+    if (route.receivedRK != null) d.receivedTotal += route.receivedRK;
+    if (route.shippedPallets  != null) d.shippedPallets  += route.shippedPallets;
+    if (route.receivedPallets != null) d.receivedPallets += route.receivedPallets;
+    if (route.shippedBoxes  != null) d.shippedBoxes  += route.shippedBoxes;
+    if (route.receivedBoxes != null) d.receivedBoxes += route.receivedBoxes;
+    if (route.shippedThermalCovers  != null) d.shippedThermalCovers  += route.shippedThermalCovers;
+    if (route.receivedThermalCovers != null) d.receivedThermalCovers += route.receivedThermalCovers;
+    if (route.shipment)  d.shippedRokhlya  += route.shipment.rokhlya  ?? 0;
+    if (route.receiving) d.receivedRokhlya += route.receiving.rokhlya ?? 0;
+    d.routes.push({
+      routeId: route.routeId, routeNumber: route.routeNumber, date: route.date,
+      vehicle: route.vehicle, cfzAddresses: route.cfzAddresses || [],
+      shippedRK: route.shippedRK, receivedRK: route.receivedRK, diff: route.diff,
+      shippedAt: route.shippedAt, receivedAt: route.receivedAt,
+      shippedPallets: route.shippedPallets, receivedPallets: route.receivedPallets,
+      shippedThermalCovers: route.shippedThermalCovers, receivedThermalCovers: route.receivedThermalCovers,
+      shippedRokhlya: route.shipment?.rokhlya ?? 0,
+      receivedRokhlya: route.receiving?.rokhlya ?? 0,
+    });
   }
 
   return Array.from(map.values())
-    .map(d => ({ ...d, routes: d.routes.sort((a, b) => (b.date || '').localeCompare(a.date || '')) }))
+    .map(d => ({
+      ...d,
+      diff: d.shippedTotal > 0 || d.receivedTotal > 0 ? d.receivedTotal - d.shippedTotal : null,
+      rokhlyaDebt: d.shippedRokhlya - d.receivedRokhlya,
+      routes: d.routes.sort((a, b) => (b.date || '').localeCompare(a.date || '')),
+    }))
     .sort((a, b) => a.name.localeCompare(b.name, 'ru'));
 }
 
@@ -420,13 +465,51 @@ async function getByCfz({ q } = {}) {
     for (const cfz of (route.cfzAddresses || [])) {
       const addr = cfz.address || '';
       if (ql && !addr.toLowerCase().includes(ql) && !(route.driver?.name || '').toLowerCase().includes(ql)) continue;
-      if (!map.has(addr)) map.set(addr, { address: addr, routes: [] });
-      map.get(addr).routes.push(route);
+      if (!map.has(addr)) {
+        map.set(addr, { address: addr, storeId: cfz.storeId, routeCount: 0, shippedTotal: 0, receivedTotal: 0, shippedPallets: 0, receivedPallets: 0, shippedBoxes: 0, receivedBoxes: 0, shippedThermalCovers: 0, receivedThermalCovers: 0, routes: [] });
+      }
+      const c = map.get(addr);
+      c.routeCount++;
+
+      const shippedItem  = route.shipment?.items?.find(i => i.address === addr);
+      const receivedItem = route.receiving?.items?.find(i => i.address === addr);
+      const cfzShipped  = shippedItem?.rk  ?? null;
+      const cfzReceived = receivedItem?.rk ?? null;
+      const cfzShippedPallets = shippedItem?.pallets ?? null;
+      const cfzReceivedPallets = receivedItem?.pallets ?? null;
+      const cfzShippedBoxes = shippedItem?.boxes ?? null;
+      const cfzReceivedBoxes = receivedItem?.boxes ?? null;
+      const cfzShippedThermalCovers = shippedItem?.thermalCovers ?? null;
+      const cfzReceivedThermalCovers = receivedItem?.thermalCovers ?? null;
+
+      if (cfzShipped  != null) c.shippedTotal  += cfzShipped;
+      if (cfzReceived != null) c.receivedTotal += cfzReceived;
+      if (cfzShippedPallets != null) c.shippedPallets += cfzShippedPallets;
+      if (cfzReceivedPallets != null) c.receivedPallets += cfzReceivedPallets;
+      if (cfzShippedBoxes != null) c.shippedBoxes += cfzShippedBoxes;
+      if (cfzReceivedBoxes != null) c.receivedBoxes += cfzReceivedBoxes;
+      if (cfzShippedThermalCovers != null) c.shippedThermalCovers += cfzShippedThermalCovers;
+      if (cfzReceivedThermalCovers != null) c.receivedThermalCovers += cfzReceivedThermalCovers;
+      c.routes.push({
+        routeId: route.routeId, routeNumber: route.routeNumber, date: route.date,
+        driver: route.driver, vehicle: route.vehicle,
+        shippedRK: cfzShipped, receivedRK: cfzReceived,
+        shippedAt: route.shipment?.at  || null,
+        receivedAt: route.receiving?.at || null,
+        diff: cfzShipped != null && cfzReceived != null ? cfzReceived - cfzShipped : null,
+        shippedPallets: cfzShippedPallets, receivedPallets: cfzReceivedPallets,
+        shippedBoxes: cfzShippedBoxes, receivedBoxes: cfzReceivedBoxes,
+        shippedThermalCovers: cfzShippedThermalCovers, receivedThermalCovers: cfzReceivedThermalCovers,
+      });
     }
   }
 
   return Array.from(map.values())
-    .map(c => ({ ...c, routes: c.routes.sort((a, b) => (b.date || '').localeCompare(a.date || '')) }))
+    .map(c => ({
+      ...c,
+      diff: c.shippedTotal > 0 || c.receivedTotal > 0 ? c.receivedTotal - c.shippedTotal : null,
+      routes: c.routes.sort((a, b) => (b.date || '').localeCompare(a.date || '')),
+    }))
     .sort((a, b) => a.address.localeCompare(b.address, 'ru'));
 }
 
@@ -505,7 +588,7 @@ async function getReportData(dateFrom, dateTo) {
   function ensureCell(addr, date) {
     if (!map.has(addr)) map.set(addr, new Map());
     const dm = map.get(addr);
-    if (!dm.has(date)) dm.set(date, { shipped: 0, received: null, shippedBoxes: 0, receivedBoxes: null });
+    if (!dm.has(date)) dm.set(date, { shipped: 0, received: null, shippedBoxes: 0, receivedBoxes: null, shippedThermalCovers: 0, receivedThermalCovers: null });
     return dm.get(date);
   }
 
@@ -518,6 +601,7 @@ async function getReportData(dateFrom, dateTo) {
           const cell = ensureCell(item.address, shipDate);
           cell.shipped += item.rk;
           if (item.boxes) cell.shippedBoxes += item.boxes;
+          if (item.thermalCovers) cell.shippedThermalCovers += item.thermalCovers;
         }
       }
     }
@@ -528,6 +612,7 @@ async function getReportData(dateFrom, dateTo) {
           const cell = ensureCell(item.address, recvDate);
           cell.received = (cell.received || 0) + item.rk;
           if (item.boxes) cell.receivedBoxes = (cell.receivedBoxes || 0) + item.boxes;
+          if (item.thermalCovers) cell.receivedThermalCovers = (cell.receivedThermalCovers || 0) + item.thermalCovers;
         }
       }
     }
@@ -537,8 +622,8 @@ async function getReportData(dateFrom, dateTo) {
     .map(([address, dm]) => ({
       address,
       records: [...dm.entries()]
-        .filter(([, v]) => v.shipped > 0 || v.received != null || v.shippedBoxes > 0 || v.receivedBoxes != null)
-        .map(([date, v]) => ({ date, shipped: v.shipped, received: v.received, shippedBoxes: v.shippedBoxes, receivedBoxes: v.receivedBoxes }))
+        .filter(([, v]) => v.shipped > 0 || v.received != null || v.shippedBoxes > 0 || v.receivedBoxes != null || v.shippedThermalCovers > 0 || v.receivedThermalCovers != null)
+        .map(([date, v]) => ({ date, shipped: v.shipped, received: v.received, shippedBoxes: v.shippedBoxes, receivedBoxes: v.receivedBoxes, shippedThermalCovers: v.shippedThermalCovers, receivedThermalCovers: v.receivedThermalCovers }))
         .sort((a, b) => a.date.localeCompare(b.date)),
     }))
     .filter(e => e.records.length > 0)

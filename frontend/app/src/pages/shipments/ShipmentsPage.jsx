@@ -370,6 +370,7 @@ function RoutesView({ data, loading, error, onOpenLightbox, onOpenEdit, onDataUp
               <th className={`${styles.thNum} ${styles.thSort}`} onClick={() => toggleSort('shippedRK')}>РК отгр. <SortArrow sort={sort} col="shippedRK" /></th>
               <th className={styles.thNum}>Пал.↗</th>
               <th className={styles.thNum}>Ящ.↗</th>
+              <th className={styles.thNum}>ТЧ↗</th>
               <th className={styles.thNum}>Рохли↗</th>
               <th>Кто отгрузил</th>
               <th className={styles.thNum}>Темп.до°</th>
@@ -378,6 +379,7 @@ function RoutesView({ data, loading, error, onOpenLightbox, onOpenEdit, onDataUp
               <th className={`${styles.thNum} ${styles.thSort}`} onClick={() => toggleSort('receivedRK')}>РК принято <SortArrow sort={sort} col="receivedRK" /></th>
               <th className={styles.thNum}>Пал.↙</th>
               <th className={styles.thNum}>Ящ.↙</th>
+              <th className={styles.thNum}>ТЧ↙</th>
               <th className={styles.thNum}>Рохли↙</th>
               <th className={styles.thNum}>Долг рохлей</th>
               <th>Кто принял</th>
@@ -467,6 +469,7 @@ const RouteRows = memo(function RouteRows({ route: r, expanded, selected, confir
         <td className={styles.tdNum}>{r.shippedRK != null ? r.shippedRK : <span className={styles.naVal}>—</span>}</td>
         <td className={styles.tdNum}>{r.shippedPallets != null && r.shippedPallets > 0 ? r.shippedPallets : <span className={styles.naVal}>—</span>}</td>
         <td className={styles.tdNum}>{r.shippedBoxes != null && r.shippedBoxes > 0 ? r.shippedBoxes : <span className={styles.naVal}>—</span>}</td>
+        <td className={styles.tdNum}>{r.shippedThermalCovers != null && r.shippedThermalCovers > 0 ? r.shippedThermalCovers : <span className={styles.naVal}>—</span>}</td>
         <td className={styles.tdNum}>{r.shipment?.rokhlya != null ? r.shipment.rokhlya : <span className={styles.naVal}>—</span>}</td>
         <td className={`${styles.tdMuted} ${styles.tdTrunc}`} title={r.shipment?.by || ''}>{r.shipment?.by || '—'}</td>
         <td className={styles.tdNum}>{r.shipment?.tempBefore != null ? `${r.shipment.tempBefore}°` : '—'}</td>
@@ -475,6 +478,7 @@ const RouteRows = memo(function RouteRows({ route: r, expanded, selected, confir
         <td className={styles.tdNum}>{r.receivedRK != null ? r.receivedRK : <span className={styles.naVal}>—</span>}</td>
         <td className={styles.tdNum}>{r.receivedPallets != null && r.receivedPallets > 0 ? r.receivedPallets : <span className={styles.naVal}>—</span>}</td>
         <td className={styles.tdNum}>{r.receivedBoxes != null && r.receivedBoxes > 0 ? r.receivedBoxes : <span className={styles.naVal}>—</span>}</td>
+        <td className={styles.tdNum}>{r.receivedThermalCovers != null && r.receivedThermalCovers > 0 ? r.receivedThermalCovers : <span className={styles.naVal}>—</span>}</td>
         <td className={styles.tdNum}>{r.receiving?.rokhlya != null ? r.receiving.rokhlya : <span className={styles.naVal}>—</span>}</td>
         <td className={styles.tdNum}>{r.rokhlyaDebt != null && r.rokhlyaDebt !== 0 ? r.rokhlyaDebt : <span className={styles.naVal}>—</span>}</td>
         <td className={`${styles.tdMuted} ${styles.tdTrunc}`} title={r.receiving?.by || ''}>{r.receiving?.by || '—'}</td>
@@ -540,9 +544,11 @@ function RouteDetailRow({ route: r, onLightbox }) {
                   <th className={styles.thNum}>РК отгр.</th>
                   <th className={styles.thNum}>Пал. отгр.</th>
                   <th className={styles.thNum}>Ящ. отгр.</th>
+                  <th className={styles.thNum}>ТЧ отгр.</th>
                   <th className={styles.thNum}>РК прин.</th>
                   <th className={styles.thNum}>Пал. прин.</th>
                   <th className={styles.thNum}>Ящ. прин.</th>
+                  <th className={styles.thNum}>ТЧ прин.</th>
                   <th className={styles.thNum}>Разница РК</th>
                 </tr></thead>
                 <tbody>
@@ -556,9 +562,11 @@ function RouteDetailRow({ route: r, onLightbox }) {
                         <td className={styles.tdNum}>{s ? s.rk : <span className={styles.naVal}>—</span>}</td>
                         <td className={styles.tdNum}>{s?.pallets > 0 ? s.pallets : <span className={styles.naVal}>—</span>}</td>
                         <td className={styles.tdNum}>{s?.boxes > 0 ? s.boxes : <span className={styles.naVal}>—</span>}</td>
+                        <td className={styles.tdNum}>{s?.thermalCovers > 0 ? s.thermalCovers : <span className={styles.naVal}>—</span>}</td>
                         <td className={styles.tdNum}>{rv ? rv.rk : <span className={styles.naVal}>—</span>}</td>
                         <td className={styles.tdNum}>{rv?.pallets > 0 ? rv.pallets : <span className={styles.naVal}>—</span>}</td>
                         <td className={styles.tdNum}>{rv?.boxes > 0 ? rv.boxes : <span className={styles.naVal}>—</span>}</td>
+                        <td className={styles.tdNum}>{rv?.thermalCovers > 0 ? rv.thermalCovers : <span className={styles.naVal}>—</span>}</td>
                         <td className={styles.tdNum}><DiffVal diff={d} /></td>
                       </tr>
                     )
@@ -805,9 +813,9 @@ function DriversView({ data, loading, error }) {
           <thead>
             <tr>
               <th>Водитель</th>
-              {['routeCount','shippedTotal','shippedPallets','shippedBoxes','shippedRokhlya','receivedTotal','receivedPallets','receivedBoxes','receivedRokhlya','rokhlyaDebt','diff'].map(col => (
+              {['routeCount','shippedTotal','shippedPallets','shippedBoxes','shippedThermalCovers','shippedRokhlya','receivedTotal','receivedPallets','receivedBoxes','receivedThermalCovers','receivedRokhlya','rokhlyaDebt','diff'].map(col => (
                 <th key={col} className={`${styles.thNum} ${styles.thSort}`} onClick={() => toggleSort(col)}>
-                  {{ routeCount:'Маршрутов', shippedTotal:'РК отгр.', shippedPallets:'Пал. отгр.', shippedBoxes:'Ящ. отгр.', shippedRokhlya:'Рохли↗', receivedTotal:'РК прин.', receivedPallets:'Пал. прин.', receivedBoxes:'Ящ. прин.', receivedRokhlya:'Рохли↙', rokhlyaDebt:'Долг рохлей', diff:'Разница РК' }[col]}
+                  {{ routeCount:'Маршрутов', shippedTotal:'РК отгр.', shippedPallets:'Пал. отгр.', shippedBoxes:'Ящ. отгр.', shippedThermalCovers:'ТЧ отгр.', shippedRokhlya:'Рохли↗', receivedTotal:'РК прин.', receivedPallets:'Пал. прин.', receivedBoxes:'Ящ. прин.', receivedThermalCovers:'ТЧ прин.', receivedRokhlya:'Рохли↙', rokhlyaDebt:'Долг рохлей', diff:'Разница РК' }[col]}
                   {' '}<SortArrow sort={sort} col={col} />
                 </th>
               ))}
@@ -840,10 +848,12 @@ function DriverRows({ driver: d, expanded, detailSort: ds, onToggle, onDetailSor
         <td className={styles.tdNum}>{d.shippedTotal || 0}</td>
         <td className={styles.tdNum}>{d.shippedPallets || 0}</td>
         <td className={styles.tdNum}>{d.shippedBoxes || 0}</td>
+        <td className={styles.tdNum}>{d.shippedThermalCovers || 0}</td>
         <td className={styles.tdNum}>{d.shippedRokhlya || 0}</td>
         <td className={styles.tdNum}>{d.receivedTotal || 0}</td>
         <td className={styles.tdNum}>{d.receivedPallets || 0}</td>
         <td className={styles.tdNum}>{d.receivedBoxes || 0}</td>
+        <td className={styles.tdNum}>{d.receivedThermalCovers || 0}</td>
         <td className={styles.tdNum}>{d.receivedRokhlya || 0}</td>
         <td className={styles.tdNum}>{d.rokhlyaDebt != null && d.rokhlyaDebt !== 0 ? (() => {
           const debtRoute = (d.routes || []).filter(r => (r.shippedRokhlya - r.receivedRokhlya) > 0).sort((a, b) => a.date.localeCompare(b.date))[0] || null
@@ -997,9 +1007,9 @@ function CfzView({ data, loading, error }) {
           <thead>
             <tr>
               <th>Адрес ЦФЗ</th>
-              {['routeCount','shippedTotal','shippedPallets','shippedBoxes','receivedTotal','receivedPallets','receivedBoxes','diff'].map(col => (
+              {['routeCount','shippedTotal','shippedPallets','shippedBoxes','shippedThermalCovers','receivedTotal','receivedPallets','receivedBoxes','receivedThermalCovers','diff'].map(col => (
                 <th key={col} className={`${styles.thNum} ${styles.thSort}`} onClick={() => toggleSort(col)}>
-                  {{ routeCount:'Маршрутов', shippedTotal:'РК отгр.', shippedPallets:'Пал. отгр.', shippedBoxes:'Ящ. отгр.', receivedTotal:'РК прин.', receivedPallets:'Пал. прин.', receivedBoxes:'Ящ. прин.', diff:'Разница' }[col]}
+                  {{ routeCount:'Маршрутов', shippedTotal:'РК отгр.', shippedPallets:'Пал. отгр.', shippedBoxes:'Ящ. отгр.', shippedThermalCovers:'ТЧ отгр.', receivedTotal:'РК прин.', receivedPallets:'Пал. прин.', receivedBoxes:'Ящ. прин.', receivedThermalCovers:'ТЧ прин.', diff:'Разница' }[col]}
                   {' '}<SortArrow sort={sort} col={col} />
                 </th>
               ))}
@@ -1032,9 +1042,11 @@ function CfzRows({ entry, expanded, detailSort: ds, onToggle, onDetailSort }) {
         <td className={styles.tdNum}>{entry.shippedTotal || 0}</td>
         <td className={styles.tdNum}>{entry.shippedPallets || 0}</td>
         <td className={styles.tdNum}>{entry.shippedBoxes || 0}</td>
+        <td className={styles.tdNum}>{entry.shippedThermalCovers || 0}</td>
         <td className={styles.tdNum}>{entry.receivedTotal || 0}</td>
         <td className={styles.tdNum}>{entry.receivedPallets || 0}</td>
         <td className={styles.tdNum}>{entry.receivedBoxes || 0}</td>
+        <td className={styles.tdNum}>{entry.receivedThermalCovers || 0}</td>
         <td className={styles.tdNum}><DiffVal diff={entry.diff} /></td>
       </tr>
       {expanded && <CfzDetailRow entry={entry} detailSort={ds} onDetailSort={onDetailSort} />}
@@ -1065,10 +1077,12 @@ function CfzDetailRow({ entry, detailSort: ds, onDetailSort }) {
                     <th className={`${styles.thNum} ${styles.thSort}`} onClick={() => onDetailSort('shippedRK')}>РК отгр. <SortArrow sort={ds} col="shippedRK" /></th>
                     <th className={styles.thNum}>Пал. отгр.</th>
                     <th className={styles.thNum}>Ящ. отгр.</th>
+                    <th className={styles.thNum}>ТЧ отгр.</th>
                     <th className={styles.thNum}>Дата отгр.</th>
                     <th className={`${styles.thNum} ${styles.thSort}`} onClick={() => onDetailSort('receivedRK')}>РК прин. <SortArrow sort={ds} col="receivedRK" /></th>
                     <th className={styles.thNum}>Пал. прин.</th>
                     <th className={styles.thNum}>Ящ. прин.</th>
+                    <th className={styles.thNum}>ТЧ прин.</th>
                     <th className={styles.thNum}>Дата прин.</th>
                     <th className={`${styles.thNum} ${styles.thSort}`} onClick={() => onDetailSort('diff')}>Разница <SortArrow sort={ds} col="diff" /></th>
                   </tr>
@@ -1082,10 +1096,12 @@ function CfzDetailRow({ entry, detailSort: ds, onDetailSort }) {
                       <td className={styles.tdNum}>{r.shippedRK != null ? r.shippedRK : <span className={styles.naVal}>—</span>}</td>
                       <td className={styles.tdNum}>{r.shippedPallets > 0 ? r.shippedPallets : <span className={styles.naVal}>—</span>}</td>
                       <td className={styles.tdNum}>{r.shippedBoxes > 0 ? r.shippedBoxes : <span className={styles.naVal}>—</span>}</td>
+                      <td className={styles.tdNum}>{r.shippedThermalCovers > 0 ? r.shippedThermalCovers : <span className={styles.naVal}>—</span>}</td>
                       <td className={`${styles.tdMuted} ${styles.tdDate}`}>{fmtDateTime(r.shippedAt)}</td>
                       <td className={styles.tdNum}>{r.receivedRK != null ? r.receivedRK : <span className={styles.naVal}>—</span>}</td>
                       <td className={styles.tdNum}>{r.receivedPallets > 0 ? r.receivedPallets : <span className={styles.naVal}>—</span>}</td>
                       <td className={styles.tdNum}>{r.receivedBoxes > 0 ? r.receivedBoxes : <span className={styles.naVal}>—</span>}</td>
+                      <td className={styles.tdNum}>{r.receivedThermalCovers > 0 ? r.receivedThermalCovers : <span className={styles.naVal}>—</span>}</td>
                       <td className={`${styles.tdMuted} ${styles.tdDate}`}>{fmtDateTime(r.receivedAt)}</td>
                       <td className={styles.tdNum}><DiffVal diff={r.diff} /></td>
                     </tr>
@@ -1271,8 +1287,12 @@ function FormModal({ initialRoute, onClose, onSaved }) {
       // Collect gate + items from DOM
       const gate  = document.getElementById('sh-react-gate')?.value.trim() || null
       const items = collectCfzInputs('sh-react-cfz-rk')
+      const thermalCoversRaw = collectCfzInputs('sh-react-cfz-thermal-covers')
+      const thermalCoversLookup = Object.fromEntries(thermalCoversRaw.map(i => [i.address, i.rk]))
+      items.forEach(i => { i.thermalCovers = thermalCoversLookup[i.address] ?? 0 })
       // Also include manual items
       manualCfz.forEach(m => items.push(m))
+      items.forEach(i => { i.thermalCovers = thermalCoversLookup[i.address] ?? i.thermalCovers ?? 0 })
       const dedupe = []
       const seen = new Set()
       for (const it of items) { if (!seen.has(it.address)) { dedupe.push(it); seen.add(it.address) } }
@@ -1305,6 +1325,9 @@ function FormModal({ initialRoute, onClose, onSaved }) {
       const shipBoxesRaw = collectCfzInputs('sh-react-ship-boxes')
       const shipBoxesLookup = Object.fromEntries(shipBoxesRaw.map(i => [i.address, i.rk]))
       shipItems.forEach(i => { i.boxes = shipBoxesLookup[i.address] ?? 0 })
+      const shipThermalCoversRaw = collectCfzInputs('sh-react-ship-thermal-covers')
+      const shipThermalCoversLookup = Object.fromEntries(shipThermalCoversRaw.map(i => [i.address, i.rk]))
+      shipItems.forEach(i => { i.thermalCovers = shipThermalCoversLookup[i.address] ?? 0 })
       const recvItems = collectCfzInputs('sh-react-recv-rk')
       const recvPalletsRaw = collectCfzInputs('sh-react-recv-pallets')
       const recvPalletsLookup = Object.fromEntries(recvPalletsRaw.map(i => [i.address, i.rk]))
@@ -1312,6 +1335,9 @@ function FormModal({ initialRoute, onClose, onSaved }) {
       const recvBoxesRaw = collectCfzInputs('sh-react-recv-boxes')
       const recvBoxesLookup = Object.fromEntries(recvBoxesRaw.map(i => [i.address, i.rk]))
       recvItems.forEach(i => { i.boxes = recvBoxesLookup[i.address] ?? 0 })
+      const recvThermalCoversRaw = collectCfzInputs('sh-react-recv-thermal-covers')
+      const recvThermalCoversLookup = Object.fromEntries(recvThermalCoversRaw.map(i => [i.address, i.rk]))
+      recvItems.forEach(i => { i.thermalCovers = recvThermalCoversLookup[i.address] ?? 0 })
       const shipBy   = document.getElementById('sh-react-edit-ship-by')?.value.trim() || ''
       const shipGate = document.getElementById('sh-react-edit-ship-gate')?.value.trim() || ''
       const parseTemp = v => { const s = String(v ?? '').replace(',', '.'); return s !== '' && !isNaN(parseFloat(s)) ? parseFloat(s) : null }
@@ -1528,12 +1554,15 @@ function FormStep4Create({ route, formType, formPhotos, manualCfz, manualAddr, m
         <div className={styles.formSectionTitle}>Количество РК по каждому ЦФЗ</div>
         {cfzList.length > 0
           ? cfzList.map(a => {
-              const prevRk = shipItems.find(x => x.address === a.address)?.rk ?? ''
+              const prevItem = shipItems.find(x => x.address === a.address)
+              const prevRk = prevItem?.rk ?? ''
+              const prevThermalCovers = prevItem?.thermalCovers ?? ''
               const curRk  = formType === 'receive' ? prevRk : ''
+              const curThermalCovers = formType === 'receive' ? prevThermalCovers : ''
               return (
                 <div key={a.address} className={styles.formCfzRow}>
                   <span className={styles.formCfzAddr}>{a.address}</span>
-                  {formType === 'receive' && prevRk !== '' && <span className={styles.formCfzHint}>отгружено: {prevRk}</span>}
+                  {formType === 'receive' && prevRk !== '' && <span className={styles.formCfzHint}>отгружено: {prevRk}{prevThermalCovers ? ` / ${prevThermalCovers} ТЧ` : ''}</span>}
                   <input
                     type="number"
                     className={`${styles.shInput} ${styles.inputRk} sh-react-cfz-rk`}
@@ -1541,6 +1570,14 @@ function FormStep4Create({ route, formType, formPhotos, manualCfz, manualAddr, m
                     min="0"
                     placeholder="0"
                     defaultValue={curRk}
+                  />
+                  <input
+                    type="number"
+                    className={`${styles.shInput} ${styles.inputRk} sh-react-cfz-thermal-covers`}
+                    data-addr={a.address}
+                    min="0"
+                    placeholder="ТЧ"
+                    defaultValue={curThermalCovers}
                   />
                 </div>
               )
@@ -1561,6 +1598,14 @@ function FormStep4Create({ route, formType, formPhotos, manualCfz, manualAddr, m
                     data-addr={m.address}
                     min="0"
                     defaultValue={m.rk}
+                  />
+                  <input
+                    type="number"
+                    className={`${styles.shInput} ${styles.inputRk} sh-react-cfz-thermal-covers`}
+                    data-addr={m.address}
+                    min="0"
+                    placeholder="ТЧ"
+                    defaultValue={m.thermalCovers ?? ''}
                   />
                   <button className="btn btn-xs btn-secondary" onClick={() => onManualCfzChange(prev => prev.filter((_, j) => j !== i))}><X size={12} strokeWidth={2}/></button>
                 </div>
@@ -1593,9 +1638,11 @@ function FormStep4Edit({ route, editShip, editRecv, editDriverName, onEditShipCh
   const shipItemMap    = Object.fromEntries((route.shipment?.items  || []).map(i => [i.address, i.rk]))
   const shipPalletsMap = Object.fromEntries((route.shipment?.items  || []).map(i => [i.address, i.pallets ?? '']))
   const shipBoxesMap   = Object.fromEntries((route.shipment?.items  || []).map(i => [i.address, i.boxes ?? '']))
+  const shipThermalCoversMap = Object.fromEntries((route.shipment?.items || []).map(i => [i.address, i.thermalCovers ?? '']))
   const recvItemMap    = Object.fromEntries((route.receiving?.items || []).map(i => [i.address, i.rk]))
   const recvPalletsMap = Object.fromEntries((route.receiving?.items || []).map(i => [i.address, i.pallets ?? '']))
   const recvBoxesMap   = Object.fromEntries((route.receiving?.items || []).map(i => [i.address, i.boxes ?? '']))
+  const recvThermalCoversMap = Object.fromEntries((route.receiving?.items || []).map(i => [i.address, i.thermalCovers ?? '']))
 
   const removeExistingPhoto = (section, idx) => {
     const setter = section === 'ship' ? onEditShipChange : onEditRecvChange
@@ -1610,17 +1657,18 @@ function FormStep4Edit({ route, editShip, editRecv, editDriverName, onEditShipCh
     setter(prev => ({ ...prev, newPhotos: [...prev.newPhotos, ...Array.from(files)] }))
   }
 
-  const CfzRows = ({ sectionClass, palletsSectionClass, boxesSectionClass, itemMap, palletsMap, boxesMap, hintMap, hintPalletsMap, hintBoxesMap }) => cfzList.length > 0
+  const CfzRows = ({ sectionClass, palletsSectionClass, boxesSectionClass, thermalCoversSectionClass, itemMap, palletsMap, boxesMap, thermalCoversMap, hintMap, hintPalletsMap, hintBoxesMap, hintThermalCoversMap }) => cfzList.length > 0
     ? cfzList.map(a => {
         const cur = itemMap[a.address] ?? ''
         const curPallets = palletsMap?.[a.address] ?? ''
         const curBoxes = boxesMap?.[a.address] ?? ''
+        const curThermalCovers = thermalCoversMap?.[a.address] ?? ''
         return (
           <div key={a.address} className={styles.formCfzRow}>
             <span className={styles.formCfzAddr}>{a.address}</span>
             {hintMap && hintMap[a.address] != null && (
               <span className={styles.formCfzHint}>
-                отгр: {hintMap[a.address]} РК{hintPalletsMap?.[a.address] ? ` / ${hintPalletsMap[a.address]} пал.` : ''}{hintBoxesMap?.[a.address] ? ` / ${hintBoxesMap[a.address]} ящ.` : ''}
+                отгр: {hintMap[a.address]} РК{hintPalletsMap?.[a.address] ? ` / ${hintPalletsMap[a.address]} пал.` : ''}{hintBoxesMap?.[a.address] ? ` / ${hintBoxesMap[a.address]} ящ.` : ''}{hintThermalCoversMap?.[a.address] ? ` / ${hintThermalCoversMap[a.address]} ТЧ` : ''}
               </span>
             )}
             <input
@@ -1646,6 +1694,14 @@ function FormStep4Edit({ route, editShip, editRecv, editDriverName, onEditShipCh
               min="0"
               placeholder="ящ."
               defaultValue={curBoxes}
+            />
+            <input
+              type="number"
+              className={`${styles.shInput} ${styles.inputRk} ${thermalCoversSectionClass}`}
+              data-addr={a.address}
+              min="0"
+              placeholder="ТЧ"
+              defaultValue={curThermalCovers}
             />
           </div>
         )
@@ -1700,7 +1756,7 @@ function FormStep4Edit({ route, editShip, editRecv, editDriverName, onEditShipCh
         </div>
         <div className={styles.formCfzSection}>
           <div className={styles.formSectionTitle}>РК по ЦФЗ <span className={styles.hintClear}>(оставьте пустым — запись удалится)</span></div>
-          <CfzRows sectionClass="sh-react-ship-rk" palletsSectionClass="sh-react-ship-pallets" boxesSectionClass="sh-react-ship-boxes" itemMap={shipItemMap} palletsMap={shipPalletsMap} boxesMap={shipBoxesMap} hintMap={null} />
+          <CfzRows sectionClass="sh-react-ship-rk" palletsSectionClass="sh-react-ship-pallets" boxesSectionClass="sh-react-ship-boxes" thermalCoversSectionClass="sh-react-ship-thermal-covers" itemMap={shipItemMap} palletsMap={shipPalletsMap} boxesMap={shipBoxesMap} thermalCoversMap={shipThermalCoversMap} hintMap={null} />
         </div>
         <div className={styles.formPhotoSection}>
           <PhotoBlock section="ship" state={editShip} />
@@ -1720,7 +1776,7 @@ function FormStep4Edit({ route, editShip, editRecv, editDriverName, onEditShipCh
         </div>
         <div className={styles.formCfzSection}>
           <div className={styles.formSectionTitle}>РК по ЦФЗ <span className={styles.hintClear}>(оставьте пустым — запись удалится)</span></div>
-          <CfzRows sectionClass="sh-react-recv-rk" palletsSectionClass="sh-react-recv-pallets" boxesSectionClass="sh-react-recv-boxes" itemMap={recvItemMap} palletsMap={recvPalletsMap} boxesMap={recvBoxesMap} hintMap={shipItemMap} hintPalletsMap={shipPalletsMap} hintBoxesMap={shipBoxesMap} />
+          <CfzRows sectionClass="sh-react-recv-rk" palletsSectionClass="sh-react-recv-pallets" boxesSectionClass="sh-react-recv-boxes" thermalCoversSectionClass="sh-react-recv-thermal-covers" itemMap={recvItemMap} palletsMap={recvPalletsMap} boxesMap={recvBoxesMap} thermalCoversMap={recvThermalCoversMap} hintMap={shipItemMap} hintPalletsMap={shipPalletsMap} hintBoxesMap={shipBoxesMap} hintThermalCoversMap={shipThermalCoversMap} />
         </div>
         <div className={styles.formPhotoSection}>
           <PhotoBlock section="recv" state={editRecv} />

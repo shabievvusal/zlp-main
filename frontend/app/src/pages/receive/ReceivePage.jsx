@@ -183,6 +183,8 @@ function StepData({ opType, route, onDone, byName }) {
   const [palletsValues, setPalletsValues] = useState(() => Object.fromEntries(cfz.map(a => [a.address, String(existingPalletsMap[a.address] ?? '')])))
   const existingBoxesMap = Object.fromEntries((existingItems || []).map(i => [i.address, i.boxes ?? '']))
   const [boxesValues, setBoxesValues] = useState(() => Object.fromEntries(cfz.map(a => [a.address, String(existingBoxesMap[a.address] ?? '')])))
+  const existingThermalCoversMap = Object.fromEntries((existingItems || []).map(i => [i.address, i.thermalCovers ?? '']))
+  const [thermalCoversValues, setThermalCoversValues] = useState(() => Object.fromEntries(cfz.map(a => [a.address, String(existingThermalCoversMap[a.address] ?? '')])))
   const [photos, setPhotos] = useState([]) // { file, url }
   const [status, setStatus] = useState(null) // { type: 'success'|'error', msg }
   const [saving, setSaving] = useState(false)
@@ -207,6 +209,7 @@ function StepData({ opType, route, onDone, byName }) {
       rk: parseNum(cfzValues[a.address]),
       pallets: parseNum(palletsValues[a.address]),
       boxes: parseNum(boxesValues[a.address]),
+      thermalCovers: parseNum(thermalCoversValues[a.address]),
     }))
 
     setSaving(true)
@@ -305,7 +308,7 @@ function StepData({ opType, route, onDone, byName }) {
         </div>
       </div>
 
-      <div className={s.fieldLabel}>РК и паллеты по ЦФЗ</div>
+      <div className={s.fieldLabel}>РК, паллеты, ящики и ТЧ по ЦФЗ</div>
       <div className={s.cfzList}>
         {cfz.length === 0 && <div className={s.empty}>Нет адресов ЦФЗ</div>}
         {cfz.map(a => {
@@ -313,12 +316,13 @@ function StepData({ opType, route, onDone, byName }) {
           const shippedRk = opType === 'receive' ? (shipItem?.rk ?? null) : null
           const shippedPallets = opType === 'receive' ? (shipItem?.pallets ?? null) : null
           const shippedBoxes = opType === 'receive' ? (shipItem?.boxes ?? null) : null
+          const shippedThermalCovers = opType === 'receive' ? (shipItem?.thermalCovers ?? null) : null
           return (
             <div key={a.address} className={s.cfzRow}>
               <span className={s.cfzAddr}>{a.address}</span>
               {shippedRk != null && (
                 <span className={s.cfzShipped}>
-                  отгр. {shippedRk} РК{shippedPallets ? ` / ${shippedPallets} пал.` : ''}{shippedBoxes ? ` / ${shippedBoxes} ящ.` : ''}
+                  отгр. {shippedRk} РК{shippedPallets ? ` / ${shippedPallets} пал.` : ''}{shippedBoxes ? ` / ${shippedBoxes} ящ.` : ''}{shippedThermalCovers ? ` / ${shippedThermalCovers} ТЧ` : ''}
                 </span>
               )}
               <input
@@ -347,6 +351,15 @@ function StepData({ opType, route, onDone, byName }) {
                 placeholder="ящ."
                 value={boxesValues[a.address] ?? ''}
                 onChange={e => setBoxesValues(prev => ({ ...prev, [a.address]: e.target.value }))}
+              />
+              <input
+                className={s.cfzInputSm}
+                type="number"
+                inputMode="numeric"
+                min="0"
+                placeholder="ТЧ"
+                value={thermalCoversValues[a.address] ?? ''}
+                onChange={e => setThermalCoversValues(prev => ({ ...prev, [a.address]: e.target.value }))}
               />
             </div>
           )
