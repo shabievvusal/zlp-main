@@ -179,8 +179,11 @@ export function AppProvider({ children }) {
         operationCompletedAtFrom: fromDate.toISOString(),
         operationCompletedAtTo:   toDate.toISOString(),
       }
-      // Как в оригинальном app.js: если есть WMS-токен — грузим через браузер
+      // Как в оригинальном app.js: если есть WMS-токен — грузим через браузер.
+      // Независимые WMS-источники запускаем параллельно: комплектация и размещение.
       let res
+      let placementRes = null
+      let placementError = null
       let token = getToken()
       if (token) {
         if (!isTokenValid()) {
@@ -188,37 +191,46 @@ export function AppProvider({ children }) {
           token = getToken()
         }
         if (!token) throw new Error('WMS токен истёк. Войдите в систему заново.')
-        try {
-          res = await api.fetchDataViaBrowser(token, opts)
-        } catch (err) {
-          // Если 401/403 — обновляем токен и повторяем один раз
-          if (/401|403|unauthorized/i.test(err.message)) {
-            const refreshed = await forceRefresh()
-            if (!refreshed) throw new Error('Сессия истекла. Войдите в систему заново.')
-            token = getToken()
-            if (!token) throw new Error('Не удалось получить токен после обновления.')
-            res = await api.fetchDataViaBrowser(token, opts)
-          } else {
+
+        const fetchSelection = async (wmsToken, allowRefresh = true) => {
+          try {
+            return await api.fetchDataViaBrowser(wmsToken, opts)
+          } catch (err) {
+            if (allowRefresh && /401|403|unauthorized/i.test(err.message)) {
+              const refreshed = await forceRefresh()
+              if (!refreshed) throw new Error('Сессия истекла. Войдите в систему заново.')
+              const freshToken = getToken()
+              if (!freshToken) throw new Error('Не удалось получить токен после обновления.')
+              token = freshToken
+              return fetchSelection(freshToken, false)
+            }
             throw err
           }
         }
+
+        const fetchPlacement = async (wmsToken) => {
+          try {
+            return await api.fetchPlacementViaBrowser(wmsToken, {
+              createdAtFrom: opts.operationCompletedAtFrom,
+              createdAtTo: opts.operationCompletedAtTo,
+            })
+          } catch (err) {
+            console.warn('placement fetch failed:', err)
+            return { __error: err }
+          }
+        }
+
+        const [selectionResult, placementResult] = await Promise.all([
+          fetchSelection(token),
+          fetchPlacement(token),
+        ])
+        res = selectionResult
+        if (placementResult?.__error) placementError = placementResult.__error
+        else placementRes = placementResult
       } else {
         res = await api.fetchData(opts)
       }
       if (res.success === false) throw new Error(res.error)
-      let placementRes = null
-      let placementError = null
-      if (token) {
-        try {
-          placementRes = await api.fetchPlacementViaBrowser(token, {
-            createdAtFrom: opts.operationCompletedAtFrom,
-            createdAtTo: opts.operationCompletedAtTo,
-          })
-        } catch (err) {
-          placementError = err
-          console.warn('placement fetch failed:', err)
-        }
-      }
       if (!silent) {
         const placementText = placementRes
           ? ` · размещение: ${placementRes.fetched ?? '?'}/${placementRes.added ?? '?'}`
