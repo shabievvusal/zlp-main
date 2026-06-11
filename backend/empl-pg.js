@@ -104,17 +104,14 @@ async function listEmployees() {
 
 /**
  * Добавить или обновить сотрудника.
- * Если executor_id известен — upsert по нему.
- * Если executor_id не передан — upsert по нормализованному ФИО (используем ФИО как pk).
+ * Сотрудники сохраняются только по реальному executor_id.
  */
 async function upsertEmployee({ executorId, fio, company }) {
-  const id = (executorId || '').trim() || ('fio:' + normFio(fio));
+  const id = (executorId || '').trim();
   const f  = String(fio || '').trim();
   const c  = String(company != null ? company : '').trim();
-  // При сохранении с реальным UUID удаляем старую fio: запись (если была)
-  if (f && !id.startsWith('fio:')) {
-    await pool.query('DELETE FROM employees WHERE executor_id = $1', ['fio:' + normFio(f)]);
-  }
+  if (!id) throw new Error('executorId обязателен для сохранения сотрудника');
+  if (!f) throw new Error('ФИО обязательно');
   await pool.query(
     `INSERT INTO employees (executor_id, fio, company)
      VALUES ($1, $2, $3)
@@ -125,7 +122,7 @@ async function upsertEmployee({ executorId, fio, company }) {
 }
 
 /**
- * Добавить сотрудников, которых ещё нет в таблице (по executor_id и по нормализованному ФИО).
+ * Добавить сотрудников, которых ещё нет в таблице по executor_id.
  * names — строки ФИО (без компании, взяты из WMS).
  * executors — массив [{executorId, fio}]
  * Возвращает количество новых записей.
@@ -134,8 +131,7 @@ async function addNewEmployees(executors) {
   if (!executors || !executors.length) return 0;
   // Получаем существующие записи
   const { rows } = await pool.query('SELECT executor_id, fio FROM employees');
-  const existingIds  = new Map(rows.map(r => [r.executor_id, normFio(r.fio)])); // id → normFio
-  const fioToId      = new Map(rows.map(r => [normFio(r.fio), r.executor_id])); // normFio → id
+  const existingIds  = new Set(rows.map(r => r.executor_id).filter(Boolean));
 
   let added = 0;
   for (const { executorId, fio } of executors) {
@@ -145,30 +141,12 @@ async function addNewEmployees(executors) {
     if (!f || !id) continue;
     // Уже есть с таким реальным UUID — пропускаем
     if (existingIds.has(id)) continue;
-    const normF = normFio(f);
-    const existingId = fioToId.get(normF);
-    if (existingId) {
-      // ФИО есть, но с fio:xxx — апгрейдим до реального UUID
-      if (existingId.startsWith('fio:')) {
-        await pool.query(
-          'UPDATE employees SET executor_id = $1, fio = $2 WHERE executor_id = $3',
-          [id, f, existingId]
-        );
-        existingIds.delete(existingId);
-        existingIds.set(id, normF);
-        fioToId.set(normF, id);
-        added++;
-      }
-      // ФИО есть с реальным UUID — пропускаем
-      continue;
-    }
     await pool.query(
       `INSERT INTO employees (executor_id, fio, company) VALUES ($1, $2, '')
        ON CONFLICT (executor_id) DO NOTHING`,
       [id, f]
     );
-    existingIds.set(id, normF);
-    fioToId.set(normF, id);
+    existingIds.add(id);
     added++;
   }
   if (added > 0) await refreshCache();

@@ -407,24 +407,18 @@ function updateNamesRegistry(items) {
     emplPg.enrichNames(registry).catch(err => console.error('empl-pg enrichNames:', err.message));
   }
 
-  // Возвращаем имена из текущей выгрузки, которых нет в хранилище
-  const knownFios = emplPg
-    ? new Set([...emplPg.getEmplMapFioToCompany().keys()])
-    : existingPks;
+  // Возвращаем исполнителей из текущей выгрузки, которых нет в хранилище.
+  // Сопоставляем только по executorId, без fallback по ФИО.
   const knownIds = emplPg
     ? null
     : new Set(Object.keys(loadEmplIdRegistry()));
   const newEmployees = [];
-  for (const [, { fio, executorId, pk }] of itemNames) {
-    const norm = fio.replace(/\s+/g, ' ').trim().toLowerCase();
-    const known = executorId
-      ? (emplPg ? emplPg.getCompanyById(executorId) != null : knownIds.has(executorId))
-      : (emplPg
-        ? [...knownFios].some(k => k === norm || k.includes(norm) || norm.includes(k))
-        : knownFios.has(pk));
+  for (const [, { fio, executorId }] of itemNames) {
+    if (!executorId) continue;
+    const known = emplPg ? emplPg.getCompanyById(executorId) != null : knownIds.has(executorId);
     if (!known) {
       const titled = fio.replace(/\S+/g, w => w.split('-').map(p => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join('-'));
-      newEmployees.push({ executorId: executorId || null, fio: titled });
+      newEmployees.push({ executorId, fio: titled });
     }
   }
   return { newEmployees };
@@ -853,31 +847,11 @@ function parseEmplCsvEmployees() {
 }
 
 function listCsvEmployeesWithIds() {
-  const csvEmployees = parseEmplCsvEmployees();
   const registry = loadEmplIdRegistry();
-  const byNorm = new Map();
-  for (const [executorId, rec] of Object.entries(registry)) {
-    const norm = normalizeFioForMatch(rec?.fio);
-    if (!norm) continue;
-    if (!byNorm.has(norm)) byNorm.set(norm, []);
-    byNorm.get(norm).push({ executorId, fio: rec.fio || '', company: rec.company || '' });
-  }
-
-  const usedIds = new Set();
-  const out = csvEmployees.map(emp => {
-    const matches = byNorm.get(normalizeFioForMatch(emp.fio)) || [];
-    const match = matches.find(m => !usedIds.has(m.executorId) && (!m.company || m.company === emp.company)) ||
-      matches.find(m => !usedIds.has(m.executorId));
-    if (!match) return emp;
-    usedIds.add(match.executorId);
-    return { ...emp, executorId: match.executorId };
-  });
-
-  for (const [executorId, rec] of Object.entries(registry)) {
-    if (usedIds.has(executorId)) continue;
-    if (rec?.fio) out.push({ executorId, fio: rec.fio, company: rec.company || '' });
-  }
-  return out;
+  return Object.entries(registry)
+    .filter(([, rec]) => rec?.fio)
+    .map(([executorId, rec]) => ({ executorId, fio: rec.fio, company: rec.company || '' }))
+    .sort((a, b) => a.fio.localeCompare(b.fio, 'ru'));
 }
 
 function writeEmployeesCsvAndIds(employees) {
@@ -886,11 +860,11 @@ function writeEmployeesCsvAndIds(employees) {
   const registry = {};
   for (const row of employees || []) {
     const fio = String(row?.fio || '').trim();
-    if (!fio) continue;
+    const executorId = String(row?.executorId || '').trim();
+    if (!fio || !executorId) continue;
     const company = String(row?.company || '').trim();
     lines.push(fio.replace(/;/g, ',') + ';' + company.replace(/[\r\n]/g, ' '));
-    const executorId = String(row?.executorId || '').trim();
-    if (executorId) registry[executorId] = { fio, company };
+    registry[executorId] = { fio, company };
   }
   fs.writeFileSync(EMPL_CSV_PATH, Buffer.from('\uFEFF' + lines.join('\n'), 'utf8'));
   saveEmplIdRegistry(registry);
@@ -935,7 +909,7 @@ function getCompanyByFio(emplMap, executorFio) {
   return null;
 }
 
-/** Приоритет: UUID → нечёткое ФИО. Используется везде, где доступен executorId. */
+/** Компания определяется только по UUID executorId. ФИО используется только для отображения. */
 function getCompanyByIdOrFio(executorId, executorFio) {
   if (executorId && emplPg) {
     const c = emplPg.getCompanyById(executorId);
@@ -945,8 +919,7 @@ function getCompanyByIdOrFio(executorId, executorFio) {
     const rec = loadEmplIdRegistry()[String(executorId).trim()];
     if (rec && rec.company != null) return rec.company;
   }
-  const emplMap = getEmplMapFioToCompany();
-  return getCompanyByFio(emplMap, executorFio);
+  return null;
 }
 
 // Веса товаров из Excel для фронтенда (article -> grams)
@@ -1036,6 +1009,9 @@ app.post('/api/empl', async (req, res) => {
     if (!fio || typeof fio !== 'string' || !fio.trim()) {
       return res.status(400).json({ ok: false, error: 'Укажите ФИО' });
     }
+    if (!executorId || typeof executorId !== 'string' || !executorId.trim()) {
+      return res.status(400).json({ ok: false, error: 'executorId обязателен' });
+    }
     if (emplPg) {
       await emplPg.upsertEmployee({ executorId, fio: fio.trim(), company: (company != null ? String(company) : '').trim() });
     } else {
@@ -1061,8 +1037,8 @@ app.post('/api/empl/add-new', async (req, res) => {
       const data = await emplPg.listEmployees();
       return res.json({ ok: true, added, ...data });
     }
-    const names = Array.isArray(req.body?.names) ? req.body.names : [];
-    if (!names.length) return res.json({ ok: true, added: 0 });
+    const executors = Array.isArray(req.body?.executors) ? req.body.executors : [];
+    if (!executors.length) return res.json({ ok: true, added: 0 });
 
     let lines = [];
     if (fs.existsSync(EMPL_CSV_PATH)) {
@@ -1070,23 +1046,17 @@ app.post('/api/empl/add-new', async (req, res) => {
       lines = text.replace(/\r\n/g, '\n').split('\n');
     }
 
-    // Собираем существующие pk чтобы не дублировать
-    const existingPks = new Set();
-    for (const line of lines) {
-      const t = line.trim();
-      if (!t) continue;
-      const idx = t.indexOf(';');
-      const fio = idx >= 0 ? t.slice(0, idx).trim() : t.trim();
-      if (fio) existingPks.add(normPkForRegistry(fio));
-    }
+    const registry = loadEmplIdRegistry();
+    const existingIds = new Set(Object.keys(registry));
 
     let added = 0;
-    for (const name of names) {
-      const trimmed = name.trim();
-      if (!trimmed) continue;
-      if (existingPks.has(normPkForRegistry(trimmed))) continue;
+    for (const rec of executors) {
+      const executorId = String(rec?.executorId || '').trim();
+      const trimmed = String(rec?.fio || '').trim();
+      if (!executorId || !trimmed || existingIds.has(executorId)) continue;
       lines.push(trimmed + ';');
-      existingPks.add(normPkForRegistry(trimmed));
+      registry[executorId] = { fio: trimmed, company: '' };
+      existingIds.add(executorId);
       added++;
     }
 
@@ -1096,23 +1066,11 @@ app.post('/api/empl/add-new', async (req, res) => {
         if (!fs.existsSync(path.dirname(EMPL_CSV_PATH))) fs.mkdirSync(path.dirname(EMPL_CSV_PATH), { recursive: true });
       }
       fs.writeFileSync(EMPL_CSV_PATH, Buffer.from('\uFEFF' + lines.join('\n'), 'utf8'));
+      saveEmplIdRegistry(registry);
     }
 
-    // Возвращаем обновлённый список
-    const employees = [];
-    const companies = new Set();
-    for (const line of lines) {
-      const t = line.trim();
-      if (!t) continue;
-      const idx = t.indexOf(';');
-      const fio = idx >= 0 ? t.slice(0, idx).trim() : t.trim();
-      const company = idx >= 0 ? t.slice(idx + 1).trim() : '';
-      if (fio) {
-        employees.push({ fio, company });
-        if (company) companies.add(company);
-      }
-    }
-
+    const employees = listCsvEmployeesWithIds();
+    const companies = new Set(employees.map(e => e.company).filter(Boolean));
     res.json({ ok: true, added, employees, companies: [...companies].sort() });
   } catch (err) {
     console.error('POST /api/empl/add-new', err);
@@ -1123,21 +1081,16 @@ app.post('/api/empl/add-new', async (req, res) => {
 // GET /api/empl/find-unregistered — найти исполнителей из всех смен, которых нет в списке сотрудников
 app.get('/api/empl/find-unregistered', async (req, res) => {
   try {
-    // Собираем известные ID и нормализованные ФИО
+    // Собираем известные ID. ФИО не используется для сопоставления.
     const knownIds  = new Set();
-    const knownFios = new Set();
     if (emplPg) {
       const data = await emplPg.listEmployees();
       for (const e of data.employees) {
         if (e.executorId) knownIds.add(e.executorId);
-        if (e.fio) knownFios.add(normalizeFioForMatch(e.fio));
       }
     } else {
-      for (const k of getEmplMapFioToCompany().keys()) knownFios.add(k);
+      for (const id of Object.keys(loadEmplIdRegistry())) knownIds.add(id);
     }
-    const knownFiosArr = [...knownFios];
-    const isFioKnown = norm =>
-      knownFiosArr.some(k => k === norm || k.includes(norm) || norm.includes(k));
 
     // Сканируем все почасовые файлы
     const seenKeys  = new Set(); // все уже проверенные ключи (не перепроверяем)
@@ -1162,16 +1115,14 @@ app.get('/api/empl/find-unregistered', async (req, res) => {
         for (const item of list) {
           const fio        = (item.executor   || '').trim();
           const executorId = (item.executorId || '').trim();
-          if (!fio) continue;
-          const normFio = normalizeFioForMatch(fio);
-          const key = executorId || normFio;
+          if (!fio || !executorId) continue;
+          const key = executorId;
           if (seenKeys.has(key)) continue;
           seenKeys.add(key);
-          if (executorId && knownIds.has(executorId)) continue;
-          if (isFioKnown(normFio)) continue;
+          if (knownIds.has(executorId)) continue;
           const titled = fio.replace(/\S+/g, w =>
             w.split('-').map(p => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join('-'));
-          found.set(key, { executorId: executorId || null, fio: titled });
+          found.set(key, { executorId, fio: titled });
         }
       }
     }
@@ -1184,64 +1135,9 @@ app.get('/api/empl/find-unregistered', async (req, res) => {
   }
 });
 
-// POST /api/empl/upgrade-fio-ids — привязать реальные UUID к записям с fio:xxx
+// POST /api/empl/upgrade-fio-ids — legacy no-op: fallback по ФИО отключён
 app.post('/api/empl/upgrade-fio-ids', async (req, res) => {
-  if (!emplPg) return res.json({ ok: true, upgraded: 0 });
-  try {
-    const data = await emplPg.listEmployees();
-    // Собираем fio:xxx записи: normFio → originalFio
-    const fioRecords = new Map();
-    for (const e of data.employees) {
-      if (e.executorId && e.executorId.startsWith('fio:') && e.fio) {
-        fioRecords.set(normalizeFioForMatch(e.fio), e.fio);
-      }
-    }
-    if (!fioRecords.size) return res.json({ ok: true, upgraded: 0 });
-
-    // Сканируем почасовые файлы в поисках реальных UUID для этих ФИО
-    const upgrades = new Map(); // normFio → executorId
-    if (fs.existsSync(DATA_DIR)) {
-      let dateDirs;
-      try {
-        dateDirs = fs.readdirSync(DATA_DIR, { withFileTypes: true })
-          .filter(e => e.isDirectory() && /^\d{4}-\d{2}-\d{2}$/.test(e.name));
-      } catch { dateDirs = []; }
-
-      for (const dir of dateDirs) {
-        if (upgrades.size === fioRecords.size) break;
-        const dirPath = path.join(DATA_DIR, dir.name);
-        let hourFiles;
-        try { hourFiles = fs.readdirSync(dirPath).filter(f => /^\d{2}\.json$/.test(f)); } catch { continue; }
-        for (const hf of hourFiles) {
-          let raw;
-          try { raw = JSON.parse(fs.readFileSync(path.join(dirPath, hf), 'utf8')); } catch { continue; }
-          const list = Array.isArray(raw.items) ? raw.items : Object.values(raw.items || {});
-          for (const item of list) {
-            const fio        = (item.executor   || '').trim();
-            const executorId = (item.executorId || '').trim();
-            if (!fio || !executorId) continue;
-            const norm = normalizeFioForMatch(fio);
-            if (fioRecords.has(norm) && !upgrades.has(norm)) {
-              upgrades.set(norm, executorId);
-            }
-          }
-        }
-      }
-    }
-
-    if (!upgrades.size) return res.json({ ok: true, upgraded: 0 });
-
-    const executors = [];
-    for (const [norm, executorId] of upgrades) {
-      executors.push({ executorId, fio: fioRecords.get(norm) });
-    }
-    const upgraded = await emplPg.addNewEmployees(executors);
-    const updated = await emplPg.listEmployees();
-    res.json({ ok: true, upgraded, ...updated });
-  } catch (err) {
-    console.error('POST /api/empl/upgrade-fio-ids', err);
-    res.status(500).json({ ok: false, error: err.message });
-  }
+  res.json({ ok: true, upgraded: 0 });
 });
 
 // POST /api/empl/enrich-names — обогатить ФИО отчествами из сырых WMS-файлов
@@ -1821,7 +1717,6 @@ app.get('/api/date/:date/items', vsSessionOptional, (req, res) => {
     }
     let items = storage.getDateItems(dateStr, { fromHour, toHour, shift });
     if (session?.role === 'manager' && Array.isArray(session.companyIds) && session.companyIds.length > 0) {
-      const emplMap = getEmplMapFioToCompany();
       const allowed = new Set(session.companyIds.map(c => c.trim().toLowerCase()));
       items = items.filter(it => {
         const company = getCompanyByIdOrFio(it.executorId, it.executor);
@@ -1834,7 +1729,6 @@ app.get('/api/date/:date/items', vsSessionOptional, (req, res) => {
       items = items.filter(it => normalizeFioForMatch(it.executor) === selfNorm);
     }
     if (Array.isArray(userForItems?.visibleCompanies) && userForItems.visibleCompanies.length > 0) {
-      const emplMapForItems = getEmplMapFioToCompany();
       const allowed = new Set(userForItems.visibleCompanies.map(c => c.trim().toLowerCase()));
       items = items.filter(it => {
         const company = getCompanyByIdOrFio(it.executorId, it.executor);

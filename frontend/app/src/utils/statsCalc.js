@@ -1,4 +1,4 @@
-import { normalizeFio, getCompanyByEmployee, hasMatchInEmplKeys } from './emplUtils.js'
+import { normalizeFio, getCompanyByEmployee } from './emplUtils.js'
 import { formatWeight, getTodayStr } from './format.js'
 
 export const ZONES = [
@@ -70,7 +70,7 @@ function addWeight(map, key, grams, isKdk) {
 function getTaskKey(item) {
   const type = (item.operationType || '').toUpperCase()
   if (type === 'PICK_BY_LINE') {
-    const exec = item.executorId || item.executor || ''
+    const exec = item.executorId || ''
     const cell = item.cell || ''
     const product = item.nomenclatureCode || item.productName || ''
     return `kdk|${exec}|${cell}|${product}`
@@ -81,11 +81,11 @@ function getTaskKey(item) {
 }
 
 export function filterByCompany(items, emplMap, filterCompany, emplIdMap = null) {
-  if (!emplMap || !filterCompany || filterCompany === '__all__') return items
+  if (!filterCompany || filterCompany === '__all__') return items
   if (filterCompany === '__none__') {
     return items.filter(i => {
       if (emplIdMap && i.executorId && emplIdMap.has(i.executorId)) return false
-      return !hasMatchInEmplKeys(normalizeFio(i.executor), emplMap)
+      return true
     })
   }
   return items.filter(i => getCompanyByEmployee(emplMap, emplIdMap, normalizeFio(i.executor), i.executorId) === filterCompany)
@@ -111,10 +111,10 @@ export function calcStats(items, emplMap, filterCompany, emplIdMap = null) {
 
   const byExecutor = new Map()
   for (const item of filtered) {
-    const key = item.executor || 'Неизвестно'
-    if (!byExecutor.has(key)) byExecutor.set(key, { name: key, executorId: item.executorId || null, taskKeys: new Set(), qty: 0, firstAt: null, lastAt: null })
+    const key = item.executorId || ''
+    if (!key) continue
+    if (!byExecutor.has(key)) byExecutor.set(key, { name: item.executor || key, executorId: key, taskKeys: new Set(), qty: 0, firstAt: null, lastAt: null })
     const e = byExecutor.get(key)
-    if (!e.executorId && item.executorId) e.executorId = item.executorId
     e.taskKeys.add(getTaskKey(item))
     e.qty += Number(item.quantity) || 0
     const ts = item.completedAt || item.startedAt
@@ -143,7 +143,7 @@ export function calcStats(items, emplMap, filterCompany, emplIdMap = null) {
     if (isKdk) hh.kdkTaskKeys.add(tk)
     else if (type === 'PIECE_SELECTION_PICKING') hh.storageOps++
     hh.kdkOps = hh.kdkTaskKeys.size
-    if (item.executorId || item.executor) hh.employees.add(item.executorId || item.executor)
+    if (item.executorId) hh.employees.add(item.executorId)
 
     const name = item.productName || item.product || item.name
     if (name) {
@@ -248,10 +248,11 @@ export function calcHourlyByEmployee(items, shiftFilter = 'day', enrichFn = null
     if (!ts) continue
     const h = new Date(ts).getHours()
     const col = (h + 1) % 24
-    const name = resolveName(item.executor || 'Неизвестно', item.executorId)
-    if (!byEmployee.has(name)) byEmployee.set(name, { hourMap: new Map(), firstAt: null, lastAt: null, executorId: null })
-    const emp = byEmployee.get(name)
-    if (!emp.executorId && item.executorId) emp.executorId = item.executorId
+    const executorId = item.executorId || ''
+    if (!executorId) continue
+    const name = resolveName(item.executor || executorId, executorId)
+    if (!byEmployee.has(executorId)) byEmployee.set(executorId, { name, hourMap: new Map(), firstAt: null, lastAt: null, executorId })
+    const emp = byEmployee.get(executorId)
     if (!emp.firstAt || ts < emp.firstAt) emp.firstAt = ts
     if (!emp.lastAt  || ts > emp.lastAt)  emp.lastAt  = ts
     const hourMap = emp.hourMap
@@ -286,7 +287,8 @@ export function calcHourlyByEmployee(items, shiftFilter = 'day', enrichFn = null
   }
 
   const rows = []
-  for (const [name, emp] of byEmployee) {
+  for (const [, emp] of byEmployee) {
+    const name = emp.name
     const { hourMap, firstAt, lastAt } = emp
     const byHour = {}, weightByHour = {}, byHourZone = {}, byZone = {}
     let total = 0
@@ -379,7 +381,8 @@ export function getCompanySummaryTableData(items, shiftFilter, emplMap, selected
     const grams = resolveWeightGrams(art, name)
     if (grams <= 0) continue
     const qty = Math.max(1, Number(item.quantity) || 1)
-    const empName = item.executor || item.executorId || 'Неизвестно'
+    const empName = item.executorId || ''
+    if (!empName) continue
     addWeight(weightByEmployee, empName, grams * qty, isKdk)
   }
 
@@ -422,17 +425,19 @@ export function getShiftBoundaryMs(dateStr, shiftFilter) {
 export function calcIdlesByEmployee(items, thresholdMs = 15 * 60 * 1000, shiftStartMs = 0, shiftEndMs = 0) {
   const byExecutor = new Map()
   for (const item of items) {
-    const name = item.executor || ''
-    if (!name || !item.completedAt) continue
-    if (!byExecutor.has(name)) byExecutor.set(name, [])
-    byExecutor.get(name).push(new Date(item.completedAt).getTime())
+    const executorId = item.executorId || ''
+    if (!executorId || !item.completedAt) continue
+    const name = item.executor || executorId
+    if (!byExecutor.has(executorId)) byExecutor.set(executorId, { name, times: [] })
+    byExecutor.get(executorId).times.push(new Date(item.completedAt).getTime())
   }
   const out = {}
   const fmt = iso => {
     const d = new Date(iso)
     return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`
   }
-  for (const [name, times] of byExecutor) {
+  for (const [, rec] of byExecutor) {
+    const { name, times } = rec
     times.sort((a, b) => a - b)
     const idles = []
     if (shiftStartMs > 0 && times[0] - shiftStartMs >= thresholdMs)
@@ -528,7 +533,8 @@ export function getWeightByEmployee(items) {
     const grams = resolveWeightGrams(art, name)
     if (grams <= 0) continue
     const qty = Math.max(1, Number(item.quantity) || 1)
-    const empName = item.executor || item.executorId || 'Неизвестно'
+    const empName = item.executorId || ''
+    if (!empName) continue
     addWeight(map, empName, grams * qty, isKdk)
   }
   return Object.fromEntries(map)

@@ -8,7 +8,6 @@ import {
   getWeightByEmployee,
 } from '../../utils/statsCalc.js'
 import { formatWeight, shortFio } from '../../utils/format.js'
-import { normalizeFio, personKey } from '../../utils/emplUtils.js'
 import CompanySummaryTable from '../stats/CompanySummaryTable.jsx'
 import HourlyEmployeeTable from '../stats/HourlyEmployeeTable.jsx'
 import { getViolations } from '../../api/index.js'
@@ -168,7 +167,7 @@ function useClock() {
 
 export default function TvPage() {
   const {
-    allItems, dateSummary, emplMap, emplIdMap, emplIdNameMap, emplNameMap,
+    allItems, dateSummary, emplMap, emplIdMap, emplIdNameMap,
     selectedDate, shiftFilter,
     idleThresholdMinutes, allowedIdleMinutes,
     loading, status,
@@ -216,9 +215,7 @@ export default function TvPage() {
       const byId = emplIdNameMap.get(executorId)
       if (byId) return byId.split(/\s+/).length >= name.split(/\s+/).length ? byId : name
     }
-    const fromMap = emplNameMap.get(personKey(normalizeFio(name)))
-    if (!fromMap) return name
-    return fromMap.split(/\s+/).length >= name.split(/\s+/).length ? fromMap : name
+    return name
   }
 
   const items = useMemo(() => {

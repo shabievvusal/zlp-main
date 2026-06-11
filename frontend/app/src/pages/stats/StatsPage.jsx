@@ -13,7 +13,6 @@ import {
 } from '../../utils/statsCalc.js'
 import * as api from '../../api/index.js'
 import { useNotify } from '../../context/NotifyContext.jsx'
-import { normalizeFio, personKey } from '../../utils/emplUtils.js'
 import StatsToolbar from './StatsToolbar.jsx'
 import StatsCards from './StatsCards.jsx'
 import CompanyFilter from './CompanyFilter.jsx'
@@ -34,7 +33,7 @@ const HE_MODES = [
 
 export default function StatsPage() {
   const {
-    allItems, dateSummary, emplMap, emplIdMap, emplIdNameMap, emplNameMap, emplCompanies,
+    allItems, dateSummary, emplMap, emplIdMap, emplIdNameMap, emplCompanies,
     selectedDate, shiftFilter, filterCompany,
     heTableMode, setHeTableMode,
     idleThresholdMinutes, setIdleThresholdMinutes,
@@ -65,10 +64,8 @@ export default function StatsPage() {
       const byId = emplIdNameMap.get(executorId)
       if (byId) return byId.split(/\s+/).length >= name.split(/\s+/).length ? byId : name
     }
-    const fromMap = emplNameMap.get(personKey(normalizeFio(name)))
-    if (!fromMap) return name
-    return fromMap.split(/\s+/).length >= name.split(/\s+/).length ? fromMap : name
-  }, [emplIdNameMap, emplNameMap])
+    return name
+  }, [emplIdNameMap])
 
   const heDataAll = useMemo(() => {
     if (isSummaryOnly && dateSummary?.hourlyByEmployee) {

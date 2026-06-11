@@ -340,7 +340,7 @@ function getHoursDisplayForSummary(dateStr, shift) {
 function getTaskKeySummary(item) {
   const type = (item.operationType || '').toUpperCase();
   if (type === 'PICK_BY_LINE') {
-    const exec = item.executorId || item.executor || '';
+    const exec = item.executorId || '';
     const cell = item.cell || '';
     const product = item.nomenclatureCode || item.productName || '';
     return `kdk|${exec}|${cell}|${product}`;
@@ -353,19 +353,21 @@ function computeEmployeeStatsForItems(items, idleThresholdMs = IDLE_THRESHOLD_MS
   const threshold = Number.isFinite(idleThresholdMs) && idleThresholdMs >= 0 ? idleThresholdMs : IDLE_THRESHOLD_MS;
   const byExecutor = new Map();
   for (const item of items || []) {
-    const name = item.executor || '';
-    if (!name) continue;
+    const executorId = item.executorId || '';
+    if (!executorId) continue;
     const ts = item.completedAt || item.startedAt;
     if (!ts) continue;
-    if (!byExecutor.has(name)) {
-      byExecutor.set(name, { times: [], taskKeys: new Set() });
+    const name = item.executor || executorId;
+    if (!byExecutor.has(executorId)) {
+      byExecutor.set(executorId, { name, times: [], taskKeys: new Set() });
     }
-    const rec = byExecutor.get(name);
+    const rec = byExecutor.get(executorId);
     rec.times.push(new Date(ts).getTime());
     rec.taskKeys.add(getTaskKeySummary(item));
   }
   const out = new Map();
-  for (const [name, rec] of byExecutor) {
+  for (const [, rec] of byExecutor) {
+    const name = rec.name;
     const times = rec.times;
     if (!times.length) continue;
     times.sort((a, b) => a - b);
@@ -402,15 +404,17 @@ function calcIdlesByEmployeeSummary(items, idleThresholdMs = IDLE_THRESHOLD_MS, 
   const threshold = Number.isFinite(idleThresholdMs) && idleThresholdMs >= 0 ? idleThresholdMs : IDLE_THRESHOLD_MS;
   const byExecutor = new Map();
   for (const item of items) {
-    const name = item.executor || '';
-    if (!name) continue;
+    const executorId = item.executorId || '';
+    if (!executorId) continue;
     const ts = item.completedAt;
     if (!ts) continue;
-    if (!byExecutor.has(name)) byExecutor.set(name, []);
-    byExecutor.get(name).push(new Date(ts).getTime());
+    const name = item.executor || executorId;
+    if (!byExecutor.has(executorId)) byExecutor.set(executorId, { name, times: [] });
+    byExecutor.get(executorId).times.push(new Date(ts).getTime());
   }
   const out = {};
-  for (const [name, times] of byExecutor) {
+  for (const [, rec] of byExecutor) {
+    const { name, times } = rec;
     if (!times.length) continue;
     times.sort((a, b) => a - b);
     const idles = [];
@@ -462,10 +466,10 @@ function buildSummaryFromItems(items, opts = {}) {
     }
     const qty = Math.max(1, Number(item.quantity) || 1);
     const grams = gramsPerUnit * qty;
-    const emp = item.executor || 'Неизвестно';
-    addWeight(weightByEmployee, emp, grams, isKdk);
-    if (getCompany) {
-      const c = getCompany(emp, item.executorId) || '—';
+    const emp = item.executorId || '';
+    if (emp) addWeight(weightByEmployee, emp, grams, isKdk);
+    if (getCompany && item.executorId) {
+      const c = getCompany(item.executor, item.executorId) || '—';
       addWeight(weightByCompany, c, grams, isKdk);
     }
     if (isKdk) totalWeightKdkGrams += grams;
@@ -474,10 +478,10 @@ function buildSummaryFromItems(items, opts = {}) {
 
   const byExecutor = new Map();
   for (const item of items) {
-    const key = item.executor || 'Неизвестно';
-    if (!byExecutor.has(key)) byExecutor.set(key, { name: key, executorId: null, taskKeys: new Set(), qty: 0, firstAt: null, lastAt: null });
+    const key = item.executorId || '';
+    if (!key) continue;
+    if (!byExecutor.has(key)) byExecutor.set(key, { name: item.executor || key, executorId: key, taskKeys: new Set(), qty: 0, firstAt: null, lastAt: null });
     const e = byExecutor.get(key);
-    if (!e.executorId && item.executorId) e.executorId = item.executorId;
     e.taskKeys.add(getTaskKeySummary(item));
     e.qty += Number(item.quantity) || 0;
     const ts = item.completedAt || item.startedAt;
@@ -512,7 +516,7 @@ function buildSummaryFromItems(items, opts = {}) {
     if (isKdk) hh.kdkTaskKeys.add(tk);
     else if (isStor) hh.storageOps++;
     hh.kdkOps = hh.kdkTaskKeys.size;
-    const exec = item.executorId || item.executor;
+    const exec = item.executorId;
     if (exec) {
       hh.employees.add(exec);
       const zone = (item.cell || '').split('-')[0].toUpperCase();
@@ -570,7 +574,7 @@ function buildSummaryFromItems(items, opts = {}) {
 
   if (shift && dateStr) {
     const order = shift === 'night' ? NIGHT_HOURS_SUMMARY : DAY_HOURS_SUMMARY;
-    const resolveCompany = (name, executorId) => (getCompany && name ? (getCompany(name, executorId) || '—') : '—');
+    const resolveCompany = (name, executorId) => (getCompany && executorId ? (getCompany(name, executorId) || '—') : '—');
 
     const byEmployeeHour = new Map();
     for (const item of items) {
@@ -579,9 +583,11 @@ function buildSummaryFromItems(items, opts = {}) {
       const moscow = new Date(new Date(ts).getTime() + MOSCOW_UTC_OFFSET_MS);
       const h = moscow.getUTCHours();
       const col = (h + 1) % 24;
-      const name = item.executor || 'Неизвестно';
-      if (!byEmployeeHour.has(name)) byEmployeeHour.set(name, new Map());
-      const hourMap = byEmployeeHour.get(name);
+      const executorId = item.executorId || '';
+      if (!executorId) continue;
+      if (!byEmployeeHour.has(executorId)) byEmployeeHour.set(executorId, { name: item.executor || executorId, hourMap: new Map() });
+      const rec = byEmployeeHour.get(executorId);
+      const hourMap = rec.hourMap;
       if (!hourMap.has(col)) hourMap.set(col, { pieceSelectionCount: 0, kdkSet: new Set(), weightGrams: 0, zoneCounts: {}, zoneWeights: {} });
       const cell = hourMap.get(col);
       const type = (item.operationType || '').toUpperCase();
@@ -610,7 +616,8 @@ function buildSummaryFromItems(items, opts = {}) {
     }
 
     const heRows = [];
-    for (const [name, hourMap] of byEmployeeHour) {
+    for (const [executorId, rec] of byEmployeeHour) {
+      const { name, hourMap } = rec;
       const byHourRow = {};
       const weightByHour = {};
       const byHourZone = {};
@@ -646,7 +653,7 @@ function buildSummaryFromItems(items, opts = {}) {
         }
         total += sz;
       }
-      const execInfo = byExecutor.get(name) || {};
+      const execInfo = byExecutor.get(executorId) || {};
       heRows.push({ name, company: resolveCompany(name, execInfo.executorId), byHour: byHourRow, weightByHour, byHourZone, byZone, total, firstAt: execInfo.firstAt || null, lastAt: execInfo.lastAt || null });
     }
 

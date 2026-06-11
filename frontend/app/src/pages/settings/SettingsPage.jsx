@@ -3,7 +3,7 @@ import { useAuth } from '../../context/AuthContext.jsx'
 import { useApp } from '../../context/AppContext.jsx'
 import { useNotify } from '../../context/NotifyContext.jsx'
 import * as api from '../../api/index.js'
-import { normalizeFio, hasMatchInEmplKeys, personKey } from '../../utils/emplUtils.js'
+import { normalizeFio } from '../../utils/emplUtils.js'
 import { formatDateTime } from '../../utils/format.js'
 import {
   Users, Send, Lock, Settings, RefreshCw, Scale,
@@ -570,7 +570,7 @@ function EmplRow({ row, onChange, onDelete }) {
 
 function EmployeesCard() {
   const notify = useNotify()
-  const { emplMap, emplIdMap, emplIdNameMap, emplNameMap, emplCompanies, dateSummary, allItems, loadEmployees } = useApp()
+  const { emplIdMap, emplIdNameMap, emplCompanies, dateSummary, allItems, loadEmployees } = useApp()
   const [rows, setRows] = useState([])
   const [allCompanies, setAllCompanies] = useState([])
   const [search, setSearch] = useState('')
@@ -602,40 +602,40 @@ function EmployeesCard() {
 
   const noCompanyList = useMemo(() => {
     const employeesByKey = new Map()
-    const employeeKey = (fio, executorId) => executorId ? `id:${executorId}` : `fio:${normalizeFio(fio)}`
+    const employeeKey = (fio, executorId) => executorId ? `id:${executorId}` : null
     const enrich = (fio, executorId) => {
       if (executorId) {
         const byId = emplIdNameMap.get(executorId)
         if (byId) return byId
       }
-      const norm = normalizeFio(fio)
-      return emplNameMap.get(personKey(norm)) || fio
+      return fio
     }
     const addCandidate = (fio, executorId) => {
       const key = employeeKey(fio, executorId)
+      if (!key) return
       if (employeesByKey.has(key)) return
       employeesByKey.set(key, { key, fio: enrich(fio, executorId), executorId: executorId || null })
     }
     for (const item of allItems) {
       const fio = (item.executor || '').trim()
       if (!fio) continue
-      if (emplIdMap && item.executorId && emplIdMap.has(item.executorId)) continue
-      const norm = normalizeFio(fio)
-      if (item.executorId || !hasMatchInEmplKeys(norm, emplMap)) {
+      if (!item.executorId) continue
+      if (emplIdMap && emplIdMap.has(item.executorId)) continue
+      {
         addCandidate(fio, item.executorId)
       }
     }
     for (const e of (dateSummary?.executors || [])) {
       const fio = (e.name || '').trim()
       if (!fio) continue
-      if (emplIdMap && e.executorId && emplIdMap.has(e.executorId)) continue
-      const norm = normalizeFio(fio)
-      if (e.executorId || !hasMatchInEmplKeys(norm, emplMap)) {
+      if (!e.executorId) continue
+      if (emplIdMap && emplIdMap.has(e.executorId)) continue
+      {
         addCandidate(fio, e.executorId)
       }
     }
     return [...employeesByKey.values()].sort((a, b) => a.fio.localeCompare(b.fio, 'ru'))
-  }, [allItems, dateSummary, emplMap, emplIdMap, emplIdNameMap, emplNameMap])
+  }, [allItems, dateSummary, emplIdMap, emplIdNameMap])
 
   // Filter out optimistically-saved employees so bubbles disappear immediately after save.
   const displayNoCompany = useMemo(
@@ -648,8 +648,7 @@ function EmployeesCard() {
       const data = await api.saveEmplOne(fio, company, executorId)
       if (data.ok) {
         notify('Сохранено', 'success')
-        const key = executorId ? `id:${executorId}` : `fio:${normalizeFio(fio)}`
-        setLocalSaved(prev => new Set([...prev, key]))
+        if (executorId) setLocalSaved(prev => new Set([...prev, `id:${executorId}`]))
         await loadEmployees()
         loadFromServer()
       } else {
@@ -718,7 +717,8 @@ const handleAddRow = () => {
     const all = []
     for (const r of rows) {
       if (!r.fio.trim()) continue
-      const k = r.executorId ? `id:${r.executorId}` : `fio:${normalizeFio(r.fio)}`
+      if (!r.executorId) continue
+      const k = `id:${r.executorId}`
       if (!seen.has(k)) {
         seen.add(k)
         all.push({ fio: r.fio, company: r.company, executorId: r.executorId || null })
@@ -779,7 +779,8 @@ const handleAddRow = () => {
   const scanExtras = useMemo(() => {
     if (!scanResult) return []
     return scanResult.filter(e => {
-      const key = e.executorId ? `id:${e.executorId}` : `fio:${normalizeFio(e.fio)}`
+      if (!e.executorId) return false
+      const key = `id:${e.executorId}`
       return !localSaved.has(key) && !noCompanyKeys.has(key)
     })
   }, [scanResult, localSaved, noCompanyKeys])

@@ -46,7 +46,7 @@ export function getCompanyByEmployee(emplMap, emplIdMap, norm, executorId) {
     const byId = emplIdMap.get(executorId)
     if (byId !== undefined) return byId
   }
-  return getCompanyByFio(emplMap, norm)
+  return undefined
 }
 
 export function parseEmplCsv(csv) {
