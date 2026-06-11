@@ -19,6 +19,7 @@ backend/config.json
 backend/vs-users.json
 
 # ─── Рабочие данные (не код) ───────────────────────────────────
+json/
 backend/data.xlsx
 backend/*.xlsx
 backend/*.json.default
