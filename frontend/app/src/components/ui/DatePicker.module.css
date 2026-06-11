@@ -1,0 +1,312 @@
+.wrap {
+  position: relative;
+  display: inline-block;
+}
+
+/* ── Trigger ── */
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-family: var(--font);
+  color: var(--text);
+  background: var(--white);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 140ms ease-out, background 140ms ease-out, transform 100ms ease-out;
+  user-select: none;
+}
+
+.trigger:hover {
+  border-color: #bbc5d0;
+  background: var(--bg);
+}
+
+.trigger:active {
+  transform: scale(0.98);
+}
+
+.triggerOpen {
+  border-color: var(--green);
+  box-shadow: 0 0 0 3px var(--green-light);
+}
+
+.calIcon {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.label {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.placeholder {
+  color: var(--text-muted);
+}
+
+.chevron {
+  color: var(--text-muted);
+  flex-shrink: 0;
+  transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.chevronOpen {
+  transform: rotate(180deg);
+}
+
+/* ── Popup ── */
+.popup {
+  z-index: 9999;
+  background: var(--white);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
+  padding: 12px;
+  width: 256px;
+
+  animation: popupIn 160ms cubic-bezier(0.23, 1, 0.32, 1) both;
+  transform-origin: top left;
+}
+
+.popupAbove {
+  transform-origin: bottom left;
+  animation-name: popupInAbove;
+}
+
+.popupRight {
+  transform-origin: top right;
+}
+
+.popupAbove.popupRight {
+  transform-origin: bottom right;
+}
+
+@keyframes popupIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes popupInAbove {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* ── Header ── */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  padding: 0 2px;
+}
+
+.monthLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+.navBtn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 120ms ease-out, color 120ms ease-out;
+  padding: 0;
+}
+
+.navBtn:hover {
+  background: var(--bg);
+  color: var(--text);
+}
+
+.navBtn:active {
+  transform: scale(0.88);
+}
+
+/* ── Calendar grid ── */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.dayName {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 4px 0 6px;
+  letter-spacing: 0.02em;
+}
+
+.day {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 6px;
+  font-size: 12.5px;
+  font-family: var(--font);
+  color: var(--text);
+  background: transparent;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+  transition: background 100ms ease-out, color 100ms ease-out, transform 80ms ease-out;
+  padding: 0;
+}
+
+.day:hover:not(:disabled) {
+  background: var(--bg);
+}
+
+.day:active:not(:disabled) {
+  transform: scale(0.88);
+}
+
+.dayToday {
+  border: 1.5px solid var(--green);
+  color: var(--green);
+  font-weight: 600;
+}
+
+.daySelected {
+  background: var(--green) !important;
+  color: #fff !important;
+  font-weight: 600;
+}
+
+.dayDisabled {
+  opacity: 0.28;
+  cursor: not-allowed;
+}
+
+/* ── Time separator in trigger ── */
+.timeSep {
+  color: var(--text-muted);
+  font-size: 11px;
+  margin: 0 1px;
+}
+
+/* ── Time picker ── */
+.timePicker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 10px 0 2px;
+  border-top: 1px solid var(--border);
+}
+
+.timeIcon {
+  color: var(--text-muted);
+  flex-shrink: 0;
+  margin-right: 2px;
+}
+
+.timeInput {
+  width: 52px;
+  text-align: center;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 20px;
+  font-weight: 600;
+  font-family: var(--font);
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  background: var(--bg);
+  padding: 5px 4px;
+  outline: none;
+  -moz-appearance: textfield;
+  line-height: 1;
+  transition: border-color 120ms ease-out, box-shadow 120ms ease-out;
+}
+
+.timeInput::-webkit-inner-spin-button,
+.timeInput::-webkit-outer-spin-button { -webkit-appearance: none; }
+
+.timeInput:hover {
+  border-color: #bbc5d0;
+}
+
+.timeInput:focus {
+  border-color: var(--green);
+  box-shadow: 0 0 0 3px var(--green-light);
+  background: var(--white);
+}
+
+.timeColon {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-muted);
+  line-height: 1;
+  user-select: none;
+}
+
+/* ── Footer ── */
+.footer {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.todayBtn {
+  font-size: 12px;
+  font-family: var(--font);
+  font-weight: 500;
+  color: var(--green);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  transition: background 120ms ease-out;
+}
+
+.todayBtn:hover { background: var(--green-light); }
+
+.applyBtn {
+  font-size: 12px;
+  font-family: var(--font);
+  font-weight: 500;
+  color: #fff;
+  background: var(--green);
+  border: none;
+  cursor: pointer;
+  padding: 5px 16px;
+  border-radius: var(--radius-sm);
+  transition: background 120ms ease-out, transform 80ms ease-out;
+}
+
+.applyBtn:hover  { background: var(--green-dark); }
+.applyBtn:active { transform: scale(0.97); }

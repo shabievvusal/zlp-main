@@ -1,0 +1,127 @@
+:root {
+  --green: #21A038;
+  --green-dark: #178030;
+  --green-light: #E8F5EC;
+  --bg: #F5F7FA;
+  --border: #DDE2EA;
+  --text: #1D1D1B;
+  --text-muted: #6B7280;
+  --radius: 10px;
+  --radius-sm: 6px;
+  --font: 'Inter', 'Segoe UI', system-ui, sans-serif;
+}
+
+.body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 24px 16px;
+}
+
+.card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 32px 24px;
+  width: 100%;
+  max-width: 440px;
+  box-shadow: 0 4px 20px rgba(0,0,0,.08);
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.logoIcon {
+  width: 40px; height: 40px;
+  object-fit: contain;
+}
+.logoText { font-size: 15px; font-weight: 700; }
+.logoSub  { font-size: 11px; color: var(--text-muted); }
+
+.h1       { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+.subtitle { font-size: 13px; color: var(--text-muted); margin-bottom: 24px; }
+
+.formGroup { margin-bottom: 16px; }
+.formGroup label {
+  display: block; font-size: 13px; font-weight: 500;
+  color: var(--text-muted); margin-bottom: 6px;
+}
+.labelRequired::after { content: ' *'; color: #DC2626; }
+
+.formControl {
+  width: 100%; padding: 11px 14px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 15px; font-family: var(--font);
+  color: var(--text); background: #fff;
+  transition: border-color .2s; outline: none;
+}
+.formControl:focus { border-color: var(--green); box-shadow: 0 0 0 3px var(--green-light); }
+.formControl[type="file"] { padding: 9px 14px; font-size: 13px; }
+
+/* Cell row */
+.cellRow { display: flex; gap: 12px; align-items: stretch; }
+.cellToggle {
+  flex: 0 0 auto; display: flex;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden; background: #fff;
+}
+.cellToggleBtn {
+  padding: 11px 16px; border: none; background: #fff;
+  font-family: var(--font); font-size: 14px; font-weight: 500;
+  color: var(--text-muted); cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.cellToggleBtn:first-child { border-right: 1px solid var(--border); }
+.cellToggleBtnActive {
+  padding: 11px 16px; border: none;
+  background: var(--green-light); color: var(--green-dark);
+  font-family: var(--font); font-size: 14px; font-weight: 500;
+  cursor: pointer; transition: background .15s, color .15s;
+}
+.cellToggleBtnActive:first-child { border-right: 1px solid var(--border); }
+
+.cellFields { display: flex; gap: 8px; align-items: stretch; flex: 1; min-width: 0; }
+.cellFields .formControl { flex: 1; min-width: 0; }
+.cellRowNum   { max-width: 44px !important; flex: 0 0 44px !important; text-align: center; }
+.cellPlaceNum { max-width: 52px !important; flex: 0 0 52px !important; text-align: center; }
+
+.cellHint { display: block; margin-top: 4px; color: var(--text-muted); font-size: 12px; }
+
+.btnSubmit {
+  width: 100%; padding: 13px;
+  background: var(--green); color: #fff;
+  border: none; border-radius: var(--radius-sm);
+  font-size: 16px; font-weight: 600;
+  font-family: var(--font);
+  cursor: pointer; transition: background .15s;
+  margin-top: 8px;
+}
+.btnSubmit:hover { background: var(--green-dark); }
+.btnSubmit:disabled { opacity: .55; cursor: not-allowed; }
+
+.msg {
+  margin-top: 16px; padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 14px; font-weight: 500;
+}
+.msgOk  { background: var(--green-light); color: var(--green-dark); }
+.msgErr { background: #FEF2F2; color: #DC2626; }
+
+@media (max-width: 640px) {
+  .body { padding: 12px; }
+  .card { max-width: 100%; border-radius: 14px; padding: 20px 14px; }
+  .logo { margin-bottom: 14px; }
+  .h1   { font-size: 18px; }
+  .subtitle { font-size: 12px; margin-bottom: 16px; }
+  .formGroup { margin-bottom: 12px; }
+  .formControl { min-height: 44px; font-size: 16px; }
+  .btnSubmit   { min-height: 46px; font-size: 16px; }
+}

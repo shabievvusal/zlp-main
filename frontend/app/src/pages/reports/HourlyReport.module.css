@@ -1,0 +1,316 @@
+.root {
+  padding-bottom: 40px;
+}
+
+/* ── Toolbar ──────────────────────────────────────────────────────────────── */
+
+.toolbar {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-card);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.field label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.dateInput {
+  padding: 5px 9px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-family: var(--font);
+  color: var(--text);
+  background: var(--bg);
+}
+
+.dateInput:focus {
+  outline: none;
+  border-color: var(--green);
+}
+
+.statusLoading {
+  font-size: 12px;
+  color: var(--text-muted);
+  align-self: flex-end;
+  padding-bottom: 2px;
+}
+
+.statusError {
+  font-size: 12px;
+  color: var(--error);
+  align-self: flex-end;
+  padding-bottom: 2px;
+}
+
+/* ── Wrap ─────────────────────────────────────────────────────────────────── */
+
+.wrap {
+  padding: 20px;
+  overflow-x: auto;
+}
+
+/* ── Main table ───────────────────────────────────────────────────────────── */
+
+.t {
+  border-collapse: collapse;
+  font-size: 13px;
+  font-family: var(--font);
+}
+
+.t td {
+  border: 1px solid #888;
+  padding: 3px 8px;
+  white-space: nowrap;
+}
+
+/* ── Cell types ───────────────────────────────────────────────────────────── */
+
+/* Yellow header (секции и заголовки столбцов) */
+.yh {
+  background: #FFFF00;
+  font-weight: 700;
+  text-align: center;
+}
+
+/* Sub-header для метрик в часовой таблице */
+.subh {
+  background: #f2f2f2;
+  font-weight: 600;
+  text-align: center;
+  font-size: 11px;
+  line-height: 1.4;
+  vertical-align: bottom;
+}
+
+/* Sub-header для Пополнения (Спуски / Перемещение) */
+.sh2 {
+  background: #f2f2f2;
+  font-weight: 600;
+  text-align: center;
+}
+
+/* Метка строки (левая колонка) */
+.lbl {
+  background: #fff;
+  font-weight: 500;
+}
+
+/* Значение (центр) */
+.v {
+  background: #fff;
+  text-align: center;
+}
+
+/* Название процесса */
+.pn {
+  background: #fff;
+  font-size: 12px;
+}
+
+/* Пустая белая ячейка */
+.e {
+  background: #fff;
+}
+
+/* Невидимая ячейка — правая часть блока Отборки (нет процессов) */
+.inv {
+  background: var(--bg) !important;
+  border-top: none !important;
+  border-right: none !important;
+  border-bottom: none !important;
+  border-left: none !important;
+}
+
+/* ── Process cells ────────────────────────────────────────────────────────── */
+
+.procName {
+  font-size: 12px;
+  margin-right: 4px;
+}
+
+.procRemove {
+  background: none;
+  border: none;
+  color: #aaa;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+  vertical-align: middle;
+}
+
+.procRemove:hover { color: #e00; }
+
+.procInput {
+  width: 60px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  padding: 1px 4px;
+  font-size: 12px;
+  text-align: center;
+  background: #fffde7;
+  font-family: var(--font);
+}
+
+.procInput:focus { outline: none; border-color: #888; }
+
+/* Строка добавления нового процесса */
+.addProcRow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 0;
+}
+
+.addProcInput {
+  flex: 1;
+  min-width: 0;
+  border: 1px dashed #bbb;
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-size: 11px;
+  background: #fafafa;
+  font-family: var(--font);
+}
+
+.addProcInput:focus { outline: none; border-color: #888; border-style: solid; }
+
+.addProcBtn {
+  width: 20px;
+  height: 20px;
+  border: 1px solid #bbb;
+  border-radius: 3px;
+  background: #f5f5f5;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.addProcBtn:hover { background: #e8f5e9; border-color: #4caf50; color: #2e7d32; }
+
+/* Разделитель между Задержкой и За час ТС */
+.sep {
+  height: 3px;
+  background: #e8e8e8;
+  padding: 0 !important;
+  border-left: 1px solid #888 !important;
+  border-right: 1px solid #888 !important;
+  border-top: none !important;
+  border-bottom: none !important;
+}
+
+/* Ячейка с заметками (правая часть Отгрузка/Роллкейджи) */
+.notesCell {
+  padding: 4px !important;
+  vertical-align: top;
+  border-left: 2px solid #aaa !important;
+}
+
+.notesArea {
+  width: 100%;
+  height: 100%;
+  min-height: 180px;
+  resize: none;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  padding: 6px 8px;
+  font-size: 12px;
+  font-family: inherit;
+  line-height: 1.5;
+  background: #fffde7;
+  box-sizing: border-box;
+}
+
+.notesArea:focus {
+  outline: none;
+  border-color: #f5a623;
+  box-shadow: 0 0 0 2px rgba(245,166,35,.2);
+}
+
+/* ── Макет: таблица + панель ввода рядом ─────────────────────────────────── */
+.pageBody {
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+}
+
+/* ── Панель ручного ввода ────────────────────────────────────────────────── */
+.inputPanel {
+  flex-shrink: 0;
+  width: 220px;
+  border-left: 2px solid #e0e0e0;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.inputSection {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.inputSectionTitle {
+  font-weight: 600;
+  font-size: 12px;
+  background: #ffeb3b;
+  padding: 3px 6px;
+  border-radius: 3px;
+  margin-bottom: 2px;
+}
+
+.inputRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.inputLbl {
+  flex: 1;
+  font-size: 12px;
+  color: #444;
+  white-space: nowrap;
+}
+
+.panelInput {
+  width: 72px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  padding: 2px 5px;
+  font-size: 12px;
+  text-align: right;
+  background: #fffde7;
+}
+
+.panelInput:focus {
+  outline: none;
+  border-color: #f5a623;
+}
+
+.panelValue {
+  width: 72px;
+  display: inline-block;
+  text-align: right;
+  font-size: 12px;
+  color: #333;
+  padding: 2px 5px;
+}
