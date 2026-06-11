@@ -1,0 +1,697 @@
+{
+    "value": {
+        "items": [
+            {
+                "id": "9587da59-4063-45b8-a582-11944e8f33a7",
+                "status": "COMPLETED",
+                "handlingUnitBarcode": "012200535904",
+                "sourceCellAddress": "G151",
+                "targetCellAddress": "SH-3-58-1-4",
+                "targetCellsAddresses": [
+                    "SH-3-58-1-4"
+                ],
+                "sourceZoneId": "c71e5603-443e-4da5-abeb-1e67096c61c7",
+                "sourceZoneName": "Ворота 151",
+                "responsibleUser": {
+                    "id": "7823b5a0-8cc7-439c-9883-7723e638ea07",
+                    "firstName": "Денис",
+                    "lastName": "Уртюков",
+                    "middleName": "Олегович"
+                },
+                "createdAt": "2026-06-11T16:02:02.556606Z",
+                "issue": "USER_REJECTED_SUGGESTED_CELLS",
+                "condition": "ACCEPTED",
+                "temperatureMode": "ORDINARY",
+                "skuCount": 1
+            },
+            {
+                "id": "f33a0989-abd5-41ac-a3fe-64adeaedb43d",
+                "status": "COMPLETED",
+                "handlingUnitBarcode": "012200535905",
+                "sourceCellAddress": "G151",
+                "targetCellAddress": "SH-2-57-1-2",
+                "targetCellsAddresses": [
+                    "SH-2-57-1-2"
+                ],
+                "sourceZoneId": "c71e5603-443e-4da5-abeb-1e67096c61c7",
+                "sourceZoneName": "Ворота 151",
+                "responsibleUser": {
+                    "id": "f834caa9-893b-456f-a0ff-f9fc510e66f5",
+                    "firstName": "Денис",
+                    "lastName": "Осипов",
+                    "middleName": "Андреевич"
+                },
+                "createdAt": "2026-06-11T16:02:02.553314Z",
+                "issue": "USER_REJECTED_SUGGESTED_CELLS",
+                "condition": "ACCEPTED",
+                "temperatureMode": "ORDINARY",
+                "skuCount": 1
+            },
+            {
+                "id": "9c2db664-f6df-489f-954e-564c25d5e3b9",
+                "status": "COMPLETED",
+                "handlingUnitBarcode": "012200535903",
+                "sourceCellAddress": "G151",
+                "targetCellAddress": "SH-6-59-3-3",
+                "targetCellsAddresses": [
+                    "SH-6-59-3-3"
+                ],
+                "sourceZoneId": "c71e5603-443e-4da5-abeb-1e67096c61c7",
+                "sourceZoneName": "Ворота 151",
+                "responsibleUser": {
+                    "id": "48f6d5e2-23ee-48e6-ad34-1cc46668b229",
+                    "firstName": "Евгений",
+                    "lastName": "Яшин",
+                    "middleName": "Валерьевич"
+                },
+                "createdAt": "2026-06-11T16:02:02.549808Z",
+                "issue": "USER_REJECTED_SUGGESTED_CELLS",
+                "condition": "ACCEPTED",
+                "temperatureMode": "ORDINARY",
+                "skuCount": 1
+            },
+            {
+                "id": "801a5509-bdb1-4375-ac19-7165cda585ce",
+                "status": "COMPLETED",
+                "handlingUnitBarcode": "012200535977",
+                "sourceCellAddress": "G151",
+                "targetCellAddress": "SH-4-38-2-2",
+                "targetCellsAddresses": [
+                    "SH-4-38-2-2"
+                ],
+                "sourceZoneId": "c71e5603-443e-4da5-abeb-1e67096c61c7",
+                "sourceZoneName": "Ворота 151",
+                "responsibleUser": {
+                    "id": "f834caa9-893b-456f-a0ff-f9fc510e66f5",
+                    "firstName": "Денис",
+                    "lastName": "Осипов",
+                    "middleName": "Андреевич"
+                },
+                "createdAt": "2026-06-11T16:02:02.545690Z",
+                "issue": "USER_REJECTED_SUGGESTED_CELLS",
+                "condition": "ACCEPTED",
+                "temperatureMode": "ORDINARY",
+                "skuCount": 1
+            },
+            {
+                "id": "f76ecaf3-a216-4f20-9654-afdd4ea5806e",
+                "status": "COMPLETED",
+                "handlingUnitBarcode": "012200535976",
+                "sourceCellAddress": "G151",
+                "targetCellAddress": "SH-6-58-3-4",
+                "targetCellsAddresses": [
+                    "SH-6-58-3-4"
+                ],
+                "sourceZoneId": "c71e5603-443e-4da5-abeb-1e67096c61c7",
+                "sourceZoneName": "Ворота 151",
+                "responsibleUser": {
+                    "id": "49df81ca-0f03-4685-8b51-62102f6f1f2b",
+                    "firstName": "Виталий",
+                    "lastName": "Дмитриев",
+                    "middleName": "Геннадьевич"
+                },
+                "createdAt": "2026-06-11T16:02:02.541685Z",
+                "issue": "USER_REJECTED_SUGGESTED_CELLS",
+                "condition": "ACCEPTED",
+                "temperatureMode": "ORDINARY",
+                "skuCount": 2
+            },
+            {
+                "id": "08a8ee2c-bba7-4026-b51a-32836a28e4de",
+                "status": "COMPLETED",
+                "handlingUnitBarcode": "012200535975",
+                "sourceCellAddress": "G151",
+                "targetCellAddress": "SH-3-49-1-4",
+                "targetCellsAddresses": [
+                    "SH-3-49-1-4"
+                ],
+                "sourceZoneId": "c71e5603-443e-4da5-abeb-1e67096c61c7",
+                "sourceZoneName": "Ворота 151",
+                "responsibleUser": {
+                    "id": "7823b5a0-8cc7-439c-9883-7723e638ea07",
+                    "firstName": "Денис",
+                    "lastName": "Уртюков",
+                    "middleName": "Олегович"
+                },
+                "createdAt": "2026-06-11T16:02:02.534601Z",
+                "issue": "USER_REJECTED_SUGGESTED_CELLS",
+                "condition": "ACCEPTED",
+                "temperatureMode": "ORDINARY",
+                "skuCount": 1
+            },
+            {
+                "id": "ece57a79-a0d6-435c-951a-acb39dc5c3f6",
+                "status": "COMPLETED",
+                "handlingUnitBarcode": "012200535974",
+                "sourceCellAddress": "G151",
+                "targetCellAddress": "SH-4-40-2-2",
+                "targetCellsAddresses": [
+                    "SH-4-40-2-2"
+                ],
+                "sourceZoneId": "c71e5603-443e-4da5-abeb-1e67096c61c7",
+                "sourceZoneName": "Ворота 151",
+                "responsibleUser": {
+                    "id": "f834caa9-893b-456f-a0ff-f9fc510e66f5",
+                    "firstName": "Денис",
+                    "lastName": "Осипов",
+                    "middleName": "Андреевич"
+                },
+                "createdAt": "2026-06-11T16:02:02.531438Z",
+                "issue": "USER_REJECTED_SUGGESTED_CELLS",
+                "condition": "ACCEPTED",
+                "temperatureMode": "ORDINARY",
+                "skuCount": 1
+            },
+            {
+                "id": "a9ecc049-4200-4807-a63c-a345d14eb812",
+                "status": "COMPLETED",
+                "handlingUnitBarcode": "012200535973",
+                "sourceCellAddress": "G151",
+                "targetCellAddress": "SH-5-65-2-4",
+                "targetCellsAddresses": [
+                    "SH-5-65-2-4"
+                ],
+                "sourceZoneId": "c71e5603-443e-4da5-abeb-1e67096c61c7",
+                "sourceZoneName": "Ворота 151",
+                "responsibleUser": {
+                    "id": "48f6d5e2-23ee-48e6-ad34-1cc46668b229",
+                    "firstName": "Евгений",
+                    "lastName": "Яшин",
+                    "middleName": "Валерьевич"
+                },
+                "createdAt": "2026-06-11T16:02:02.528055Z",
+                "issue": "USER_REJECTED_SUGGESTED_CELLS",
+                "condition": "ACCEPTED",
+                "temperatureMode": "ORDINARY",
+                "skuCount": 1
+            },
+            {
+                "id": "5ebf8740-4104-4a09-8910-21b1f52da38d",
+                "status": "COMPLETED",
+                "handlingUnitBarcode": "012200535972",
+                "sourceCellAddress": "G151",
+                "targetCellAddress": "SH-3-55-2-3",
+                "targetCellsAddresses": [
+                    "SH-3-55-2-3"
+                ],
+                "sourceZoneId": "c71e5603-443e-4da5-abeb-1e67096c61c7",
+                "sourceZoneName": "Ворота 151",
+                "responsibleUser": {
+                    "id": "f834caa9-893b-456f-a0ff-f9fc510e66f5",
+                    "firstName": "Денис",
+                    "lastName": "Осипов",
+                    "middleName": "Андреевич"
+                },
+                "createdAt": "2026-06-11T16:02:02.524543Z",
+                "issue": "USER_REJECTED_SUGGESTED_CELLS",
+                "condition": "ACCEPTED",
+                "temperatureMode": "ORDINARY",
+                "skuCount": 2
+            },
+            {
+                "id": "50e07b80-7128-45f8-b621-78fdcdb68894",
+                "status": "COMPLETED",
+                "handlingUnitBarcode": "012200535971",
+                "sourceCellAddress": "G151",
+                "targetCellAddress": "SH-2-55-3-2",
+                "targetCellsAddresses": [
+                    "SH-2-55-3-2"
+                ],
+                "sourceZoneId": "c71e5603-443e-4da5-abeb-1e67096c61c7",
+                "sourceZoneName": "Ворота 151",
+                "responsibleUser": {
+                    "id": "f834caa9-893b-456f-a0ff-f9fc510e66f5",
+                    "firstName": "Денис",
+                    "lastName": "Осипов",
+                    "middleName": "Андреевич"
+                },
+                "createdAt": "2026-06-11T16:02:02.517190Z",
+                "issue": "USER_REJECTED_SUGGESTED_CELLS",
+                "condition": "ACCEPTED",
+                "temperatureMode": "ORDINARY",
+                "skuCount": 1
+            },
+            {
+                "id": "69dd7e51-d297-4ccc-9385-dade553f1469",
+                "status": "COMPLETED",
+                "handlingUnitBarcode": "012200535970",
+                "sourceCellAddress": "G151",
+                "targetCellAddress": "SH-6-27-2-2",
+                "targetCellsAddresses": [
+                    "SH-6-27-2-2"
+                ],
+                "sourceZoneId": "c71e5603-443e-4da5-abeb-1e67096c61c7",
+                "sourceZoneName": "Ворота 151",
+                "responsibleUser": {
+                    "id": "49df81ca-0f03-4685-8b51-62102f6f1f2b",
+                    "firstName": "Виталий",
+                    "lastName": "Дмитриев",
+                    "middleName": "Геннадьевич"
+                },
+                "createdAt": "2026-06-11T16:02:02.510633Z",
+                "issue": "USER_REJECTED_SUGGESTED_CELLS",
+                "condition": "ACCEPTED",
+                "temperatureMode": "ORDINARY",
+                "skuCount": 1
+            },
+            {
+                "id": "7f10bd7f-e369-4d0f-8f8c-73aac627dc6f",
+                "status": "COMPLETED",
+                "handlingUnitBarcode": "012200535969",
+                "sourceCellAddress": "G151",
+                "targetCellAddress": "SH-6-52-2-3",
+                "targetCellsAddresses": [
+                    "SH-6-52-2-3"
+                ],
+                "sourceZoneId": "c71e5603-443e-4da5-abeb-1e67096c61c7",
+                "sourceZoneName": "Ворота 151",
+                "responsibleUser": {
+                    "id": "49df81ca-0f03-4685-8b51-62102f6f1f2b",
+                    "firstName": "Виталий",
+                    "lastName": "Дмитриев",
+                    "middleName": "Геннадьевич"
+                },
+                "createdAt": "2026-06-11T16:02:02.507165Z",
+                "issue": "USER_REJECTED_SUGGESTED_CELLS",
+                "condition": "ACCEPTED",
+                "temperatureMode": "ORDINARY",
+                "skuCount": 1
+            },
+            {
+                "id": "462ee170-34d5-42b8-9f35-06689d876df7",
+                "status": "COMPLETED",
+                "handlingUnitBarcode": "012200535968",
+                "sourceCellAddress": "G151",
+                "targetCellAddress": "SH-6-46-2-3",
+                "targetCellsAddresses": [
+                    "SH-6-46-2-3"
+                ],
+                "sourceZoneId": "c71e5603-443e-4da5-abeb-1e67096c61c7",
+                "sourceZoneName": "Ворота 151",
+                "responsibleUser": {
+                    "id": "49df81ca-0f03-4685-8b51-62102f6f1f2b",
+                    "firstName": "Виталий",
+                    "lastName": "Дмитриев",
+                    "middleName": "Геннадьевич"
+                },
+                "createdAt": "2026-06-11T16:02:02.500784Z",
+                "issue": "USER_REJECTED_SUGGESTED_CELLS",
+                "condition": "ACCEPTED",
+                "temperatureMode": "ORDINARY",
+                "skuCount": 1
+            },
+            {
+                "id": "b5f8ee37-3205-44d7-8da9-a82b30ddbe36",
+                "status": "COMPLETED",
+                "handlingUnitBarcode": "012200535967",
+                "sourceCellAddress": "G151",
+                "targetCellAddress": "SH-7-25-3-4",
+                "targetCellsAddresses": [
+                    "SH-7-25-3-4"
+                ],
+                "sourceZoneId": "c71e5603-443e-4da5-abeb-1e67096c61c7",
+                "sourceZoneName": "Ворота 151",
+                "responsibleUser": {
+                    "id": "49df81ca-0f03-4685-8b51-62102f6f1f2b",
+                    "firstName": "Виталий",
+                    "lastName": "Дмитриев",
+                    "middleName": "Геннадьевич"
+                },
+                "createdAt": "2026-06-11T16:02:02.497417Z",
+                "issue": "USER_REJECTED_SUGGESTED_CELLS",
+                "condition": "ACCEPTED",
+                "temperatureMode": "ORDINARY",
+                "skuCount": 1
+            },
+            {
+                "id": "61aff9f5-9cc8-4e41-9421-1ba95f191081",
+                "status": "COMPLETED",
+                "handlingUnitBarcode": "012200535966",
+                "sourceCellAddress": "G151",
+                "targetCellAddress": "SH-5-61-3-4",
+                "targetCellsAddresses": [
+                    "SH-5-61-3-4"
+                ],
+                "sourceZoneId": "c71e5603-443e-4da5-abeb-1e67096c61c7",
+                "sourceZoneName": "Ворота 151",
+                "responsibleUser": {
+                    "id": "48f6d5e2-23ee-48e6-ad34-1cc46668b229",
+                    "firstName": "Евгений",
+                    "lastName": "Яшин",
+                    "middleName": "Валерьевич"
+                },
+                "createdAt": "2026-06-11T16:02:02.494144Z",
+                "issue": "USER_REJECTED_SUGGESTED_CELLS",
+                "condition": "ACCEPTED",
+                "temperatureMode": "ORDINARY",
+                "skuCount": 1
+            },
+            {
+                "id": "01d1ac99-3135-469d-90c4-6aef7e91410d",
+                "status": "COMPLETED",
+                "handlingUnitBarcode": "012200535965",
+                "sourceCellAddress": "G151",
+                "targetCellAddress": "SH-7-61-2-2",
+                "targetCellsAddresses": [
+                    "SH-7-61-2-2"
+                ],
+                "sourceZoneId": "c71e5603-443e-4da5-abeb-1e67096c61c7",
+                "sourceZoneName": "Ворота 151",
+                "responsibleUser": {
+                    "id": "49df81ca-0f03-4685-8b51-62102f6f1f2b",
+                    "firstName": "Виталий",
+                    "lastName": "Дмитриев",
+                    "middleName": "Геннадьевич"
+                },
+                "createdAt": "2026-06-11T16:02:02.491038Z",
+                "issue": "USER_REJECTED_SUGGESTED_CELLS",
+                "condition": "ACCEPTED",
+                "temperatureMode": "ORDINARY",
+                "skuCount": 1
+            },
+            {
+                "id": "e5ea1a47-2995-4a4d-8abe-4312270e2a83",
+                "status": "COMPLETED",
+                "handlingUnitBarcode": "012200535964",
+                "sourceCellAddress": "G151",
+                "targetCellAddress": "SH-6-42-2-3",
+                "targetCellsAddresses": [
+                    "SH-6-42-2-3"
+                ],
+                "sourceZoneId": "c71e5603-443e-4da5-abeb-1e67096c61c7",
+                "sourceZoneName": "Ворота 151",
+                "responsibleUser": {
+                    "id": "49df81ca-0f03-4685-8b51-62102f6f1f2b",
+                    "firstName": "Виталий",
+                    "lastName": "Дмитриев",
+                    "middleName": "Геннадьевич"
+                },
+                "createdAt": "2026-06-11T16:02:02.487486Z",
+                "issue": "USER_REJECTED_SUGGESTED_CELLS",
+                "condition": "ACCEPTED",
+                "temperatureMode": "ORDINARY",
+                "skuCount": 1
+            },
+            {
+                "id": "6d04f091-82c5-40b6-8e68-dff268422085",
+                "status": "COMPLETED",
+                "handlingUnitBarcode": "012200535963",
+                "sourceCellAddress": "G151",
+                "targetCellAddress": "SH-5-51-1-4",
+                "targetCellsAddresses": [
+                    "SH-5-51-1-4"
+                ],
+                "sourceZoneId": "c71e5603-443e-4da5-abeb-1e67096c61c7",
+                "sourceZoneName": "Ворота 151",
+                "responsibleUser": {
+                    "id": "48f6d5e2-23ee-48e6-ad34-1cc46668b229",
+                    "firstName": "Евгений",
+                    "lastName": "Яшин",
+                    "middleName": "Валерьевич"
+                },
+                "createdAt": "2026-06-11T16:02:02.484329Z",
+                "issue": "USER_REJECTED_SUGGESTED_CELLS",
+                "condition": "ACCEPTED",
+                "temperatureMode": "ORDINARY",
+                "skuCount": 1
+            },
+            {
+                "id": "31f7d32d-01a4-4cd7-8725-aea18ccd1431",
+                "status": "COMPLETED",
+                "handlingUnitBarcode": "012200535962",
+                "sourceCellAddress": "G151",
+                "targetCellAddress": "SH-4-49-2-2",
+                "targetCellsAddresses": [
+                    "SH-4-49-2-2"
+                ],
+                "sourceZoneId": "c71e5603-443e-4da5-abeb-1e67096c61c7",
+                "sourceZoneName": "Ворота 151",
+                "responsibleUser": {
+                    "id": "f834caa9-893b-456f-a0ff-f9fc510e66f5",
+                    "firstName": "Денис",
+                    "lastName": "Осипов",
+                    "middleName": "Андреевич"
+                },
+                "createdAt": "2026-06-11T16:02:02.481025Z",
+                "issue": "USER_REJECTED_SUGGESTED_CELLS",
+                "condition": "ACCEPTED",
+                "temperatureMode": "ORDINARY",
+                "skuCount": 1
+            },
+            {
+                "id": "1979854f-c43c-4dca-852a-f820d1cea6b7",
+                "status": "COMPLETED",
+                "handlingUnitBarcode": "012200535961",
+                "sourceCellAddress": "G151",
+                "targetCellAddress": "SH-4-59-2-3",
+                "targetCellsAddresses": [
+                    "SH-4-59-2-3"
+                ],
+                "sourceZoneId": "c71e5603-443e-4da5-abeb-1e67096c61c7",
+                "sourceZoneName": "Ворота 151",
+                "responsibleUser": {
+                    "id": "f834caa9-893b-456f-a0ff-f9fc510e66f5",
+                    "firstName": "Денис",
+                    "lastName": "Осипов",
+                    "middleName": "Андреевич"
+                },
+                "createdAt": "2026-06-11T16:02:02.477613Z",
+                "issue": "USER_REJECTED_SUGGESTED_CELLS",
+                "condition": "ACCEPTED",
+                "temperatureMode": "ORDINARY",
+                "skuCount": 1
+            },
+            {
+                "id": "fbca0590-aafb-4297-b61f-7f88b5a9d569",
+                "status": "COMPLETED",
+                "handlingUnitBarcode": "012200535960",
+                "sourceCellAddress": "G151",
+                "targetCellAddress": "SH-4-48-2-3",
+                "targetCellsAddresses": [
+                    "SH-4-48-2-3"
+                ],
+                "sourceZoneId": "c71e5603-443e-4da5-abeb-1e67096c61c7",
+                "sourceZoneName": "Ворота 151",
+                "responsibleUser": {
+                    "id": "f834caa9-893b-456f-a0ff-f9fc510e66f5",
+                    "firstName": "Денис",
+                    "lastName": "Осипов",
+                    "middleName": "Андреевич"
+                },
+                "createdAt": "2026-06-11T16:02:02.470507Z",
+                "issue": "USER_REJECTED_SUGGESTED_CELLS",
+                "condition": "ACCEPTED",
+                "temperatureMode": "ORDINARY",
+                "skuCount": 1
+            },
+            {
+                "id": "d3afbe33-d977-404a-ab67-22d7aed07597",
+                "status": "COMPLETED",
+                "handlingUnitBarcode": "012200535959",
+                "sourceCellAddress": "G151",
+                "targetCellAddress": "SH-4-53-2-3",
+                "targetCellsAddresses": [
+                    "SH-4-53-2-3"
+                ],
+                "sourceZoneId": "c71e5603-443e-4da5-abeb-1e67096c61c7",
+                "sourceZoneName": "Ворота 151",
+                "responsibleUser": {
+                    "id": "f834caa9-893b-456f-a0ff-f9fc510e66f5",
+                    "firstName": "Денис",
+                    "lastName": "Осипов",
+                    "middleName": "Андреевич"
+                },
+                "createdAt": "2026-06-11T16:02:02.467167Z",
+                "issue": "USER_REJECTED_SUGGESTED_CELLS",
+                "condition": "ACCEPTED",
+                "temperatureMode": "ORDINARY",
+                "skuCount": 1
+            },
+            {
+                "id": "bd4c1af3-ac78-41b7-941e-46ee04a97586",
+                "status": "COMPLETED",
+                "handlingUnitBarcode": "012200535958",
+                "sourceCellAddress": "G151",
+                "targetCellAddress": "SH-5-63-2-4",
+                "targetCellsAddresses": [
+                    "SH-5-63-2-4"
+                ],
+                "sourceZoneId": "c71e5603-443e-4da5-abeb-1e67096c61c7",
+                "sourceZoneName": "Ворота 151",
+                "responsibleUser": {
+                    "id": "48f6d5e2-23ee-48e6-ad34-1cc46668b229",
+                    "firstName": "Евгений",
+                    "lastName": "Яшин",
+                    "middleName": "Валерьевич"
+                },
+                "createdAt": "2026-06-11T16:02:02.463445Z",
+                "issue": "USER_REJECTED_SUGGESTED_CELLS",
+                "condition": "ACCEPTED",
+                "temperatureMode": "ORDINARY",
+                "skuCount": 1
+            },
+            {
+                "id": "2f745f4e-0df5-4ab2-b33b-ca8d05fca172",
+                "status": "COMPLETED",
+                "handlingUnitBarcode": "012200535957",
+                "sourceCellAddress": "G151",
+                "targetCellAddress": "SH-4-64-3-4",
+                "targetCellsAddresses": [
+                    "SH-4-64-3-4"
+                ],
+                "sourceZoneId": "c71e5603-443e-4da5-abeb-1e67096c61c7",
+                "sourceZoneName": "Ворота 151",
+                "responsibleUser": {
+                    "id": "48f6d5e2-23ee-48e6-ad34-1cc46668b229",
+                    "firstName": "Евгений",
+                    "lastName": "Яшин",
+                    "middleName": "Валерьевич"
+                },
+                "createdAt": "2026-06-11T16:02:02.456971Z",
+                "issue": "USER_REJECTED_SUGGESTED_CELLS",
+                "condition": "ACCEPTED",
+                "temperatureMode": "ORDINARY",
+                "skuCount": 1
+            },
+            {
+                "id": "43aeb89e-75e4-4033-88d4-3a7747a05144",
+                "status": "COMPLETED",
+                "handlingUnitBarcode": "012200535956",
+                "sourceCellAddress": "G151",
+                "targetCellAddress": "SH-2-58-2-2",
+                "targetCellsAddresses": [
+                    "SH-2-58-2-2"
+                ],
+                "sourceZoneId": "c71e5603-443e-4da5-abeb-1e67096c61c7",
+                "sourceZoneName": "Ворота 151",
+                "responsibleUser": {
+                    "id": "f834caa9-893b-456f-a0ff-f9fc510e66f5",
+                    "firstName": "Денис",
+                    "lastName": "Осипов",
+                    "middleName": "Андреевич"
+                },
+                "createdAt": "2026-06-11T16:02:02.450042Z",
+                "issue": "USER_REJECTED_SUGGESTED_CELLS",
+                "condition": "ACCEPTED",
+                "temperatureMode": "ORDINARY",
+                "skuCount": 2
+            },
+            {
+                "id": "a95e39fd-c070-4bc9-a265-b8e9eaa144ed",
+                "status": "COMPLETED",
+                "handlingUnitBarcode": "012200535955",
+                "sourceCellAddress": "G151",
+                "targetCellAddress": "SH-6-64-2-3",
+                "targetCellsAddresses": [
+                    "SH-6-64-2-3"
+                ],
+                "sourceZoneId": "c71e5603-443e-4da5-abeb-1e67096c61c7",
+                "sourceZoneName": "Ворота 151",
+                "responsibleUser": {
+                    "id": "49df81ca-0f03-4685-8b51-62102f6f1f2b",
+                    "firstName": "Виталий",
+                    "lastName": "Дмитриев",
+                    "middleName": "Геннадьевич"
+                },
+                "createdAt": "2026-06-11T16:02:02.442355Z",
+                "issue": "USER_REJECTED_SUGGESTED_CELLS",
+                "condition": "ACCEPTED",
+                "temperatureMode": "ORDINARY",
+                "skuCount": 1
+            },
+            {
+                "id": "0c95fcae-e3a6-4359-a815-7c61c21b12ed",
+                "status": "COMPLETED",
+                "handlingUnitBarcode": "012200535954",
+                "sourceCellAddress": "G151",
+                "targetCellAddress": "SH-5-61-2-2",
+                "targetCellsAddresses": [
+                    "SH-5-61-2-2"
+                ],
+                "sourceZoneId": "c71e5603-443e-4da5-abeb-1e67096c61c7",
+                "sourceZoneName": "Ворота 151",
+                "responsibleUser": {
+                    "id": "49df81ca-0f03-4685-8b51-62102f6f1f2b",
+                    "firstName": "Виталий",
+                    "lastName": "Дмитриев",
+                    "middleName": "Геннадьевич"
+                },
+                "createdAt": "2026-06-11T16:02:02.439341Z",
+                "issue": "USER_REJECTED_SUGGESTED_CELLS",
+                "condition": "ACCEPTED",
+                "temperatureMode": "ORDINARY",
+                "skuCount": 1
+            },
+            {
+                "id": "1d9e0ce3-af00-4473-8b95-d267f6848d9e",
+                "status": "COMPLETED",
+                "handlingUnitBarcode": "012200535949",
+                "sourceCellAddress": "G151",
+                "targetCellAddress": "SH-4-63-1-4",
+                "targetCellsAddresses": [
+                    "SH-4-63-1-4"
+                ],
+                "sourceZoneId": "c71e5603-443e-4da5-abeb-1e67096c61c7",
+                "sourceZoneName": "Ворота 151",
+                "responsibleUser": {
+                    "id": "48f6d5e2-23ee-48e6-ad34-1cc46668b229",
+                    "firstName": "Евгений",
+                    "lastName": "Яшин",
+                    "middleName": "Валерьевич"
+                },
+                "createdAt": "2026-06-11T16:02:02.436297Z",
+                "issue": "USER_REJECTED_SUGGESTED_CELLS",
+                "condition": "ACCEPTED",
+                "temperatureMode": "ORDINARY",
+                "skuCount": 1
+            },
+            {
+                "id": "91db80bb-4681-4d78-9d3f-73717488193b",
+                "status": "COMPLETED",
+                "handlingUnitBarcode": "012200535951",
+                "sourceCellAddress": "G151",
+                "targetCellAddress": "SH-3-52-2-2",
+                "targetCellsAddresses": [
+                    "SH-3-52-2-2"
+                ],
+                "sourceZoneId": "c71e5603-443e-4da5-abeb-1e67096c61c7",
+                "sourceZoneName": "Ворота 151",
+                "responsibleUser": {
+                    "id": "f834caa9-893b-456f-a0ff-f9fc510e66f5",
+                    "firstName": "Денис",
+                    "lastName": "Осипов",
+                    "middleName": "Андреевич"
+                },
+                "createdAt": "2026-06-11T16:02:02.432896Z",
+                "issue": "USER_REJECTED_SUGGESTED_CELLS",
+                "condition": "ACCEPTED",
+                "temperatureMode": "ORDINARY",
+                "skuCount": 1
+            },
+            {
+                "id": "d3fc3baa-0093-4be1-a861-37550b886fc2",
+                "status": "COMPLETED",
+                "handlingUnitBarcode": "012200535950",
+                "sourceCellAddress": "G151",
+                "targetCellAddress": "SH-2-64-2-2",
+                "targetCellsAddresses": [
+                    "SH-2-64-2-2"
+                ],
+                "sourceZoneId": "c71e5603-443e-4da5-abeb-1e67096c61c7",
+                "sourceZoneName": "Ворота 151",
+                "responsibleUser": {
+                    "id": "f834caa9-893b-456f-a0ff-f9fc510e66f5",
+                    "firstName": "Денис",
+                    "lastName": "Осипов",
+                    "middleName": "Андреевич"
+                },
+                "createdAt": "2026-06-11T16:02:02.429565Z",
+                "issue": "USER_REJECTED_SUGGESTED_CELLS",
+                "condition": "ACCEPTED",
+                "temperatureMode": "ORDINARY",
+                "skuCount": 1
+            }
+        ],
+        "total": 100096
+    }
+}

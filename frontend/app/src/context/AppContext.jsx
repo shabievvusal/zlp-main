@@ -34,6 +34,7 @@ export function AppProvider({ children }) {
   const [status, setStatus] = useState(null)
   const [loading, setLoading] = useState(false)
   const [heTableMode, setHeTableMode] = useState('sz')
+  const [statsOperation, setStatsOperation] = useState('selection')
   const [idleThresholdMinutes, setIdleThresholdMinutesRaw] = useState(() => lsGetNum('vs_idle_threshold', 15))
   const [allowedIdleMinutes, setAllowedIdleMinutesRaw] = useState(() => lsGetNum('vs_allowed_idle', 0))
 
@@ -48,6 +49,7 @@ export function AppProvider({ children }) {
   const [fetchHourFrom, setFetchHourFrom] = useState(9)
   const [fetchHourTo, setFetchHourTo] = useState(21)
   const [engineNote, setEngineNote] = useState('')
+  const [statsRefreshSeq, setStatsRefreshSeq] = useState(0)
   const [newEmployeesFromFetch, setNewEmployeesFromFetch] = useState([])
   const autoFetchEnabled = _autoFetchEnabled
 
@@ -204,7 +206,27 @@ export function AppProvider({ children }) {
         res = await api.fetchData(opts)
       }
       if (res.success === false) throw new Error(res.error)
-      if (!silent) notify(`Получено ${res.fetched ?? '?'}, добавлено ${res.added ?? '?'}`, 'success')
+      let placementRes = null
+      let placementError = null
+      if (token) {
+        try {
+          placementRes = await api.fetchPlacementViaBrowser(token, {
+            createdAtFrom: opts.operationCompletedAtFrom,
+            createdAtTo: opts.operationCompletedAtTo,
+          })
+        } catch (err) {
+          placementError = err
+          console.warn('placement fetch failed:', err)
+        }
+      }
+      if (!silent) {
+        const placementText = placementRes
+          ? ` · размещение: ${placementRes.fetched ?? '?'}/${placementRes.added ?? '?'}`
+          : placementError
+            ? ' · размещение не загружено'
+            : ''
+        notify(`Комплектация: получено ${res.fetched ?? '?'}, добавлено ${res.added ?? '?'}${placementText}`, placementError ? 'info' : 'success')
+      }
       // Build engine note
       const t = res.timings || {}
       const ms = v => Number.isFinite(v) ? `${Math.round(v / 100) / 10}с` : ''
@@ -213,11 +235,14 @@ export function AppProvider({ children }) {
       else if (res.engine === 'node') { parts.push('Node'); if (res.dotnetError) parts.push('.NET err') }
       if (t.totalMs)    parts.push(`итого ${ms(t.totalMs)}`)
       if (t.rawWriteMs) parts.push(`raw ${ms(t.rawWriteMs)}`)
+      if (placementRes) parts.push(`размещение +${placementRes.added ?? 0}`)
+      else if (placementError) parts.push('размещение: ошибка')
       setEngineNote(parts.join(' · '))
       if (res.newEmployees?.length > 0) setNewEmployeesFromFetch(res.newEmployees)
       await loadEmployees()
       await loadDateSummary(dateStr, shift)
       await loadStatus()
+      setStatsRefreshSeq(v => v + 1)
     } catch (err) {
       notify('Ошибка: ' + err.message, 'error')
       throw err
@@ -364,7 +389,9 @@ export function AppProvider({ children }) {
       dateSummary, setDateSummary,
       emplMap, emplIdMap, emplIdNameMap, emplNameMap, emplCompanies,
       status, loading,
-      heTableMode, setHeTableMode,
+    heTableMode, setHeTableMode,
+    statsOperation, setStatsOperation,
+    statsRefreshSeq,
       idleThresholdMinutes, setIdleThresholdMinutes,
       allowedIdleMinutes, setAllowedIdleMinutes,
       fetchHourFrom, setFetchHourFrom,

@@ -9,6 +9,7 @@ const path = require('path');
 const productWeights = require('./product-weights');
 
 const DATA_DIR = path.join(__dirname, 'data');
+const PLACEMENT_DIR_NAME = 'placement';
 
 /** Часовой пояс смен: Москва (UTC+3), без перехода на летнее время */
 const MOSCOW_UTC_OFFSET_MS = 3 * 60 * 60 * 1000;
@@ -833,6 +834,205 @@ function storageByHourToCols(storageByHour, cols) {
   return byHour;
 }
 
+function placementDir(dateStr) {
+  return path.join(DATA_DIR, dateStr, PLACEMENT_DIR_NAME);
+}
+
+function placementFilePath(dateStr, hour) {
+  return path.join(placementDir(dateStr), String(hour).padStart(2, '0') + '.json');
+}
+
+function normalizePlacementUser(user) {
+  const last = String(user?.lastName || '').trim();
+  const first = String(user?.firstName || '').trim();
+  const middle = String(user?.middleName || '').trim();
+  return [last, first, middle].filter(Boolean).join(' ').trim();
+}
+
+function normalizePlacementItem(item) {
+  const createdAt = item?.createdAt || item?.completedAt || item?.updatedAt || null;
+  const responsibleUser = item?.responsibleUser || {};
+  return {
+    id: String(item?.id || '').trim(),
+    status: item?.status || '',
+    handlingUnitBarcode: item?.handlingUnitBarcode || '',
+    sourceCellAddress: item?.sourceCellAddress || '',
+    targetCellAddress: item?.targetCellAddress || '',
+    targetCellsAddresses: Array.isArray(item?.targetCellsAddresses) ? item.targetCellsAddresses : [],
+    sourceZoneId: item?.sourceZoneId || '',
+    sourceZoneName: item?.sourceZoneName || '',
+    responsibleUser: {
+      id: responsibleUser.id || '',
+      firstName: responsibleUser.firstName || '',
+      lastName: responsibleUser.lastName || '',
+      middleName: responsibleUser.middleName || '',
+    },
+    executorId: responsibleUser.id || '',
+    executor: normalizePlacementUser(responsibleUser) || responsibleUser.id || '',
+    createdAt,
+    completedAt: createdAt,
+    issue: item?.issue || '',
+    condition: item?.condition || '',
+    temperatureMode: item?.temperatureMode || '',
+    skuCount: Number(item?.skuCount) || 0,
+  };
+}
+
+function placementMoscowDateHour(ts) {
+  const d = new Date(ts);
+  if (Number.isNaN(d.getTime())) return null;
+  const m = new Date(d.getTime() + MOSCOW_UTC_OFFSET_MS);
+  return { dateStr: m.toISOString().slice(0, 10), hour: m.getUTCHours() };
+}
+
+function loadPlacementHour(dateStr, hour) {
+  const fp = placementFilePath(dateStr, hour);
+  if (!fs.existsSync(fp)) return new Map();
+  try {
+    const raw = JSON.parse(fs.readFileSync(fp, 'utf8'));
+    const list = Array.isArray(raw.items) ? raw.items : Object.values(raw.items || {});
+    const map = new Map();
+    for (const item of list) {
+      const key = item.id || item.handlingUnitBarcode || `${item.createdAt}|${item.executorId}|${item.targetCellAddress}`;
+      if (key && !map.has(key)) map.set(key, item);
+    }
+    return map;
+  } catch {
+    return new Map();
+  }
+}
+
+function savePlacementItems(items = []) {
+  ensureDataDir();
+  const bySlot = new Map();
+  for (const raw of items || []) {
+    const item = normalizePlacementItem(raw);
+    if (!item.createdAt) continue;
+    const slot = placementMoscowDateHour(item.createdAt);
+    if (!slot) continue;
+    const key = `${slot.dateStr}\t${slot.hour}`;
+    if (!bySlot.has(key)) bySlot.set(key, []);
+    bySlot.get(key).push(item);
+  }
+
+  let added = 0;
+  let skipped = 0;
+  const byShift = {};
+  for (const [slotKey, list] of bySlot) {
+    const [dateStr, hourStr] = slotKey.split('\t');
+    const hour = Number(hourStr);
+    fs.mkdirSync(placementDir(dateStr), { recursive: true });
+    const map = loadPlacementHour(dateStr, hour);
+    for (const item of list) {
+      const key = item.id || item.handlingUnitBarcode || `${item.createdAt}|${item.executorId}|${item.targetCellAddress}`;
+      if (!key || map.has(key)) { skipped++; continue; }
+      map.set(key, item);
+      added++;
+    }
+    const fp = placementFilePath(dateStr, hour);
+    const out = {
+      updatedAt: new Date().toISOString(),
+      operation: 'placement',
+      items: Array.from(map.values()).sort((a, b) => String(a.createdAt || '').localeCompare(String(b.createdAt || ''))),
+    };
+    fs.writeFileSync(fp, JSON.stringify(out), 'utf8');
+    byShift[`${dateStr}_${hour >= 9 && hour < 21 ? 'day' : 'night'}`] = true;
+  }
+  return { added, skipped, byShift };
+}
+
+function getPlacementItems(dateStr, options = {}) {
+  const { fromHour, toHour, shift } = options;
+  const pairs = getHoursToLoad(dateStr, fromHour, toHour, shift);
+  const byId = new Map();
+  for (const [d, hour] of pairs) {
+    const map = loadPlacementHour(d, hour);
+    for (const item of map.values()) {
+      const key = item.id || item.handlingUnitBarcode || `${item.createdAt}|${item.executorId}|${item.targetCellAddress}`;
+      if (key && !byId.has(key)) byId.set(key, item);
+    }
+  }
+  return Array.from(byId.values()).sort((a, b) => String(a.createdAt || '').localeCompare(String(b.createdAt || '')));
+}
+
+function buildPlacementSummary(items, opts = {}) {
+  const { getCompany } = opts;
+  const byExecutor = new Map();
+  const byHour = new Map();
+  for (const item of items || []) {
+    const executorId = item.executorId || '';
+    const name = item.executor || executorId || '—';
+    const ts = item.createdAt || item.completedAt;
+    if (!ts) continue;
+    const slot = placementMoscowDateHour(ts);
+    if (!slot) continue;
+    const hour = slot.hour;
+    const taskKey = item.id || item.handlingUnitBarcode || `${ts}|${executorId}|${item.targetCellAddress}`;
+    if (!byExecutor.has(executorId || name)) {
+      byExecutor.set(executorId || name, {
+        name,
+        executorId,
+        company: getCompany ? (getCompany(name, executorId) || '—') : '—',
+        byHour: {},
+        totalKeys: new Set(),
+        firstAt: null,
+        lastAt: null,
+      });
+    }
+    const rec = byExecutor.get(executorId || name);
+    rec.totalKeys.add(taskKey);
+    rec.byHour[hour] = (rec.byHour[hour] || 0) + 1;
+    if (!rec.firstAt || ts < rec.firstAt) rec.firstAt = ts;
+    if (!rec.lastAt || ts > rec.lastAt) rec.lastAt = ts;
+    if (!byHour.has(hour)) byHour.set(hour, { hour, ops: 0, employees: new Set() });
+    byHour.get(hour).ops += 1;
+    if (executorId || name) byHour.get(hour).employees.add(executorId || name);
+  }
+  const rows = Array.from(byExecutor.values()).map(r => ({
+    name: r.name,
+    executorId: r.executorId || null,
+    company: r.company,
+    byHour: r.byHour,
+    byHourZone: {},
+    byZone: {},
+    weightByHour: {},
+    total: r.totalKeys.size,
+    firstAt: r.firstAt,
+    lastAt: r.lastAt,
+  })).sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, 'ru'));
+  const hours = Array.from(new Set(rows.flatMap(r => Object.keys(r.byHour).map(Number)))).sort((a, b) => a - b);
+  const hourly = Array.from(byHour.values()).map(h => ({
+    hour: h.hour,
+    ops: h.ops,
+    employees: h.employees.size,
+    storageOps: h.ops,
+    kdkOps: 0,
+    storageEmployees: h.employees.size,
+    kdkEmployees: 0,
+  })).sort((a, b) => a.hour - b.hour);
+  return {
+    totalOps: rows.reduce((s, r) => s + r.total, 0),
+    executors: rows.map(r => ({ name: r.name, executorId: r.executorId, ops: r.total, firstAt: r.firstAt, lastAt: r.lastAt })),
+    hourly,
+    hourlyByEmployee: { hours, rows },
+  };
+}
+
+function getPlacementSummary(dateStr, options = {}, context = {}) {
+  let items = getPlacementItems(dateStr, options);
+  if (options.filterExecutorNorm) {
+    items = items.filter(it => normalizeFioSummary(it.executor) === options.filterExecutorNorm);
+  }
+  if (Array.isArray(options.filterCompanies) && options.filterCompanies.length > 0 && context.getCompany) {
+    const allowed = new Set(options.filterCompanies.map(c => c.trim().toLowerCase()));
+    items = items.filter(it => {
+      const company = context.getCompany(it.executor, it.executorId);
+      return company && allowed.has(company.trim().toLowerCase());
+    });
+  }
+  return buildPlacementSummary(items, { getCompany: context.getCompany });
+}
+
 /** Быстрая сводка за дату и смену. context: { getCompany(fio) } опционально для companySummary. */
 function getDateSummary(dateStr, options = {}, context = {}) {
   let items = getDateItems(dateStr, options);
@@ -964,4 +1164,7 @@ module.exports = {
   getMergeKeyFromLight,
   getTaskKeySummary,
   computeEmployeeStatsForItems,
+  savePlacementItems,
+  getPlacementItems,
+  getPlacementSummary,
 };

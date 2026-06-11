@@ -36,6 +36,8 @@ export default function StatsPage() {
     allItems, dateSummary, emplMap, emplIdMap, emplIdNameMap, emplCompanies,
     selectedDate, shiftFilter, filterCompany,
     heTableMode, setHeTableMode,
+    statsOperation,
+    statsRefreshSeq,
     idleThresholdMinutes, setIdleThresholdMinutes,
     allowedIdleMinutes, setAllowedIdleMinutes,
     loading, status,
@@ -49,6 +51,8 @@ export default function StatsPage() {
   const [missingWeightTotal, setMissingWeightTotal] = useState(null)
   const notify = useNotify()
   const monthlyExportRef = useRef(null)
+  const [placementSummary, setPlacementSummary] = useState(null)
+  const [placementLoading, setPlacementLoading] = useState(false)
 
   const items = useMemo(() => {
     if (allItems.length) return allItems
@@ -539,11 +543,67 @@ export default function StatsPage() {
     }
   }, [statsAll, filterCompany, hourlyByEmployee, companySummary])
 
+  useEffect(() => {
+    if (statsOperation !== 'placement' || !selectedDate) return
+    let alive = true
+    setPlacementLoading(true)
+    api.getPlacementDateSummary(selectedDate, { shift: shiftFilter })
+      .then(res => { if (alive) setPlacementSummary(res) })
+      .catch(err => {
+        if (alive) {
+          setPlacementSummary(null)
+          notify('Ошибка загрузки размещения: ' + err.message, 'error')
+        }
+      })
+      .finally(() => { if (alive) setPlacementLoading(false) })
+    return () => { alive = false }
+  }, [statsOperation, selectedDate, shiftFilter, status?.lastRun, statsRefreshSeq, notify])
+
+  const placementHourlyByEmployee = useMemo(() => {
+    const hb = placementSummary?.hourlyByEmployee
+    if (!hb) return null
+    const rows = (hb.rows || []).filter(r =>
+      filterCompany === '__all__'
+        ? true
+        : filterCompany === '__none__'
+          ? (!r.company || r.company === '—')
+          : r.company === filterCompany
+    )
+    return { hours: hb.hours || [], allRows: rows }
+  }, [placementSummary, filterCompany])
+
+  const placementStats = useMemo(() => {
+    if (!placementSummary) return null
+    const rows = placementHourlyByEmployee?.allRows || []
+    const totalOps = rows.reduce((sum, r) => sum + (Number(r.total) || 0), 0)
+    const hourMap = new Map()
+    for (const r of rows) {
+      for (const [hourStr, v] of Object.entries(r.byHour || {})) {
+        const n = Number(v) || 0
+        if (!n) continue
+        const hour = Number(hourStr)
+        if (!hourMap.has(hour)) hourMap.set(hour, { hour, ops: 0, employees: 0, storageOps: 0, kdkOps: 0, storageEmployees: 0, kdkEmployees: 0 })
+        const h = hourMap.get(hour)
+        h.ops += n
+        h.storageOps += n
+        h.employees += 1
+        h.storageEmployees += 1
+      }
+    }
+    return { totalOps, hourly: [...hourMap.values()].sort((a, b) => a.hour - b.hour) }
+  }, [placementSummary, placementHourlyByEmployee])
+
+  const isPlacement = statsOperation === 'placement'
+  const activeHourlyByEmployee = isPlacement ? placementHourlyByEmployee : hourlyByEmployee
+  const activeStats = isPlacement ? placementStats : stats
+  const activeWeightByEmployee = isPlacement ? {} : weightByEmployee
+  const activeIdlesByEmployee = isPlacement ? {} : idlesByEmployee
+
   return (
     <div className={styles.mainContent}>
       <StatsToolbar />
 
-      {loading && <div className={styles.loadingBar} />}
+      {(loading || placementLoading) && <div className={styles.loadingBar} />}
 
       {newEmployeesFromFetch.length > 0 && (
         <div className={styles.newEmplBanner}>
@@ -563,12 +623,12 @@ export default function StatsPage() {
       )}
 
       {/* Карточки */}
-      {stats && (
+      {!isPlacement && stats && (
         <StatsCards stats={stats} selectedDate={selectedDate} shiftFilter={shiftFilter} />
       )}
 
       {/* Неучтённый вес */}
-      {statsAll && (
+      {!isPlacement && statsAll && (
         <div className={styles.statsWeightRow}>
           <span className={styles.statsWeightNote}>
             {missingWeightNames.length > 0
@@ -590,7 +650,7 @@ export default function StatsPage() {
       {emplCompanies.length > 0 && <CompanyFilter />}
 
       {/* Сводка по компаниям */}
-      <div className={styles.card}>
+      {!isPlacement && <div className={styles.card}>
         <div className={styles.cardHeader}>
           <div>
             <span>Сводка по компаниям</span>
@@ -602,19 +662,21 @@ export default function StatsPage() {
           ? <CompanySummaryTable rows={companySummary.rows} hoursDisplay={companySummary.hoursDisplay} showHours={showHours} />
           : <div className={styles.emptyRow}>Нет данных</div>
         }
-      </div>
+      </div>}
 
       {/* Сводка по компаниям за месяц */}
-      <MonthlyCompanySummaryTable />
+      {!isPlacement && <MonthlyCompanySummaryTable />}
 
       {/* Пики по часам */}
       <div className={styles.card}>
         <div className={styles.cardHeader}>
-          <span>Пики по часам</span>
-          <span className={styles.cardHeaderSub}>операции и сотрудники за каждый час; столбики — хранение и КДК</span>
+          <span>{isPlacement ? 'Размещение по часам' : 'Пики по часам'}</span>
+          <span className={styles.cardHeaderSub}>
+            {isPlacement ? 'операции размещения и сотрудники за каждый час' : 'операции и сотрудники за каждый час; столбики — хранение и КДК'}
+          </span>
         </div>
-        {stats?.hourly?.length
-          ? <HourlyChart hourly={stats.hourly} shiftFilter={shiftFilter} />
+        {activeStats?.hourly?.length
+          ? <HourlyChart hourly={activeStats.hourly} shiftFilter={shiftFilter} />
           : <div className={styles.emptyRow}>Нет данных</div>
         }
       </div>
@@ -623,7 +685,7 @@ export default function StatsPage() {
       <div className={styles.card}>
         <div className={`${styles.cardHeader} ${styles.cardHeaderHourly}`}>
           <div>
-            <span>Сотрудники по часам</span>
+            <span>{isPlacement ? 'Сотрудники по часам: размещение' : 'Сотрудники по часам'}</span>
             {status?.lastRun && (
               <div className={styles.statsLastUpdate}>
                 Обновлено: {new Date(status.lastRun).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
@@ -635,7 +697,7 @@ export default function StatsPage() {
               type="button"
               className="btn btn-secondary btn-sm"
               onClick={heTableMode === 'idles' ? handleExportIdles : heTableMode === 'monthly' ? () => monthlyExportRef.current?.() : handleExportHourly}
-              disabled={heTableMode !== 'monthly' && !hourlyByEmployee?.allRows?.length}
+              disabled={isPlacement ? heTableMode !== 'monthly' : (heTableMode !== 'monthly' && !hourlyByEmployee?.allRows?.length)}
               title="Выгрузить таблицу в Excel"
             >
               <Download size={13} strokeWidth={2} style={{marginRight:4}}/>XLSX
@@ -680,14 +742,14 @@ export default function StatsPage() {
           </div>
         </div>
         {heTableMode === 'monthly'
-          ? <MonthlyEmployeeTable exportRef={monthlyExportRef} />
-          : hourlyByEmployee
+          ? <MonthlyEmployeeTable exportRef={monthlyExportRef} operation={isPlacement ? 'placement' : 'selection'} />
+          : activeHourlyByEmployee
             ? <HourlyEmployeeTable
-                allRows={hourlyByEmployee.allRows}
-                hours={hourlyByEmployee.hours}
+                allRows={activeHourlyByEmployee.allRows}
+                hours={activeHourlyByEmployee.hours}
                 mode={heTableMode}
-                idlesByEmployee={idlesByEmployee}
-                weightByEmployee={weightByEmployee}
+                idlesByEmployee={activeIdlesByEmployee}
+                weightByEmployee={activeWeightByEmployee}
                 allowedIdleMinutes={allowedIdleMinutes}
                 shiftFilter={shiftFilter}
                 selectedDate={selectedDate}

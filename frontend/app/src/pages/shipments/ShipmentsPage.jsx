@@ -1938,7 +1938,7 @@ function ReportModal({ onClose }) {
       const blob = await r.blob()
       const a = document.createElement('a')
       a.href = URL.createObjectURL(blob)
-      a.download = 'Отчет по РК и ящикам.xlsx'
+      a.download = 'Отчет по РК, ящикам, ТЧ.xlsx'
       a.click()
       URL.revokeObjectURL(a.href)
       setResult('Отчёт скачан')

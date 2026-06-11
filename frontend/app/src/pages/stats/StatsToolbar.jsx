@@ -6,10 +6,18 @@ import { RefreshCw, Radio, RotateCcw } from 'lucide-react'
 import DatePicker from '../../components/ui/DatePicker.jsx'
 import styles from './StatsPage.module.css'
 
+const STATS_OPERATIONS = [
+  { key: 'selection', label: 'Комплектация' },
+  { key: 'placement', label: 'Размещение' },
+  { key: 'receiving', label: 'Приёмка', disabled: true },
+  { key: 'remains', label: 'Остатки', disabled: true },
+]
+
 export default function StatsToolbar() {
   const {
     selectedDate, setSelectedDate,
     shiftFilter, setShiftFilter,
+    statsOperation, setStatsOperation,
     fetchHourFrom, setFetchHourFrom,
     fetchHourTo, setFetchHourTo,
     loading,
@@ -67,6 +75,24 @@ export default function StatsToolbar() {
         >
           Ночь (21–9)
         </button>
+      </div>
+
+      <div className={styles.operationToggleWrap}>
+        <span className={styles.shiftToggleLabel}>Операция:</span>
+        <div className={styles.operationToggle}>
+          {STATS_OPERATIONS.map(op => (
+            <button
+              key={op.key}
+              type="button"
+              className={`${styles.operationBtn} ${statsOperation === op.key ? styles.operationBtnActive : ''}`}
+              onClick={() => !op.disabled && setStatsOperation(op.key)}
+              disabled={op.disabled}
+              title={op.disabled ? 'Добавим следующим шагом' : undefined}
+            >
+              {op.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className={styles.fetchRangeWrap}>

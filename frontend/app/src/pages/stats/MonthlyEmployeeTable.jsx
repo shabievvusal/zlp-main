@@ -41,7 +41,7 @@ function enrichRows(rows) {
   })
 }
 
-export default function MonthlyEmployeeTable({ exportRef }) {
+export default function MonthlyEmployeeTable({ exportRef, operation = 'selection' }) {
   const [dateFrom,    setDateFrom]    = useState(getMonthStartStr)
   const [dateTo,      setDateTo]      = useState(getTodayStr)
   const [shift,       setShift]       = useState('')
@@ -56,7 +56,9 @@ export default function MonthlyEmployeeTable({ exportRef }) {
     if (!dateFrom || !dateTo) return
     setLoading(true)
     try {
-      const res = await api.getMonthlyEmployees(dateFrom, dateTo, shift || undefined, zone || undefined)
+      const res = operation === 'placement'
+        ? await api.getMonthlyPlacementEmployees(dateFrom, dateTo, shift || undefined)
+        : await api.getMonthlyEmployees(dateFrom, dateTo, shift || undefined, zone || undefined)
       setRows(enrichRows(res.rows || []))
       setLoadedRange({ from: dateFrom, to: dateTo })
     } catch (e) {
@@ -117,6 +119,10 @@ export default function MonthlyEmployeeTable({ exportRef }) {
   )
 
   const selectedZone = ZONES.find(z => z.key === zone)
+  const opLabel = operation === 'placement' ? 'Размещение' : 'Производительность'
+  const totalLabel = operation === 'placement' ? 'Итого операций' : 'Итого СЗ'
+  const rateHourLabel = operation === 'placement' ? 'Опер./ч' : 'СЗ/ч'
+  const rateMinLabel = operation === 'placement' ? 'Опер./мин' : 'СЗ/мин'
 
   useEffect(() => {
     if (exportRef) exportRef.current = handleExport
@@ -137,7 +143,7 @@ export default function MonthlyEmployeeTable({ exportRef }) {
 
       const zoneLbl = selectedZone ? ` • ${selectedZone.label}` : ''
       const shiftLbl = shift === 'night' ? ' • Ночь' : shift === 'day' ? ' • День' : ''
-      const title = `Производительность • ${fmtDate(loadedRange?.from)} — ${fmtDate(loadedRange?.to)}${zoneLbl}${shiftLbl}`
+      const title = `${opLabel} • ${fmtDate(loadedRange?.from)} — ${fmtDate(loadedRange?.to)}${operation === 'placement' ? '' : zoneLbl}${shiftLbl}`
 
       const NCOLS = 7
       const AVG_FILL = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDBEAFE' } }
@@ -153,7 +159,7 @@ export default function MonthlyEmployeeTable({ exportRef }) {
       ws.getRow(1).height = 26
 
       // Средние — правее таблицы, начиная с колонки 9 (I)
-      const avgLabels = ['Ср. СЗ', 'Ср. СЗ/ч', 'Ср. СЗ/мин']
+      const avgLabels = [operation === 'placement' ? 'Ср. оп.' : 'Ср. СЗ', rateHourLabel, rateMinLabel]
       const avgValues = [avg?.avgTotal ?? '', avg?.avgSzPerHour ?? '', avg?.avgSzPerMin ?? '']
       avgLabels.forEach((lbl, i) => {
         const labelCell = ws.getRow(1).getCell(9 + i * 2)
@@ -164,7 +170,7 @@ export default function MonthlyEmployeeTable({ exportRef }) {
         valCell.style = { font: { bold: true, size: 13 }, fill: AVG_FILL, border: BORDER, alignment: ALIGN }
       })
 
-      const headers = ['Дата', 'Компания', 'ФИО', 'Итого СЗ', 'В работе', 'СЗ/ч', 'СЗ/мин']
+      const headers = ['Дата', 'Компания', 'ФИО', totalLabel, 'В работе', rateHourLabel, rateMinLabel]
       const hdrRow = ws.addRow(headers)
       hdrRow.height = 20
       hdrRow.eachCell(cell => {
@@ -212,7 +218,7 @@ export default function MonthlyEmployeeTable({ exportRef }) {
       const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a'); a.href = url
-      const fname = `производительность_${loadedRange?.from}_${loadedRange?.to}${zone ? '_' + zone : ''}.xlsx`
+      const fname = `${operation === 'placement' ? 'размещение' : 'производительность'}_${loadedRange?.from}_${loadedRange?.to}${operation === 'selection' && zone ? '_' + zone : ''}.xlsx`
       a.download = fname; a.click()
       setTimeout(() => URL.revokeObjectURL(url), 1000)
     } catch (err) {
@@ -233,20 +239,22 @@ export default function MonthlyEmployeeTable({ exportRef }) {
           <option value="day">День (9–21)</option>
           <option value="night">Ночь (21–9)</option>
         </select>
-        <select
-          className={styles.selectControl}
-          style={{
-            fontSize: 13,
-            background: selectedZone ? selectedZone.bg : undefined,
-            color:      selectedZone ? selectedZone.text : undefined,
-          }}
-          value={zone} onChange={e => setZone(e.target.value)}
-        >
-          <option value="">Все зоны</option>
-          {ZONES.map(z => (
-            <option key={z.key} value={z.key}>{z.label}</option>
-          ))}
-        </select>
+        {operation === 'selection' && (
+          <select
+            className={styles.selectControl}
+            style={{
+              fontSize: 13,
+              background: selectedZone ? selectedZone.bg : undefined,
+              color:      selectedZone ? selectedZone.text : undefined,
+            }}
+            value={zone} onChange={e => setZone(e.target.value)}
+          >
+            <option value="">Все зоны</option>
+            {ZONES.map(z => (
+              <option key={z.key} value={z.key}>{z.label}</option>
+            ))}
+          </select>
+        )}
         <button className="btn btn-secondary btn-sm"
           onClick={load} disabled={loading || !dateFrom || !dateTo}>
           {loading ? 'Загрузка...' : 'Загрузить'}
@@ -268,15 +276,15 @@ export default function MonthlyEmployeeTable({ exportRef }) {
       {avg && (
         <div style={{ display: 'flex', gap: 8, padding: '6px 12px', flexWrap: 'wrap' }}>
           <div style={avgChipStyle}>
-            <span style={avgLabelStyle}>Ср. СЗ</span>
+            <span style={avgLabelStyle}>{operation === 'placement' ? 'Ср. оп.' : 'Ср. СЗ'}</span>
             <span style={avgValStyle}>{avg.avgTotal}</span>
           </div>
           <div style={avgChipStyle}>
-            <span style={avgLabelStyle}>Ср. СЗ/ч</span>
+            <span style={avgLabelStyle}>{rateHourLabel}</span>
             <span style={avgValStyle}>{avg.avgSzPerHour ?? '—'}</span>
           </div>
           <div style={avgChipStyle}>
-            <span style={avgLabelStyle}>Ср. СЗ/мин</span>
+            <span style={avgLabelStyle}>{rateMinLabel}</span>
             <span style={avgValStyle}>{avg.avgSzPerMin ?? '—'}</span>
           </div>
         </div>
@@ -289,10 +297,10 @@ export default function MonthlyEmployeeTable({ exportRef }) {
                 {thLeft ('date',      'Дата',     'Дата смены')}
                 {thLeft ('company',   'Компания', 'Компания-подрядчик')}
                 {thLeft ('name',      'ФИО',      'ФИО сотрудника')}
-                {thRight('total',     'Итого СЗ', 'Суммарное кол-во СЗ за смену')}
+                {thRight('total',     totalLabel, 'Суммарное количество операций за смену')}
                 {thRight('worked',    'В работе', 'Время в работе (span − простои ≥ 5 мин)')}
-                {thRight('szPerHour', 'СЗ/ч',    'СЗ в час = Итого ÷ время в работе')}
-                {thRight('szPerMin',  'СЗ/мин',  'СЗ в минуту = Итого ÷ время в работе')}
+                {thRight('szPerHour', rateHourLabel, 'Операций в час = Итого ÷ время в работе')}
+                {thRight('szPerMin',  rateMinLabel,  'Операций в минуту = Итого ÷ время в работе')}
               </tr>
             </thead>
             <tbody>

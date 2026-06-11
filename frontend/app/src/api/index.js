@@ -353,6 +353,7 @@ export async function getLiveMonitor() {
 
 const LIVE_MONITOR_URL = 'https://api.samokat.ru/wmsops-wwh/activity-monitor/selection/handling-units-in-progress'
 const SAMOKAT_STOCKS_URL = 'https://api.samokat.ru/wmsops-wwh/stocks/changes/search'
+const PLACEMENT_TASKS_URL = 'https://api.samokat.ru/wmsin-wwh/placement/tasks'
 
 export async function getLiveMonitorViaBrowser(token) {
   const r = await fetch(LIVE_MONITOR_URL, {
@@ -432,6 +433,80 @@ export async function fetchLastCompletedForExecutor(token, executorId, fromIso, 
     if (maxCompletedAt === null || ts > maxCompletedAt) maxCompletedAt = ts
   }
   return { items, maxCompletedAt }
+}
+
+async function _fetchPlacementPage(token, params) {
+  const r = await fetch(`${PLACEMENT_TASKS_URL}?${params}`, {
+    headers: {
+      'Accept': 'application/json',
+      'Authorization': `Bearer ${token}`,
+      'Origin': 'https://wwh.samokat.ru',
+      'Referer': 'https://wwh.samokat.ru/',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36',
+    },
+  })
+  const text = await r.text()
+  const trimmed = (text || '').trim().toLowerCase()
+  if (trimmed.startsWith('<!doctype') || trimmed.startsWith('<html')) {
+    throw new Error('WMS вернул HTML вместо JSON. Проверьте VPN или вход.')
+  }
+  let data
+  try { data = text ? JSON.parse(text) : null } catch {
+    throw new Error('Ответ размещения не JSON: ' + (text || '').slice(0, 150))
+  }
+  if (!r.ok) throw new Error(`WMS placement ${r.status}: ${data?.message || data?.error || r.statusText}`)
+  const value = data?.value || data
+  return {
+    items: Array.isArray(value?.items) ? value.items : [],
+    total: value?.total ?? data?.totalElements ?? null,
+  }
+}
+
+export async function fetchPlacementViaBrowser(token, { createdAtFrom, createdAtTo, pageSize = 500 } = {}) {
+  const size = Math.min(1000, Math.max(50, parseInt(pageSize, 10) || 500))
+  const buildParams = pageNumber => {
+    const p = new URLSearchParams()
+    if (createdAtFrom) p.set('createdAtFrom', createdAtFrom)
+    if (createdAtTo) p.set('createdAtTo', createdAtTo)
+    p.set('pageNumber', String(pageNumber))
+    p.set('pageSize', String(size))
+    return p
+  }
+  const first = await _fetchPlacementPage(token, buildParams(1))
+  let allItems = [...first.items]
+  const total = first.total ?? allItems.length
+  const pages = Math.ceil(total / size)
+  for (let page = 2; page <= pages; page++) {
+    const next = await _fetchPlacementPage(token, buildParams(page))
+    allItems = allItems.concat(next.items)
+  }
+  const saveRes = await req('/api/stats/placement/save', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ value: { items: allItems, total: allItems.length } }),
+  })
+  if (saveRes.ok !== true) throw new Error(saveRes.error || 'Ошибка сохранения размещения')
+  return {
+    success: true,
+    fetched: allItems.length,
+    added: saveRes.added ?? 0,
+    skipped: saveRes.skipped ?? 0,
+  }
+}
+
+export async function getPlacementDateSummary(dateStr, { shift, fromHour, toHour } = {}) {
+  const params = new URLSearchParams()
+  if (shift) params.set('shift', shift)
+  if (fromHour != null) params.set('fromHour', String(fromHour))
+  if (toHour != null) params.set('toHour', String(toHour))
+  const qs = params.toString()
+  return req(`/api/date/${encodeURIComponent(dateStr)}/placement/summary${qs ? '?' + qs : ''}`)
+}
+
+export async function getMonthlyPlacementEmployees(dateFrom, dateTo, shift) {
+  const params = new URLSearchParams({ dateFrom, dateTo })
+  if (shift) params.set('shift', shift)
+  return req(`/api/stats/placement/monthly-employees?${params}`)
 }
 
 // ─── Shipments / РК ──────────────────────────────────────────────────────────
