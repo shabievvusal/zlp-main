@@ -47,34 +47,62 @@
 .shiftToggleWrap { display: flex; align-items: center; gap: 8px; }
 .shiftToggleLabel { font-size: 13px; color: var(--text-muted); white-space: nowrap; }
 
-.operationToggleWrap { display: flex; align-items: center; gap: 8px; }
-.operationToggle {
+.operationToggleWrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.operationMenuButton {
+  height: 32px;
+  min-width: 138px;
+  padding: 0 9px 0 11px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--white);
+  color: var(--text);
+  font: 500 13px/1 var(--font);
   display: inline-flex;
   align-items: center;
-  gap: 2px;
-  padding: 2px;
+  justify-content: space-between;
+  gap: 10px;
+  cursor: pointer;
+  transition: border-color .16s var(--ease-out), transform .12s var(--ease-out), box-shadow .16s var(--ease-out);
+}
+.operationMenuButton:hover { border-color: var(--green); }
+.operationMenuButton:active { transform: scale(.97); }
+.operationMenu {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 6px);
+  left: 72px;
+  min-width: 180px;
+  padding: 4px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  background: var(--bg-secondary, #f3f4f6);
+  background: var(--white);
+  box-shadow: var(--shadow-md);
 }
-.operationBtn {
-  height: 28px;
+.operationMenuItem {
+  width: 100%;
+  height: 30px;
   padding: 0 10px;
   border: 0;
   border-radius: 5px;
   background: transparent;
-  color: var(--text-muted);
-  font: 500 12px/1 var(--font);
-  cursor: pointer;
-  transition: background .16s var(--ease-out), color .16s var(--ease-out), transform .12s var(--ease-out);
-}
-.operationBtn:active:not(:disabled) { transform: scale(.97); }
-.operationBtnActive {
-  background: var(--white);
   color: var(--text);
-  box-shadow: var(--shadow-sm);
+  font: 500 13px/1 var(--font);
+  text-align: left;
+  cursor: pointer;
 }
-.operationBtn:disabled {
+.operationMenuItem:hover:not(:disabled),
+.operationMenuItemActive {
+  background: var(--bg-secondary, #f3f4f6);
+}
+.operationMenuItemActive {
+  color: var(--green-dark);
+}
+.operationMenuItem:disabled {
   cursor: not-allowed;
   opacity: .45;
 }

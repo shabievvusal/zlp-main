@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useApp } from '../../context/AppContext.jsx'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { getTodayStr, formatDateTime } from '../../utils/format.js'
-import { RefreshCw, Radio, RotateCcw } from 'lucide-react'
+import { ChevronDown, RefreshCw, Radio, RotateCcw } from 'lucide-react'
 import DatePicker from '../../components/ui/DatePicker.jsx'
 import styles from './StatsPage.module.css'
 
@@ -33,6 +33,18 @@ export default function StatsToolbar() {
   const [fetchLabel, setFetchLabel] = useState(null)
   const [fetchDisabled, setFetchDisabled] = useState(false)
   const [recheckDisabled, setRecheckDisabled] = useState(false)
+  const [operationOpen, setOperationOpen] = useState(false)
+  const operationRef = useRef(null)
+  const activeOperation = STATS_OPERATIONS.find(op => op.key === statsOperation) || STATS_OPERATIONS[0]
+
+  useEffect(() => {
+    if (!operationOpen) return
+    function onPointerDown(e) {
+      if (operationRef.current && !operationRef.current.contains(e.target)) setOperationOpen(false)
+    }
+    document.addEventListener('mousedown', onPointerDown)
+    return () => document.removeEventListener('mousedown', onPointerDown)
+  }, [operationOpen])
 
   const handleFetch = async () => {
     setFetchLabel('Загрузка...')
@@ -77,22 +89,38 @@ export default function StatsToolbar() {
         </button>
       </div>
 
-      <div className={styles.operationToggleWrap}>
+      <div className={styles.operationToggleWrap} ref={operationRef}>
         <span className={styles.shiftToggleLabel}>Операция:</span>
-        <div className={styles.operationToggle}>
-          {STATS_OPERATIONS.map(op => (
-            <button
-              key={op.key}
-              type="button"
-              className={`${styles.operationBtn} ${statsOperation === op.key ? styles.operationBtnActive : ''}`}
-              onClick={() => !op.disabled && setStatsOperation(op.key)}
-              disabled={op.disabled}
-              title={op.disabled ? 'Добавим следующим шагом' : undefined}
-            >
-              {op.label}
-            </button>
-          ))}
-        </div>
+        <button
+          type="button"
+          className={styles.operationMenuButton}
+          onClick={() => setOperationOpen(v => !v)}
+          aria-haspopup="menu"
+          aria-expanded={operationOpen}
+        >
+          <span>{activeOperation.label}</span>
+          <ChevronDown size={14} strokeWidth={2} />
+        </button>
+        {operationOpen && (
+          <div className={styles.operationMenu} role="menu">
+            {STATS_OPERATIONS.map(op => (
+              <button
+                key={op.key}
+                type="button"
+                className={`${styles.operationMenuItem} ${statsOperation === op.key ? styles.operationMenuItemActive : ''}`}
+                onClick={() => {
+                  if (op.disabled) return
+                  setStatsOperation(op.key)
+                  setOperationOpen(false)
+                }}
+                disabled={op.disabled}
+                role="menuitem"
+              >
+                {op.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className={styles.fetchRangeWrap}>
