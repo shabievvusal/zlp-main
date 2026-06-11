@@ -462,12 +462,13 @@ async function _fetchPlacementPage(token, params) {
   }
 }
 
-export async function fetchPlacementViaBrowser(token, { createdAtFrom, createdAtTo, pageSize = 100 } = {}) {
-  const size = Math.min(100, Math.max(1, parseInt(pageSize, 10) || 100))
+export async function fetchPlacementViaBrowser(token, { dateFrom, dateTo, createdAtFrom, createdAtTo, pageSize = 500 } = {}) {
+  const size = Math.min(500, Math.max(1, parseInt(pageSize, 10) || 500))
   const buildParams = pageNumber => {
     const p = new URLSearchParams()
-    if (createdAtFrom) p.set('createdAtFrom', createdAtFrom)
-    if (createdAtTo) p.set('createdAtTo', createdAtTo)
+    p.set('status', 'COMPLETED')
+    if (dateFrom || createdAtFrom) p.set('dateFrom', dateFrom || createdAtFrom)
+    if (dateTo || createdAtTo) p.set('dateTo', dateTo || createdAtTo)
     p.set('pageNumber', String(pageNumber))
     p.set('pageSize', String(size))
     return p

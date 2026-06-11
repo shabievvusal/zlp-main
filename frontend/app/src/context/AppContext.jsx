@@ -211,8 +211,8 @@ export function AppProvider({ children }) {
         const fetchPlacement = async (wmsToken) => {
           try {
             return await api.fetchPlacementViaBrowser(wmsToken, {
-              createdAtFrom: opts.operationCompletedAtFrom,
-              createdAtTo: opts.operationCompletedAtTo,
+              dateFrom: opts.operationCompletedAtFrom,
+              dateTo: opts.operationCompletedAtTo,
             })
           } catch (err) {
             console.warn('placement fetch failed:', err)
