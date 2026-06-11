@@ -58,7 +58,9 @@ export default function MonthlyEmployeeTable({ exportRef, operation = 'selection
     try {
       const res = operation === 'placement'
         ? await api.getMonthlyPlacementEmployees(dateFrom, dateTo, shift || undefined)
-        : await api.getMonthlyEmployees(dateFrom, dateTo, shift || undefined, zone || undefined)
+        : operation === 'receiving'
+          ? await api.getMonthlyReceivingEmployees(dateFrom, dateTo, shift || undefined)
+          : await api.getMonthlyEmployees(dateFrom, dateTo, shift || undefined, zone || undefined)
       setRows(enrichRows(res.rows || []))
       setLoadedRange({ from: dateFrom, to: dateTo })
     } catch (e) {
@@ -119,10 +121,11 @@ export default function MonthlyEmployeeTable({ exportRef, operation = 'selection
   )
 
   const selectedZone = ZONES.find(z => z.key === zone)
-  const opLabel = operation === 'placement' ? 'Размещение' : 'Производительность'
-  const totalLabel = operation === 'placement' ? 'Итого операций' : 'Итого СЗ'
-  const rateHourLabel = operation === 'placement' ? 'Опер./ч' : 'СЗ/ч'
-  const rateMinLabel = operation === 'placement' ? 'Опер./мин' : 'СЗ/мин'
+  const isOperationStats = operation === 'placement' || operation === 'receiving'
+  const opLabel = operation === 'placement' ? 'Размещение' : operation === 'receiving' ? 'Приёмка' : 'Производительность'
+  const totalLabel = isOperationStats ? 'Итого операций' : 'Итого СЗ'
+  const rateHourLabel = isOperationStats ? 'Опер./ч' : 'СЗ/ч'
+  const rateMinLabel = isOperationStats ? 'Опер./мин' : 'СЗ/мин'
 
   useEffect(() => {
     if (exportRef) exportRef.current = handleExport
@@ -143,7 +146,7 @@ export default function MonthlyEmployeeTable({ exportRef, operation = 'selection
 
       const zoneLbl = selectedZone ? ` • ${selectedZone.label}` : ''
       const shiftLbl = shift === 'night' ? ' • Ночь' : shift === 'day' ? ' • День' : ''
-      const title = `${opLabel} • ${fmtDate(loadedRange?.from)} — ${fmtDate(loadedRange?.to)}${operation === 'placement' ? '' : zoneLbl}${shiftLbl}`
+      const title = `${opLabel} • ${fmtDate(loadedRange?.from)} — ${fmtDate(loadedRange?.to)}${isOperationStats ? '' : zoneLbl}${shiftLbl}`
 
       const NCOLS = 7
       const AVG_FILL = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFDBEAFE' } }
@@ -159,7 +162,7 @@ export default function MonthlyEmployeeTable({ exportRef, operation = 'selection
       ws.getRow(1).height = 26
 
       // Средние — правее таблицы, начиная с колонки 9 (I)
-      const avgLabels = [operation === 'placement' ? 'Ср. оп.' : 'Ср. СЗ', rateHourLabel, rateMinLabel]
+      const avgLabels = [isOperationStats ? 'Ср. оп.' : 'Ср. СЗ', rateHourLabel, rateMinLabel]
       const avgValues = [avg?.avgTotal ?? '', avg?.avgSzPerHour ?? '', avg?.avgSzPerMin ?? '']
       avgLabels.forEach((lbl, i) => {
         const labelCell = ws.getRow(1).getCell(9 + i * 2)
@@ -218,7 +221,7 @@ export default function MonthlyEmployeeTable({ exportRef, operation = 'selection
       const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a'); a.href = url
-      const fname = `${operation === 'placement' ? 'размещение' : 'производительность'}_${loadedRange?.from}_${loadedRange?.to}${operation === 'selection' && zone ? '_' + zone : ''}.xlsx`
+      const fname = `${operation === 'placement' ? 'размещение' : operation === 'receiving' ? 'приемка' : 'производительность'}_${loadedRange?.from}_${loadedRange?.to}${operation === 'selection' && zone ? '_' + zone : ''}.xlsx`
       a.download = fname; a.click()
       setTimeout(() => URL.revokeObjectURL(url), 1000)
     } catch (err) {
@@ -239,7 +242,7 @@ export default function MonthlyEmployeeTable({ exportRef, operation = 'selection
           <option value="day">День (9–21)</option>
           <option value="night">Ночь (21–9)</option>
         </select>
-        {operation === 'selection' && (
+        {!isOperationStats && (
           <select
             className={styles.selectControl}
             style={{
@@ -276,7 +279,7 @@ export default function MonthlyEmployeeTable({ exportRef, operation = 'selection
       {avg && (
         <div style={{ display: 'flex', gap: 8, padding: '6px 12px', flexWrap: 'wrap' }}>
           <div style={avgChipStyle}>
-            <span style={avgLabelStyle}>{operation === 'placement' ? 'Ср. оп.' : 'Ср. СЗ'}</span>
+            <span style={avgLabelStyle}>{isOperationStats ? 'Ср. оп.' : 'Ср. СЗ'}</span>
             <span style={avgValStyle}>{avg.avgTotal}</span>
           </div>
           <div style={avgChipStyle}>

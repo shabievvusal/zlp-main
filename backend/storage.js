@@ -10,6 +10,7 @@ const productWeights = require('./product-weights');
 
 const DATA_DIR = path.join(__dirname, 'data');
 const PLACEMENT_DIR_NAME = 'placement';
+const RECEIVING_DIR_NAME = 'receiving';
 
 /** Часовой пояс смен: Москва (UTC+3), без перехода на летнее время */
 const MOSCOW_UTC_OFFSET_MS = 3 * 60 * 60 * 1000;
@@ -1033,6 +1034,124 @@ function getPlacementSummary(dateStr, options = {}, context = {}) {
   return buildPlacementSummary(items, { getCompany: context.getCompany });
 }
 
+function receivingDir(dateStr) {
+  return path.join(DATA_DIR, dateStr, RECEIVING_DIR_NAME);
+}
+
+function receivingFilePath(dateStr, hour) {
+  return path.join(receivingDir(dateStr), String(hour).padStart(2, '0') + '.json');
+}
+
+function normalizeReceivingItem(item) {
+  const completedAt = item?.completedAt || item?.createdAt || item?.updatedAt || null;
+  const responsibleUser = item?.responsibleUser || item?.acceptedBy || {};
+  return {
+    id: String(item?.id || '').trim(),
+    status: item?.status || '',
+    type: item?.type || item?.taskType || '',
+    taskNumber: item?.taskNumber || item?.number || '',
+    orderNumber: item?.orderNumber || '',
+    supplierName: item?.supplier?.name || item?.supplierName || '',
+    completedAt,
+    createdAt: completedAt,
+    startedAt: item?.startedAt || item?.acceptanceStartedAt || '',
+    responsibleUser: {
+      id: responsibleUser.id || '',
+      firstName: responsibleUser.firstName || '',
+      lastName: responsibleUser.lastName || '',
+      middleName: responsibleUser.middleName || '',
+    },
+    executorId: responsibleUser.id || '',
+    executor: normalizePlacementUser(responsibleUser) || responsibleUser.id || '',
+    volumeInMilliliters: Number(item?.volumeInMilliliters) || 0,
+    weightInGrams: Number(item?.weightInGrams) || Number(item?.actualWeightInGrams) || 0,
+  };
+}
+
+function loadReceivingHour(dateStr, hour) {
+  const fp = receivingFilePath(dateStr, hour);
+  if (!fs.existsSync(fp)) return new Map();
+  try {
+    const raw = JSON.parse(fs.readFileSync(fp, 'utf8'));
+    const list = Array.isArray(raw.items) ? raw.items : Object.values(raw.items || {});
+    const map = new Map();
+    for (const item of list) {
+      const key = item.id || `${item.completedAt}|${item.executorId}|${item.taskNumber}`;
+      if (key && !map.has(key)) map.set(key, item);
+    }
+    return map;
+  } catch {
+    return new Map();
+  }
+}
+
+function saveReceivingItems(items = []) {
+  ensureDataDir();
+  const bySlot = new Map();
+  for (const raw of items || []) {
+    const item = normalizeReceivingItem(raw);
+    if (!item.completedAt) continue;
+    const slot = placementMoscowDateHour(item.completedAt);
+    if (!slot) continue;
+    const key = `${slot.dateStr}\t${slot.hour}`;
+    if (!bySlot.has(key)) bySlot.set(key, []);
+    bySlot.get(key).push(item);
+  }
+
+  let added = 0;
+  let skipped = 0;
+  const byShift = {};
+  for (const [slotKey, list] of bySlot) {
+    const [dateStr, hourStr] = slotKey.split('\t');
+    const hour = Number(hourStr);
+    fs.mkdirSync(receivingDir(dateStr), { recursive: true });
+    const map = loadReceivingHour(dateStr, hour);
+    for (const item of list) {
+      const key = item.id || `${item.completedAt}|${item.executorId}|${item.taskNumber}`;
+      if (!key || map.has(key)) { skipped++; continue; }
+      map.set(key, item);
+      added++;
+    }
+    const fp = receivingFilePath(dateStr, hour);
+    fs.writeFileSync(fp, JSON.stringify({
+      updatedAt: new Date().toISOString(),
+      operation: 'receiving',
+      items: Array.from(map.values()).sort((a, b) => String(a.completedAt || '').localeCompare(String(b.completedAt || ''))),
+    }), 'utf8');
+    byShift[`${dateStr}_${hour >= 9 && hour < 21 ? 'day' : 'night'}`] = true;
+  }
+  return { added, skipped, byShift };
+}
+
+function getReceivingItems(dateStr, options = {}) {
+  const { fromHour, toHour, shift } = options;
+  const pairs = getHoursToLoad(dateStr, fromHour, toHour, shift);
+  const byId = new Map();
+  for (const [d, hour] of pairs) {
+    const map = loadReceivingHour(d, hour);
+    for (const item of map.values()) {
+      const key = item.id || `${item.completedAt}|${item.executorId}|${item.taskNumber}`;
+      if (key && !byId.has(key)) byId.set(key, item);
+    }
+  }
+  return Array.from(byId.values()).sort((a, b) => String(a.completedAt || '').localeCompare(String(b.completedAt || '')));
+}
+
+function getReceivingSummary(dateStr, options = {}, context = {}) {
+  let items = getReceivingItems(dateStr, options);
+  if (options.filterExecutorNorm) {
+    items = items.filter(it => normalizeFioSummary(it.executor) === options.filterExecutorNorm);
+  }
+  if (Array.isArray(options.filterCompanies) && options.filterCompanies.length > 0 && context.getCompany) {
+    const allowed = new Set(options.filterCompanies.map(c => c.trim().toLowerCase()));
+    items = items.filter(it => {
+      const company = context.getCompany(it.executor, it.executorId);
+      return company && allowed.has(company.trim().toLowerCase());
+    });
+  }
+  return buildPlacementSummary(items, { getCompany: context.getCompany });
+}
+
 /** Быстрая сводка за дату и смену. context: { getCompany(fio) } опционально для companySummary. */
 function getDateSummary(dateStr, options = {}, context = {}) {
   let items = getDateItems(dateStr, options);
@@ -1167,4 +1286,7 @@ module.exports = {
   savePlacementItems,
   getPlacementItems,
   getPlacementSummary,
+  saveReceivingItems,
+  getReceivingItems,
+  getReceivingSummary,
 };

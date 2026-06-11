@@ -184,6 +184,8 @@ export function AppProvider({ children }) {
       let res
       let placementRes = null
       let placementError = null
+      let receivingRes = null
+      let receivingError = null
       let token = getToken()
       if (token) {
         if (!isTokenValid()) {
@@ -220,13 +222,28 @@ export function AppProvider({ children }) {
           }
         }
 
-        const [selectionResult, placementResult] = await Promise.all([
+        const fetchReceiving = async (wmsToken) => {
+          try {
+            return await api.fetchReceivingViaBrowser(wmsToken, {
+              completedDateFrom: opts.operationCompletedAtFrom,
+              completedDateTo: opts.operationCompletedAtTo,
+            })
+          } catch (err) {
+            console.warn('receiving fetch failed:', err)
+            return { __error: err }
+          }
+        }
+
+        const [selectionResult, placementResult, receivingResult] = await Promise.all([
           fetchSelection(token),
           fetchPlacement(token),
+          fetchReceiving(token),
         ])
         res = selectionResult
         if (placementResult?.__error) placementError = placementResult.__error
         else placementRes = placementResult
+        if (receivingResult?.__error) receivingError = receivingResult.__error
+        else receivingRes = receivingResult
       } else {
         res = await api.fetchData(opts)
       }
@@ -237,7 +254,12 @@ export function AppProvider({ children }) {
           : placementError
             ? ' · размещение не загружено'
             : ''
-        notify(`Комплектация: получено ${res.fetched ?? '?'}, добавлено ${res.added ?? '?'}${placementText}`, placementError ? 'info' : 'success')
+        const receivingText = receivingRes
+          ? ` · приемка: ${receivingRes.fetched ?? '?'}/${receivingRes.added ?? '?'}`
+          : receivingError
+            ? ' · приемка не загружена'
+            : ''
+        notify(`Комплектация: получено ${res.fetched ?? '?'}, добавлено ${res.added ?? '?'}${placementText}${receivingText}`, placementError || receivingError ? 'info' : 'success')
       }
       // Build engine note
       const t = res.timings || {}
@@ -249,8 +271,18 @@ export function AppProvider({ children }) {
       if (t.rawWriteMs) parts.push(`raw ${ms(t.rawWriteMs)}`)
       if (placementRes) parts.push(`размещение +${placementRes.added ?? 0}`)
       else if (placementError) parts.push('размещение: ошибка')
+      if (receivingRes) parts.push(`приемка +${receivingRes.added ?? 0}`)
+      else if (receivingError) parts.push('приемка: ошибка')
       setEngineNote(parts.join(' · '))
-      if (res.newEmployees?.length > 0) setNewEmployeesFromFetch(res.newEmployees)
+      const mergedNewEmployees = []
+      const seenNewEmployees = new Set()
+      for (const emp of [...(res.newEmployees || []), ...(placementRes?.newEmployees || []), ...(receivingRes?.newEmployees || [])]) {
+        const key = typeof emp === 'string' ? emp : (emp.executorId || emp.fio || '')
+        if (!key || seenNewEmployees.has(key)) continue
+        seenNewEmployees.add(key)
+        mergedNewEmployees.push(emp)
+      }
+      if (mergedNewEmployees.length > 0) setNewEmployeesFromFetch(mergedNewEmployees)
       await loadEmployees()
       await loadDateSummary(dateStr, shift)
       await loadStatus()

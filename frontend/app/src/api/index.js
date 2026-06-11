@@ -492,6 +492,7 @@ export async function fetchPlacementViaBrowser(token, { dateFrom, dateTo, create
     fetched: allItems.length,
     added: saveRes.added ?? 0,
     skipped: saveRes.skipped ?? 0,
+    newEmployees: saveRes.newEmployees || [],
   }
 }
 
@@ -508,6 +509,81 @@ export async function getMonthlyPlacementEmployees(dateFrom, dateTo, shift) {
   const params = new URLSearchParams({ dateFrom, dateTo })
   if (shift) params.set('shift', shift)
   return req(`/api/stats/placement/monthly-employees?${params}`)
+}
+
+function pickInboundAcceptedUser(responsibleUsers = []) {
+  const accepted = responsibleUsers.find(u => u.type === 'ACCEPTANCE_COMPLETED')
+    ?? responsibleUsers.find(u => u.type === 'ACCEPTANCE_STARTED')
+  return accepted?.user || null
+}
+
+export async function fetchReceivingViaBrowser(token, { completedDateFrom, completedDateTo, pageSize = 100 } = {}) {
+  const size = Math.min(100, Math.max(1, parseInt(pageSize, 10) || 100))
+  const base = {
+    completedDateFrom,
+    completedDateTo,
+    statuses: ['COMPLETED_AS_PLANNED', 'COMPLETED_WITH_DISCREPANCY'],
+    types: ['IMPORT', 'CROSSDOCK', 'STORAGE', 'STORAGE_DC'],
+    pageSize: size,
+    sortField: 'PLANNED_ARRIVAL_DATE',
+    sortDirection: 'DESC',
+  }
+  const first = await getInboundTasks(token, { ...base, pageNumber: 1 })
+  const total = first?.value?.total ?? 0
+  let tasks = [...(first?.value?.items ?? [])]
+  const pages = Math.ceil(total / size)
+  if (pages > 1) {
+    const rest = await Promise.all(
+      Array.from({ length: pages - 1 }, (_, i) => getInboundTasks(token, { ...base, pageNumber: i + 2 }))
+    )
+    for (const r of rest) tasks = tasks.concat(r?.value?.items ?? [])
+  }
+
+  const enriched = []
+  const BATCH = 8
+  for (let i = 0; i < tasks.length; i += BATCH) {
+    const batch = tasks.slice(i, i + BATCH)
+    const rows = await Promise.all(batch.map(async task => {
+      try {
+        const res = await getInboundTaskResponsibleUsers(token, { taskType: task.type, id: task.id })
+        const user = pickInboundAcceptedUser(res?.value?.responsibleUsers ?? [])
+        return user ? { ...task, responsibleUser: user } : null
+      } catch {
+        return null
+      }
+    }))
+    enriched.push(...rows.filter(Boolean))
+  }
+
+  const saveRes = await req('/api/stats/receiving/save', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ value: { items: enriched, total: enriched.length } }),
+  })
+  if (saveRes.ok !== true) throw new Error(saveRes.error || 'Ошибка сохранения приемки')
+  return {
+    success: true,
+    fetched: tasks.length,
+    saved: enriched.length,
+    added: saveRes.added ?? 0,
+    skipped: saveRes.skipped ?? 0,
+    newEmployees: saveRes.newEmployees || [],
+  }
+}
+
+export async function getReceivingDateSummary(dateStr, { shift, fromHour, toHour } = {}) {
+  const params = new URLSearchParams()
+  if (shift) params.set('shift', shift)
+  if (fromHour != null) params.set('fromHour', String(fromHour))
+  if (toHour != null) params.set('toHour', String(toHour))
+  const qs = params.toString()
+  return req(`/api/date/${encodeURIComponent(dateStr)}/receiving/summary${qs ? '?' + qs : ''}`)
+}
+
+export async function getMonthlyReceivingEmployees(dateFrom, dateTo, shift) {
+  const params = new URLSearchParams({ dateFrom, dateTo })
+  if (shift) params.set('shift', shift)
+  return req(`/api/stats/receiving/monthly-employees?${params}`)
 }
 
 // ─── Shipments / РК ──────────────────────────────────────────────────────────

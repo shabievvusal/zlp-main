@@ -9,7 +9,7 @@ import styles from './StatsPage.module.css'
 const STATS_OPERATIONS = [
   { key: 'selection', label: 'Комплектация' },
   { key: 'placement', label: 'Размещение' },
-  { key: 'receiving', label: 'Приёмка', disabled: true },
+  { key: 'receiving', label: 'Приёмка' },
   { key: 'remains', label: 'Остатки', disabled: true },
 ]
 
