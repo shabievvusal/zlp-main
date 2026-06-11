@@ -462,8 +462,8 @@ async function _fetchPlacementPage(token, params) {
   }
 }
 
-export async function fetchPlacementViaBrowser(token, { createdAtFrom, createdAtTo, pageSize = 500 } = {}) {
-  const size = Math.min(1000, Math.max(50, parseInt(pageSize, 10) || 500))
+export async function fetchPlacementViaBrowser(token, { createdAtFrom, createdAtTo, pageSize = 100 } = {}) {
+  const size = Math.min(100, Math.max(1, parseInt(pageSize, 10) || 100))
   const buildParams = pageNumber => {
     const p = new URLSearchParams()
     if (createdAtFrom) p.set('createdAtFrom', createdAtFrom)
