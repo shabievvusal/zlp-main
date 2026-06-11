@@ -79,6 +79,7 @@ export default function HourlyEmployeeTable({
   allRows, hours, mode = 'sz',
   idlesByEmployee = {}, weightByEmployee = {},
   allowedIdleMinutes = 0, shiftFilter = 'day', selectedDate = null,
+  operation = 'selection',
   compact = false,
 }) {
   const [sortCol, setSortCol] = useState('total')
@@ -157,6 +158,7 @@ export default function HourlyEmployeeTable({
 
   // ── sz / hourly / idles modes ───────────────────────────────────────────────
   const showIdlesCol = mode === 'idles'
+  const isReceiving = operation === 'receiving'
 
   // Pre-compute worked minutes for sorting
   const workedByName = {}
@@ -253,7 +255,8 @@ export default function HourlyEmployeeTable({
                     }
                     const cellTitle = [
                       hourLabel(col),
-                      `${v} оп.`,
+                      isReceiving ? `${v} поставок` : `${v} оп.`,
+                      isReceiving ? `${r.secondaryByHour?.[col] || 0} ЕО` : null,
                       zoneName,
                       wg > 0 ? formatWeight(wg) : null,
                     ].filter(Boolean).join(' — ')
@@ -262,7 +265,9 @@ export default function HourlyEmployeeTable({
                         {v > 0 && (
                           <>
                             <span className={styles.heCellSz}>{v}</span>
-                            {wg > 0 && <span className={styles.heCellWeight}>{formatWeight(wg)}</span>}
+                            {isReceiving
+                              ? <span className={styles.heCellWeight}>{(r.secondaryByHour?.[col] || 0).toLocaleString('ru-RU')} ЕО</span>
+                              : wg > 0 && <span className={styles.heCellWeight}>{formatWeight(wg)}</span>}
                           </>
                         )}
                       </td>
@@ -278,7 +283,10 @@ export default function HourlyEmployeeTable({
                       )}
                     </td>
                   )}
-                  <td className={styles.heTdTotal}>{r.total}</td>
+                  <td className={styles.heTdTotal}>
+                    {r.total}
+                    {isReceiving && <div className={styles.hePeak}>{(r.secondaryTotal || 0).toLocaleString('ru-RU')} ЕО</div>}
+                  </td>
                   <td className={styles.heTdTotal} title="Время в работе (смена − простои)">
                     {workedMin != null && workedMin > 0 ? formatMinutesToHours(workedMin) : '—'}
                   </td>

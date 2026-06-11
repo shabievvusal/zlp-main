@@ -1065,6 +1065,7 @@ function normalizeReceivingItem(item) {
     executor: normalizePlacementUser(responsibleUser) || responsibleUser.id || '',
     volumeInMilliliters: Number(item?.volumeInMilliliters) || 0,
     weightInGrams: Number(item?.weightInGrams) || Number(item?.actualWeightInGrams) || 0,
+    eoCount: Number(item?.handlingUnitsQuantity) || Number(item?.eoCount) || 0,
   };
 }
 
@@ -1137,6 +1138,80 @@ function getReceivingItems(dateStr, options = {}) {
   return Array.from(byId.values()).sort((a, b) => String(a.completedAt || '').localeCompare(String(b.completedAt || '')));
 }
 
+function buildReceivingSummary(items, opts = {}) {
+  const { getCompany } = opts;
+  const byExecutor = new Map();
+  const byHour = new Map();
+  for (const item of items || []) {
+    const executorId = item.executorId || '';
+    const name = item.executor || executorId || '—';
+    const ts = item.completedAt || item.createdAt;
+    if (!ts) continue;
+    const slot = placementMoscowDateHour(ts);
+    if (!slot) continue;
+    const hour = slot.hour;
+    const taskKey = item.id || `${ts}|${executorId}|${item.taskNumber}`;
+    const eoCount = Number(item.eoCount) || 0;
+    if (!byExecutor.has(executorId || name)) {
+      byExecutor.set(executorId || name, {
+        name,
+        executorId,
+        company: getCompany ? (getCompany(name, executorId) || '—') : '—',
+        byHour: {},
+        secondaryByHour: {},
+        totalKeys: new Set(),
+        secondaryTotal: 0,
+        firstAt: null,
+        lastAt: null,
+      });
+    }
+    const rec = byExecutor.get(executorId || name);
+    rec.totalKeys.add(taskKey);
+    rec.byHour[hour] = (rec.byHour[hour] || 0) + 1;
+    rec.secondaryByHour[hour] = (rec.secondaryByHour[hour] || 0) + eoCount;
+    rec.secondaryTotal += eoCount;
+    if (!rec.firstAt || ts < rec.firstAt) rec.firstAt = ts;
+    if (!rec.lastAt || ts > rec.lastAt) rec.lastAt = ts;
+    if (!byHour.has(hour)) byHour.set(hour, { hour, ops: 0, secondary: 0, employees: new Set() });
+    const hh = byHour.get(hour);
+    hh.ops += 1;
+    hh.secondary += eoCount;
+    if (executorId || name) hh.employees.add(executorId || name);
+  }
+  const rows = Array.from(byExecutor.values()).map(r => ({
+    name: r.name,
+    executorId: r.executorId || null,
+    company: r.company,
+    byHour: r.byHour,
+    secondaryByHour: r.secondaryByHour,
+    secondaryTotal: r.secondaryTotal,
+    byHourZone: {},
+    byZone: {},
+    weightByHour: {},
+    total: r.totalKeys.size,
+    firstAt: r.firstAt,
+    lastAt: r.lastAt,
+  })).sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, 'ru'));
+  const hours = Array.from(new Set(rows.flatMap(r => Object.keys(r.byHour).map(Number)))).sort((a, b) => a - b);
+  const hourly = Array.from(byHour.values()).map(h => ({
+    hour: h.hour,
+    ops: h.ops,
+    secondary: h.secondary,
+    employees: h.employees.size,
+    storageOps: h.ops,
+    kdkOps: 0,
+    storageEmployees: h.employees.size,
+    kdkEmployees: 0,
+  })).sort((a, b) => a.hour - b.hour);
+  return {
+    totalOps: rows.reduce((s, r) => s + r.total, 0),
+    totalSecondary: rows.reduce((s, r) => s + (Number(r.secondaryTotal) || 0), 0),
+    executors: rows.map(r => ({ name: r.name, executorId: r.executorId, ops: r.total, secondary: r.secondaryTotal, firstAt: r.firstAt, lastAt: r.lastAt })),
+    hourly,
+    hourlyByEmployee: { hours, rows },
+  };
+}
+
 function getReceivingSummary(dateStr, options = {}, context = {}) {
   let items = getReceivingItems(dateStr, options);
   if (options.filterExecutorNorm) {
@@ -1149,7 +1224,7 @@ function getReceivingSummary(dateStr, options = {}, context = {}) {
       return company && allowed.has(company.trim().toLowerCase());
     });
   }
-  return buildPlacementSummary(items, { getCompany: context.getCompany });
+  return buildReceivingSummary(items, { getCompany: context.getCompany });
 }
 
 /** Быстрая сводка за дату и смену. context: { getCompany(fio) } опционально для companySummary. */

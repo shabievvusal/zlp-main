@@ -776,6 +776,7 @@ export default function StatsPage() {
                 allowedIdleMinutes={allowedIdleMinutes}
                 shiftFilter={shiftFilter}
                 selectedDate={selectedDate}
+                operation={isOperationStats ? statsOperation : 'selection'}
               />
             : <div className={styles.emptyRow}>Нет данных</div>
         }
