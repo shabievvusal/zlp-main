@@ -11,6 +11,7 @@ const productWeights = require('./product-weights');
 const DATA_DIR = path.join(__dirname, 'data');
 const PLACEMENT_DIR_NAME = 'placement';
 const RECEIVING_DIR_NAME = 'receiving';
+const REMAINS_DIR_NAME = 'remains';
 
 /** Часовой пояс смен: Москва (UTC+3), без перехода на летнее время */
 const MOSCOW_UTC_OFFSET_MS = 3 * 60 * 60 * 1000;
@@ -926,7 +927,21 @@ function savePlacementItems(items = []) {
     const map = loadPlacementHour(dateStr, hour);
     for (const item of list) {
       const key = item.id || item.handlingUnitBarcode || `${item.createdAt}|${item.executorId}|${item.targetCellAddress}`;
-      if (!key || map.has(key)) { skipped++; continue; }
+      if (!key) { skipped++; continue; }
+      if (map.has(key)) {
+        const prev = map.get(key) || {};
+        map.set(key, {
+          ...prev,
+          ...item,
+          responsibleUser: item.responsibleUser || prev.responsibleUser,
+          executorId: item.executorId || prev.executorId || '',
+          executor: item.executor || prev.executor || '',
+          targetCellsAddresses: item.targetCellsAddresses?.length ? item.targetCellsAddresses : (prev.targetCellsAddresses || []),
+          skuCount: Number(item.skuCount) || Number(prev.skuCount) || 0,
+        });
+        skipped++;
+        continue;
+      }
       map.set(key, item);
       added++;
     }
@@ -1109,7 +1124,20 @@ function saveReceivingItems(items = []) {
     const map = loadReceivingHour(dateStr, hour);
     for (const item of list) {
       const key = item.id || `${item.completedAt}|${item.executorId}|${item.taskNumber}`;
-      if (!key || map.has(key)) { skipped++; continue; }
+      if (!key) { skipped++; continue; }
+      if (map.has(key)) {
+        const prev = map.get(key) || {};
+        map.set(key, {
+          ...prev,
+          ...item,
+          eoCount: Number(item.eoCount) || Number(prev.eoCount) || 0,
+          responsibleUser: item.responsibleUser || prev.responsibleUser,
+          executorId: item.executorId || prev.executorId || '',
+          executor: item.executor || prev.executor || '',
+        });
+        skipped++;
+        continue;
+      }
       map.set(key, item);
       added++;
     }
@@ -1225,6 +1253,134 @@ function getReceivingSummary(dateStr, options = {}, context = {}) {
     });
   }
   return buildReceivingSummary(items, { getCompany: context.getCompany });
+}
+
+function remainsDir(dateStr) {
+  return path.join(DATA_DIR, dateStr, REMAINS_DIR_NAME);
+}
+
+function remainsFilePath(dateStr, hour) {
+  return path.join(remainsDir(dateStr), String(hour).padStart(2, '0') + '.json');
+}
+
+function normalizeRemainsItem(item) {
+  const createdAt = item?.createdAt || item?.completedAt || item?.updatedAt || null;
+  const responsibleUser = item?.responsibleUser || {};
+  return {
+    id: String(item?.id || '').trim(),
+    status: item?.status || '',
+    taskType: item?.taskType || '',
+    sourceCellAddress: item?.sourceCellAddress || '',
+    sourceHandlingUnitBarcode: item?.sourceHandlingUnitBarcode || '',
+    targetCellAddress: item?.targetCellAddress || '',
+    targetHandlingUnitBarcode: item?.targetHandlingUnitBarcode || '',
+    consolidationItems: Array.isArray(item?.consolidationItems) ? item.consolidationItems : [],
+    responsibleUser: {
+      id: responsibleUser.id || '',
+      firstName: responsibleUser.firstName || '',
+      lastName: responsibleUser.lastName || '',
+      middleName: responsibleUser.middleName || '',
+    },
+    executorId: responsibleUser.id || '',
+    executor: normalizePlacementUser(responsibleUser) || responsibleUser.id || '',
+    createdAt,
+    completedAt: createdAt,
+  };
+}
+
+function loadRemainsHour(dateStr, hour) {
+  const fp = remainsFilePath(dateStr, hour);
+  if (!fs.existsSync(fp)) return new Map();
+  try {
+    const raw = JSON.parse(fs.readFileSync(fp, 'utf8'));
+    const list = Array.isArray(raw.items) ? raw.items : Object.values(raw.items || {});
+    const map = new Map();
+    for (const item of list) {
+      const key = item.id || `${item.createdAt}|${item.executorId}|${item.sourceHandlingUnitBarcode}|${item.targetHandlingUnitBarcode}`;
+      if (key && !map.has(key)) map.set(key, item);
+    }
+    return map;
+  } catch {
+    return new Map();
+  }
+}
+
+function saveRemainsItems(items = []) {
+  ensureDataDir();
+  const bySlot = new Map();
+  for (const raw of items || []) {
+    const item = normalizeRemainsItem(raw);
+    if (!item.createdAt) continue;
+    const slot = placementMoscowDateHour(item.createdAt);
+    if (!slot) continue;
+    const key = `${slot.dateStr}\t${slot.hour}`;
+    if (!bySlot.has(key)) bySlot.set(key, []);
+    bySlot.get(key).push(item);
+  }
+  let added = 0;
+  let skipped = 0;
+  const byShift = {};
+  for (const [slotKey, list] of bySlot) {
+    const [dateStr, hourStr] = slotKey.split('\t');
+    const hour = Number(hourStr);
+    fs.mkdirSync(remainsDir(dateStr), { recursive: true });
+    const map = loadRemainsHour(dateStr, hour);
+    for (const item of list) {
+      const key = item.id || `${item.createdAt}|${item.executorId}|${item.sourceHandlingUnitBarcode}|${item.targetHandlingUnitBarcode}`;
+      if (!key) { skipped++; continue; }
+      if (map.has(key)) {
+        const prev = map.get(key) || {};
+        map.set(key, {
+          ...prev,
+          ...item,
+          responsibleUser: item.responsibleUser || prev.responsibleUser,
+          executorId: item.executorId || prev.executorId || '',
+          executor: item.executor || prev.executor || '',
+          consolidationItems: item.consolidationItems?.length ? item.consolidationItems : (prev.consolidationItems || []),
+        });
+        skipped++;
+        continue;
+      }
+      map.set(key, item);
+      added++;
+    }
+    fs.writeFileSync(remainsFilePath(dateStr, hour), JSON.stringify({
+      updatedAt: new Date().toISOString(),
+      operation: 'remains',
+      items: Array.from(map.values()).sort((a, b) => String(a.createdAt || '').localeCompare(String(b.createdAt || ''))),
+    }), 'utf8');
+    byShift[`${dateStr}_${hour >= 9 && hour < 21 ? 'day' : 'night'}`] = true;
+  }
+  return { added, skipped, byShift };
+}
+
+function getRemainsItems(dateStr, options = {}) {
+  const { fromHour, toHour, shift } = options;
+  const pairs = getHoursToLoad(dateStr, fromHour, toHour, shift);
+  const byId = new Map();
+  for (const [d, hour] of pairs) {
+    const map = loadRemainsHour(d, hour);
+    for (const item of map.values()) {
+      const key = item.id || `${item.createdAt}|${item.executorId}|${item.sourceHandlingUnitBarcode}|${item.targetHandlingUnitBarcode}`;
+      if (key && !byId.has(key)) byId.set(key, item);
+    }
+  }
+  return Array.from(byId.values()).sort((a, b) => String(a.createdAt || '').localeCompare(String(b.createdAt || '')));
+}
+
+function getRemainsSummary(dateStr, options = {}, context = {}) {
+  let items = getRemainsItems(dateStr, options);
+  if (options.filterExecutorNorm) {
+    items = items.filter(it => normalizeFioSummary(it.executor) === options.filterExecutorNorm);
+  }
+  if (Array.isArray(options.filterCompanies) && options.filterCompanies.length > 0 && context.getCompany) {
+    const allowed = new Set(options.filterCompanies.map(c => c.trim().toLowerCase()));
+    items = items.filter(it => {
+      const company = context.getCompany(it.executor, it.executorId);
+      return company && allowed.has(company.trim().toLowerCase());
+    });
+  }
+  return buildPlacementSummary(items, { getCompany: context.getCompany });
 }
 
 /** Быстрая сводка за дату и смену. context: { getCompany(fio) } опционально для companySummary. */
@@ -1364,4 +1520,7 @@ module.exports = {
   saveReceivingItems,
   getReceivingItems,
   getReceivingSummary,
+  saveRemainsItems,
+  getRemainsItems,
+  getRemainsSummary,
 };

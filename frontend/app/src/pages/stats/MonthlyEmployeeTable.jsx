@@ -60,6 +60,8 @@ export default function MonthlyEmployeeTable({ exportRef, operation = 'selection
         ? await api.getMonthlyPlacementEmployees(dateFrom, dateTo, shift || undefined)
         : operation === 'receiving'
           ? await api.getMonthlyReceivingEmployees(dateFrom, dateTo, shift || undefined)
+          : operation === 'remains'
+            ? await api.getMonthlyRemainsEmployees(dateFrom, dateTo, shift || undefined)
           : await api.getMonthlyEmployees(dateFrom, dateTo, shift || undefined, zone || undefined)
       setRows(enrichRows(res.rows || []))
       setLoadedRange({ from: dateFrom, to: dateTo })
@@ -121,8 +123,8 @@ export default function MonthlyEmployeeTable({ exportRef, operation = 'selection
   )
 
   const selectedZone = ZONES.find(z => z.key === zone)
-  const isOperationStats = operation === 'placement' || operation === 'receiving'
-  const opLabel = operation === 'placement' ? 'Размещение' : operation === 'receiving' ? 'Приёмка' : 'Производительность'
+  const isOperationStats = operation === 'placement' || operation === 'receiving' || operation === 'remains'
+  const opLabel = operation === 'placement' ? 'Размещение' : operation === 'receiving' ? 'Приёмка' : operation === 'remains' ? 'Остатки' : 'Производительность'
   const totalLabel = isOperationStats ? 'Итого операций' : 'Итого СЗ'
   const rateHourLabel = isOperationStats ? 'Опер./ч' : 'СЗ/ч'
   const rateMinLabel = isOperationStats ? 'Опер./мин' : 'СЗ/мин'
@@ -221,7 +223,7 @@ export default function MonthlyEmployeeTable({ exportRef, operation = 'selection
       const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a'); a.href = url
-      const fname = `${operation === 'placement' ? 'размещение' : operation === 'receiving' ? 'приемка' : 'производительность'}_${loadedRange?.from}_${loadedRange?.to}${operation === 'selection' && zone ? '_' + zone : ''}.xlsx`
+      const fname = `${operation === 'placement' ? 'размещение' : operation === 'receiving' ? 'приемка' : operation === 'remains' ? 'остатки' : 'производительность'}_${loadedRange?.from}_${loadedRange?.to}${operation === 'selection' && zone ? '_' + zone : ''}.xlsx`
       a.download = fname; a.click()
       setTimeout(() => URL.revokeObjectURL(url), 1000)
     } catch (err) {

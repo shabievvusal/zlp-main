@@ -186,6 +186,8 @@ export function AppProvider({ children }) {
       let placementError = null
       let receivingRes = null
       let receivingError = null
+      let remainsRes = null
+      let remainsError = null
       let token = getToken()
       if (token) {
         if (!isTokenValid()) {
@@ -234,16 +236,31 @@ export function AppProvider({ children }) {
           }
         }
 
-        const [selectionResult, placementResult, receivingResult] = await Promise.all([
+        const fetchRemains = async (wmsToken) => {
+          try {
+            return await api.fetchRemainsViaBrowser(wmsToken, {
+              dateFrom: opts.operationCompletedAtFrom,
+              dateTo: opts.operationCompletedAtTo,
+            })
+          } catch (err) {
+            console.warn('remains fetch failed:', err)
+            return { __error: err }
+          }
+        }
+
+        const [selectionResult, placementResult, receivingResult, remainsResult] = await Promise.all([
           fetchSelection(token),
           fetchPlacement(token),
           fetchReceiving(token),
+          fetchRemains(token),
         ])
         res = selectionResult
         if (placementResult?.__error) placementError = placementResult.__error
         else placementRes = placementResult
         if (receivingResult?.__error) receivingError = receivingResult.__error
         else receivingRes = receivingResult
+        if (remainsResult?.__error) remainsError = remainsResult.__error
+        else remainsRes = remainsResult
       } else {
         res = await api.fetchData(opts)
       }
@@ -259,7 +276,12 @@ export function AppProvider({ children }) {
           : receivingError
             ? ' · приемка не загружена'
             : ''
-        notify(`Комплектация: получено ${res.fetched ?? '?'}, добавлено ${res.added ?? '?'}${placementText}${receivingText}`, placementError || receivingError ? 'info' : 'success')
+        const remainsText = remainsRes
+          ? ` · остатки: ${remainsRes.fetched ?? '?'}/${remainsRes.added ?? '?'}`
+          : remainsError
+            ? ' · остатки не загружены'
+            : ''
+        notify(`Комплектация: получено ${res.fetched ?? '?'}, добавлено ${res.added ?? '?'}${placementText}${receivingText}${remainsText}`, placementError || receivingError || remainsError ? 'info' : 'success')
       }
       // Build engine note
       const t = res.timings || {}
@@ -273,10 +295,12 @@ export function AppProvider({ children }) {
       else if (placementError) parts.push('размещение: ошибка')
       if (receivingRes) parts.push(`приемка +${receivingRes.added ?? 0}`)
       else if (receivingError) parts.push('приемка: ошибка')
+      if (remainsRes) parts.push(`остатки +${remainsRes.added ?? 0}`)
+      else if (remainsError) parts.push('остатки: ошибка')
       setEngineNote(parts.join(' · '))
       const mergedNewEmployees = []
       const seenNewEmployees = new Set()
-      for (const emp of [...(res.newEmployees || []), ...(placementRes?.newEmployees || []), ...(receivingRes?.newEmployees || [])]) {
+      for (const emp of [...(res.newEmployees || []), ...(placementRes?.newEmployees || []), ...(receivingRes?.newEmployees || []), ...(remainsRes?.newEmployees || [])]) {
         const key = typeof emp === 'string' ? emp : (emp.executorId || emp.fio || '')
         if (!key || seenNewEmployees.has(key)) continue
         seenNewEmployees.add(key)

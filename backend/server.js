@@ -1959,6 +1959,78 @@ app.get('/api/stats/receiving/monthly-employees', vsSessionRequired, (req, res) 
   }
 });
 
+app.post('/api/stats/remains/save', vsSessionRequired, (req, res) => {
+  try {
+    const value = req.body?.value || req.body || {};
+    const items = Array.isArray(value?.items) ? value.items : (Array.isArray(req.body?.items) ? req.body.items : []);
+    const regResult = items.length > 0 ? updateNamesRegistry(items) : { newEmployees: [] };
+    const result = storage.saveRemainsItems(items);
+    res.json({
+      ok: true,
+      operation: 'remains',
+      savedTo: Object.keys(result.byShift || {}).join(', '),
+      added: result.added,
+      skipped: result.skipped,
+      itemsCount: items.length,
+      newEmployees: regResult.newEmployees || [],
+    });
+  } catch (err) {
+    console.error('POST /api/stats/remains/save', err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get('/api/date/:date/remains/summary', vsSessionOptional, (req, res) => {
+  try {
+    const dateStr = req.params.date;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return res.status(400).json({ error: 'Неверный формат даты (YYYY-MM-DD)' });
+    const fromHour = req.query.fromHour != null ? parseInt(req.query.fromHour, 10) : undefined;
+    const toHour = req.query.toHour != null ? parseInt(req.query.toHour, 10) : undefined;
+    let shift = req.query.shift === 'day' || req.query.shift === 'night' ? req.query.shift : undefined;
+    const session = req.vsSession;
+    if (session?.role === 'supervisor' && session.shiftType) {
+      if (shift && shift !== session.shiftType) return res.status(403).json({ error: 'Доступ только к своей смене' });
+      shift = session.shiftType;
+    }
+    const user = session ? vsAuth.findUserByLogin(session.login) : null;
+    const filterExecutorNorm = user?.selfOnly && user?.name ? normalizeFioForMatch(user.name) : undefined;
+    const filterCompanies = Array.isArray(user?.visibleCompanies) && user.visibleCompanies.length > 0 ? user.visibleCompanies : undefined;
+    const getCompany = (fio, id) => getCompanyByIdOrFio(id, fio);
+    const summary = storage.getRemainsSummary(dateStr, { fromHour, toHour, shift, filterExecutorNorm, filterCompanies }, { getCompany });
+    res.json({ date: dateStr, shift: shift || null, ...summary });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/stats/remains/monthly-employees', vsSessionRequired, (req, res) => {
+  try {
+    const dateFrom = String(req.query.dateFrom || '').slice(0, 10);
+    const dateTo = String(req.query.dateTo || '').slice(0, 10);
+    const shift = req.query.shift === 'day' || req.query.shift === 'night' ? req.query.shift : undefined;
+    const dates = getDateRangeList(dateFrom, dateTo);
+    if (!dates.length) return res.status(400).json({ error: 'Неверный диапазон дат' });
+    const getCompany = (fio, id) => getCompanyByIdOrFio(id, fio);
+    const session = req.vsSession;
+    const user = session ? vsAuth.findUserByLogin(session.login) : null;
+    const filterExecutorNorm = user?.selfOnly && user?.name ? normalizeFioForMatch(user.name) : undefined;
+    const filterCompanies = Array.isArray(user?.visibleCompanies) && user.visibleCompanies.length > 0 ? user.visibleCompanies : undefined;
+    const rows = [];
+    for (const dateStr of dates) {
+      const summary = storage.getRemainsSummary(dateStr, { shift, filterExecutorNorm, filterCompanies }, { getCompany });
+      const hb = summary?.hourlyByEmployee;
+      for (const row of hb?.rows || []) {
+        const hours = Object.values(row.byHour || {}).filter(v => Number(v) > 0).length;
+        rows.push({ date: dateStr, company: row.company || '—', name: row.name, total: Number(row.total) || 0, workedMinutes: hours * 60, firstAt: row.firstAt || null, lastAt: row.lastAt || null });
+      }
+    }
+    res.json({ dateFrom, dateTo, shift: shift || null, rows });
+  } catch (err) {
+    console.error('GET /api/stats/remains/monthly-employees', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/api/shifts', vsSessionOptional, (req, res) => {
   try {
     let shifts = storage.listShifts();

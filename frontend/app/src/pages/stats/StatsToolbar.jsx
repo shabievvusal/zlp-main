@@ -10,7 +10,7 @@ const STATS_OPERATIONS = [
   { key: 'selection', label: 'Комплектация' },
   { key: 'placement', label: 'Размещение' },
   { key: 'receiving', label: 'Приёмка' },
-  { key: 'remains', label: 'Остатки', disabled: true },
+  { key: 'remains', label: 'Остатки' },
 ]
 
 export default function StatsToolbar() {

@@ -354,6 +354,7 @@ export async function getLiveMonitor() {
 const LIVE_MONITOR_URL = 'https://api.samokat.ru/wmsops-wwh/activity-monitor/selection/handling-units-in-progress'
 const SAMOKAT_STOCKS_URL = 'https://api.samokat.ru/wmsops-wwh/stocks/changes/search'
 const PLACEMENT_TASKS_URL = 'https://api.samokat.ru/wmsin-wwh/placement/tasks'
+const REMAINS_TASKS_URL = 'https://api.samokat.ru/wmsin-wwh/storage-zone-movements/consolidation/tasks'
 
 export async function getLiveMonitorViaBrowser(token) {
   const r = await fetch(LIVE_MONITOR_URL, {
@@ -547,7 +548,7 @@ export async function fetchReceivingViaBrowser(token, { completedDateFrom, compl
       try {
         const res = await getInboundTaskResponsibleUsers(token, { taskType: task.type, id: task.id })
         const user = pickInboundAcceptedUser(res?.value?.responsibleUsers ?? [])
-        return user ? { ...task, responsibleUser: user } : null
+        return user ? { ...task, responsibleUser: user, eoCount: Number(task.handlingUnitsQuantity) || 0 } : null
       } catch {
         return null
       }
@@ -584,6 +585,71 @@ export async function getMonthlyReceivingEmployees(dateFrom, dateTo, shift) {
   const params = new URLSearchParams({ dateFrom, dateTo })
   if (shift) params.set('shift', shift)
   return req(`/api/stats/receiving/monthly-employees?${params}`)
+}
+
+async function _fetchRemainsPage(token, params) {
+  const r = await fetch(`${REMAINS_TASKS_URL}?${params}`, {
+    headers: {
+      'Accept': 'application/json',
+      'Authorization': `Bearer ${token}`,
+      'Origin': 'https://wwh.samokat.ru',
+      'Referer': 'https://wwh.samokat.ru/',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36',
+    },
+  })
+  const text = await r.text()
+  const trimmed = (text || '').trim().toLowerCase()
+  if (trimmed.startsWith('<!doctype') || trimmed.startsWith('<html')) throw new Error('WMS вернул HTML вместо JSON. Проверьте VPN или вход.')
+  let data
+  try { data = text ? JSON.parse(text) : null } catch {
+    throw new Error('Ответ объединения остатков не JSON: ' + (text || '').slice(0, 150))
+  }
+  if (!r.ok) throw new Error(`WMS remains ${r.status}: ${data?.message || data?.error || r.statusText}`)
+  const value = data?.value || data
+  return { items: Array.isArray(value?.items) ? value.items : [], total: value?.total ?? data?.totalElements ?? null }
+}
+
+export async function fetchRemainsViaBrowser(token, { dateFrom, dateTo, pageSize = 500 } = {}) {
+  const size = Math.min(500, Math.max(1, parseInt(pageSize, 10) || 500))
+  const buildParams = pageNumber => {
+    const p = new URLSearchParams()
+    p.set('status', 'COMPLETED')
+    if (dateFrom) p.set('dateFrom', dateFrom)
+    if (dateTo) p.set('dateTo', dateTo)
+    p.set('pageNumber', String(pageNumber))
+    p.set('pageSize', String(size))
+    return p
+  }
+  const first = await _fetchRemainsPage(token, buildParams(1))
+  let allItems = [...first.items]
+  const total = first.total ?? allItems.length
+  const pages = Math.ceil(total / size)
+  for (let page = 2; page <= pages; page++) {
+    const next = await _fetchRemainsPage(token, buildParams(page))
+    allItems = allItems.concat(next.items)
+  }
+  const saveRes = await req('/api/stats/remains/save', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ value: { items: allItems, total: allItems.length } }),
+  })
+  if (saveRes.ok !== true) throw new Error(saveRes.error || 'Ошибка сохранения объединения остатков')
+  return { success: true, fetched: allItems.length, added: saveRes.added ?? 0, skipped: saveRes.skipped ?? 0, newEmployees: saveRes.newEmployees || [] }
+}
+
+export async function getRemainsDateSummary(dateStr, { shift, fromHour, toHour } = {}) {
+  const params = new URLSearchParams()
+  if (shift) params.set('shift', shift)
+  if (fromHour != null) params.set('fromHour', String(fromHour))
+  if (toHour != null) params.set('toHour', String(toHour))
+  const qs = params.toString()
+  return req(`/api/date/${encodeURIComponent(dateStr)}/remains/summary${qs ? '?' + qs : ''}`)
+}
+
+export async function getMonthlyRemainsEmployees(dateFrom, dateTo, shift) {
+  const params = new URLSearchParams({ dateFrom, dateTo })
+  if (shift) params.set('shift', shift)
+  return req(`/api/stats/remains/monthly-employees?${params}`)
 }
 
 // ─── Shipments / РК ──────────────────────────────────────────────────────────

@@ -53,8 +53,10 @@ export default function StatsPage() {
   const monthlyExportRef = useRef(null)
   const [placementSummary, setPlacementSummary] = useState(null)
   const [receivingSummary, setReceivingSummary] = useState(null)
+  const [remainsSummary, setRemainsSummary] = useState(null)
   const [placementLoading, setPlacementLoading] = useState(false)
   const [receivingLoading, setReceivingLoading] = useState(false)
+  const [remainsLoading, setRemainsLoading] = useState(false)
 
   const items = useMemo(() => {
     if (allItems.length) return allItems
@@ -577,8 +579,24 @@ export default function StatsPage() {
     return () => { alive = false }
   }, [statsOperation, selectedDate, shiftFilter, status?.lastRun, statsRefreshSeq, notify])
 
-  const operationSummary = statsOperation === 'placement' ? placementSummary : statsOperation === 'receiving' ? receivingSummary : null
-  const operationLabel = statsOperation === 'placement' ? 'Размещение' : statsOperation === 'receiving' ? 'Приёмка' : ''
+  useEffect(() => {
+    if (statsOperation !== 'remains' || !selectedDate) return
+    let alive = true
+    setRemainsLoading(true)
+    api.getRemainsDateSummary(selectedDate, { shift: shiftFilter })
+      .then(res => { if (alive) setRemainsSummary(res) })
+      .catch(err => {
+        if (alive) {
+          setRemainsSummary(null)
+          notify('Ошибка загрузки остатков: ' + err.message, 'error')
+        }
+      })
+      .finally(() => { if (alive) setRemainsLoading(false) })
+    return () => { alive = false }
+  }, [statsOperation, selectedDate, shiftFilter, status?.lastRun, statsRefreshSeq, notify])
+
+  const operationSummary = statsOperation === 'placement' ? placementSummary : statsOperation === 'receiving' ? receivingSummary : statsOperation === 'remains' ? remainsSummary : null
+  const operationLabel = statsOperation === 'placement' ? 'Размещение' : statsOperation === 'receiving' ? 'Приёмка' : statsOperation === 'remains' ? 'Остатки' : ''
 
   const operationHourlyByEmployee = useMemo(() => {
     const hb = operationSummary?.hourlyByEmployee
@@ -616,7 +634,8 @@ export default function StatsPage() {
 
   const isPlacement = statsOperation === 'placement'
   const isReceiving = statsOperation === 'receiving'
-  const isOperationStats = isPlacement || isReceiving
+  const isRemains = statsOperation === 'remains'
+  const isOperationStats = isPlacement || isReceiving || isRemains
   const activeHourlyByEmployee = isOperationStats ? operationHourlyByEmployee : hourlyByEmployee
   const activeStats = isOperationStats ? operationStats : stats
   const activeWeightByEmployee = isOperationStats ? {} : weightByEmployee
@@ -626,7 +645,7 @@ export default function StatsPage() {
     <div className={styles.mainContent}>
       <StatsToolbar />
 
-      {(loading || placementLoading || receivingLoading) && <div className={styles.loadingBar} />}
+      {(loading || placementLoading || receivingLoading || remainsLoading) && <div className={styles.loadingBar} />}
 
       {newEmployeesFromFetch.length > 0 && (
         <div className={styles.newEmplBanner}>
