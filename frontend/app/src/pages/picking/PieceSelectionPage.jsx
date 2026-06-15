@@ -6,20 +6,32 @@ import DatePicker from '../../components/ui/DatePicker.jsx'
 import s from './PieceSelectionPage.module.css'
 
 const PAGE_SIZE = 100
-const DEFAULT_STATUSES = ['COMPLETED', 'CREATED', 'IN_PROGRESS', 'PENDING']
+const DEFAULT_STATUSES = ['CREATED', 'PENDING', 'IN_PROGRESS', 'COMPLETED']
 
 const TEMP_LABELS = {
+  LOW_COLD: 'Низкий холод',
+  MEDIUM_COLD: 'Средний холод',
   ORDINARY: 'Сухой',
-  MEDIUM_COLD: 'Холод',
-  LOW_COLD: 'Морозилка',
 }
 
 const STATUS_LABELS = {
-  PENDING: 'Ожидает',
-  CREATED: 'Создано',
+  CREATED: 'Новое',
+  PENDING: 'Ждёт отбора',
   IN_PROGRESS: 'В работе',
-  COMPLETED: 'Завершено',
+  COMPLETED: 'Выполнено',
 }
+
+const ZONE_OPTIONS = [
+  { id: 'c976ff6d-865c-472c-a754-cee17e93e63d', label: 'Холод' },
+  { id: '0b29f9ce-9549-435e-b7c2-ecdd3e937057', label: 'Сухой' },
+  { id: '4cdf0cb7-9361-43b6-abd7-cc98f594765b', label: 'Морозилка' },
+]
+
+const TEMP_OPTIONS = [
+  { value: 'LOW_COLD', label: TEMP_LABELS.LOW_COLD },
+  { value: 'MEDIUM_COLD', label: TEMP_LABELS.MEDIUM_COLD },
+  { value: 'ORDINARY', label: TEMP_LABELS.ORDINARY },
+]
 
 const SORT_FIELDS = {
   cells: 'sourceCellsCount',
@@ -156,19 +168,6 @@ export default function PieceSelectionPage() {
     }
   }, [dateFrom, dateTo, forceRefresh, getToken, isTokenValid, status, temperatureMode, zoneId])
 
-  const filterOptions = useMemo(() => {
-    const zones = new Map()
-    const temperatures = new Set()
-    for (const row of rows || []) {
-      if (row.sourceZone?.id) zones.set(row.sourceZone.id, row.sourceZone.name || row.sourceZone.id)
-      for (const mode of row.shipmentTemperatureModes || []) temperatures.add(mode)
-    }
-    return {
-      zones: Array.from(zones, ([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name, 'ru')),
-      temperatures: Array.from(temperatures).sort(),
-    }
-  }, [rows])
-
   const filtered = useMemo(() => {
     const list = rows || []
     const q = search.trim().toLowerCase()
@@ -220,14 +219,14 @@ export default function PieceSelectionPage() {
         </select>
         <select className={s.select} value={zoneId} onChange={e => setZoneId(e.target.value)}>
           <option value="">Все зоны</option>
-          {filterOptions.zones.map(zone => (
-            <option key={zone.id} value={zone.id}>{zone.name}</option>
+          {ZONE_OPTIONS.map(zone => (
+            <option key={zone.label} value={zone.id} disabled={zone.disabled}>{zone.label}</option>
           ))}
         </select>
         <select className={s.select} value={temperatureMode} onChange={e => setTemperatureMode(e.target.value)}>
           <option value="">Все температуры</option>
-          {filterOptions.temperatures.map(value => (
-            <option key={value} value={value}>{TEMP_LABELS[value] || value}</option>
+          {TEMP_OPTIONS.map(({ value, label }) => (
+            <option key={value} value={value}>{label}</option>
           ))}
         </select>
         <button type="button" className="btn btn-primary" onClick={load} disabled={loading}>

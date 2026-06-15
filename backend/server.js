@@ -1570,7 +1570,6 @@ function vsAdminRequired(req, res, next) {
   next();
 }
 
-
 app.post('/api/vs/request-fetch', vsSessionRequired, (req, res) => {
   fetchRequested = true;
   res.json({ ok: true });

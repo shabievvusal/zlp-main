@@ -1023,7 +1023,7 @@ export async function refreshStoreEos(routeId, storeId, eos) {
 const MONITORING_STATS_URL = 'https://api.samokat.ru/wmsops-wwh/activity-monitor/selection/stats'
 const INBOUND_TASKS_URL    = 'https://api.samokat.ru/wmsin-wwh/inbound/tasks'
 const MOVEMENTS_URL        = 'https://api-p01.samokat.ru/wmsout-wwh/movements/picking-refill/tasks'
-const PIECE_SELECTION_TASKS_URL = 'https://api-p01.samokat.ru/wmsout-wwh/picking-selection'
+const PIECE_SELECTION_TASKS_URL = 'https://api-p01.samokat.ru/wmsout-wwh/picking-selection/tasks'
 
 /** Общий хелпер для прямых GET-запросов к api.samokat.ru */
 async function samokatGet(token, url, params) {
@@ -1033,6 +1033,7 @@ async function samokatGet(token, url, params) {
       'Authorization': `Bearer ${token}`,
       'Origin': 'https://wwh.samokat.ru',
       'Referer': 'https://wwh.samokat.ru/',
+      'X-Who': 'a3327d34-1f6b-46bb-9936-0306ec6c21ad',
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36',
     },
   })
