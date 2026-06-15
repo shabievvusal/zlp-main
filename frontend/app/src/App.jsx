@@ -19,14 +19,7 @@ import SuppliesPage from './pages/supplies/SuppliesPage.jsx'
 import SupplyDetailPage from './pages/supplies/SupplyDetailPage.jsx'
 import ViolationsPage from './pages/violations/ViolationsPage.jsx'
 import PieceSelectionPage from './pages/picking/PieceSelectionPage.jsx'
-
-function PlaceholderPage({ title }) {
-  return (
-    <div style={{ padding: 24, color: 'var(--text-muted)', fontSize: 14 }}>
-      {title} — раздел в разработке
-    </div>
-  )
-}
+import KdkLayoutPage from './pages/picking/KdkLayoutPage.jsx'
 
 function ProtectedRoute({ children, module }) {
   const { user, loading } = useAuth()
@@ -73,7 +66,7 @@ function AppRoutes() {
             <Route path="/supplies/:taskType/:id" element={<ModuleRoute module="supplies"><SupplyDetailPage /></ModuleRoute>} />
             <Route path="/picking" element={<Navigate to="/picking/piece-selection" replace />} />
             <Route path="/picking/piece-selection" element={<ModuleRoute module="stats"><PieceSelectionPage /></ModuleRoute>} />
-            <Route path="/picking/kdk-layout" element={<ModuleRoute module="stats"><PlaceholderPage title="Раскладка КДК" /></ModuleRoute>} />
+            <Route path="/picking/kdk-layout" element={<ModuleRoute module="stats"><KdkLayoutPage /></ModuleRoute>} />
             <Route path="/settings" element={<ModuleRoute module="settings"><SettingsPage /></ModuleRoute>} />
             <Route path="/reports" element={<ModuleRoute module="reports"><ReportsPage /></ModuleRoute>} />
             <Route path="/violations" element={<ModuleRoute module="violations"><ViolationsPage /></ModuleRoute>} />

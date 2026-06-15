@@ -388,6 +388,7 @@ async function _fetchOnePageFromBrowser(token, body) {
       'Origin': 'https://wwh.samokat.ru',
       'Referer': 'https://wwh.samokat.ru/',
       'Authorization': `Bearer ${token}`,
+      'X-Who': 'a3327d34-1f6b-46bb-9936-0306ec6c21ad',
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36',
     },
     body: JSON.stringify(body),
@@ -434,6 +435,44 @@ export async function fetchLastCompletedForExecutor(token, executorId, fromIso, 
     if (maxCompletedAt === null || ts > maxCompletedAt) maxCompletedAt = ts
   }
   return { items, maxCompletedAt }
+}
+
+export async function fetchLastKdkCompletedForExecutor(token, executorId) {
+  const body = {
+    productId: null,
+    parts: [],
+    operationTypes: [],
+    sourceCellId: null,
+    targetCellId: null,
+    sourceHandlingUnitBarcode: null,
+    targetHandlingUnitBarcode: null,
+    operationStartedAtFrom: null,
+    operationStartedAtTo: null,
+    operationCompletedAtFrom: null,
+    operationCompletedAtTo: null,
+    executorId: executorId || null,
+    pageNumber: 1,
+    pageSize: 100,
+  }
+  const { items } = await _fetchOnePageFromBrowser(token, body)
+  let lastItem = null
+  let maxCompletedAt = null
+  for (const item of items) {
+    if (item.operationType && item.operationType !== 'PICK_BY_LINE') continue
+    const at = item.operationCompletedAt
+    if (!at) continue
+    const ts = new Date(at).getTime()
+    if (maxCompletedAt === null || ts > maxCompletedAt) {
+      maxCompletedAt = ts
+      lastItem = item
+    }
+  }
+  return {
+    items,
+    lastItem,
+    maxCompletedAt,
+    remainingPieces: lastItem?.sourceQuantity?.newQuantity ?? null,
+  }
 }
 
 async function _fetchPlacementPage(token, params) {

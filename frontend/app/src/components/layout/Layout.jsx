@@ -39,8 +39,12 @@ export default function Layout() {
   const location = useLocation()
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem(LS_KEY) === '1')
   const [userMenuOpen, setUserMenuOpen] = useState(false)
-  const [openGroups, setOpenGroups] = useState(() => ({ picking: true }))
+  const [openGroups, setOpenGroups] = useState({})
   const userMenuRef = useRef(null)
+
+  useEffect(() => {
+    setOpenGroups({})
+  }, [])
 
   const toggle = () => setCollapsed(v => {
     const next = !v
@@ -99,7 +103,7 @@ export default function Layout() {
             const hasChildren = Array.isArray(children) && children.length > 0
             const groupKey = to.replace(/^\//, '') || 'root'
             const groupActive = hasChildren && children.some(child => location.pathname.startsWith(child.to))
-            const groupOpen = !!openGroups[groupKey] || groupActive
+            const groupOpen = !!openGroups[groupKey]
             if (hasChildren) {
               return (
                 <div key={to} className={styles.navGroup}>
