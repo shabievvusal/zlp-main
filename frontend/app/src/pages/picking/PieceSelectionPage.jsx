@@ -6,7 +6,7 @@ import DatePicker from '../../components/ui/DatePicker.jsx'
 import s from './PieceSelectionPage.module.css'
 
 const PAGE_SIZE = 100
-const DEFAULT_STATUSES = ['CREATED', 'PENDING', 'IN_PROGRESS', 'COMPLETED']
+const DEFAULT_STATUSES = ['PENDING', 'CREATED', 'IN_PROGRESS', 'COMPLETED']
 
 const TEMP_LABELS = {
   LOW_COLD: 'Низкий холод',
@@ -15,8 +15,8 @@ const TEMP_LABELS = {
 }
 
 const STATUS_LABELS = {
-  CREATED: 'Новое',
-  PENDING: 'Ждёт отбора',
+  PENDING: 'Новое',
+  CREATED: 'Ждёт отбора',
   IN_PROGRESS: 'В работе',
   COMPLETED: 'Выполнено',
 }
@@ -174,7 +174,6 @@ export default function PieceSelectionPage() {
     if (!q) return list
     return list.filter(row => [
       row.shipTo?.name,
-      row.shipTo?.address,
       row.sourceZone?.name,
       ...(row.shipmentNumbers || []),
     ].some(v => String(v || '').toLowerCase().includes(q)))
@@ -207,7 +206,7 @@ export default function PieceSelectionPage() {
           className={s.search}
           value={search}
           onChange={e => { setSearch(e.target.value); setPage(1) }}
-          placeholder="Поиск по магазину, адресу, зоне, отгрузке"
+          placeholder="Поиск по ЦФЗ, зоне, отгрузке"
         />
         <DatePicker value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
         <DatePicker value={dateTo} onChange={e => setDateTo(e.target.value)} />
@@ -266,6 +265,7 @@ export default function PieceSelectionPage() {
                     </th>
                     <th>ШК ЕО</th>
                     <th>Зона</th>
+                    <th>Температура</th>
                     <th>Дата отгрузки</th>
                     <th>Исполнитель</th>
                   </tr>
@@ -274,18 +274,13 @@ export default function PieceSelectionPage() {
                   {displayed.map(row => (
                     <tr key={row.id}>
                       <td><span className={statusClass(row.status)}>{STATUS_LABELS[row.status] || row.status || '—'}</span></td>
-                      <td>
-                        <div>{row.shipTo?.name || '—'}</div>
-                        <div className={s.muted}>{row.shipTo?.address || ''}</div>
-                      </td>
+                      <td>{row.shipTo?.name || '—'}</td>
                       <td className={s.num}>{fmtNum(row.sourceCellsCount)}</td>
                       <td className={s.num}>{fmtKg(row.weightInGrams)}</td>
                       <td className={s.num}>{fmtLiters(row.volumeInMilliliters)}</td>
                       <td>{row.targetHandlingUnitBarcode || '—'}</td>
-                      <td>
-                        <div>{row.sourceZone?.name || '—'}</div>
-                        <div className={s.muted}>{(row.shipmentTemperatureModes || []).map(t => TEMP_LABELS[t] || t).join(', ') || ''}</div>
-                      </td>
+                      <td>{row.sourceZone?.name || '—'}</td>
+                      <td>{(row.shipmentTemperatureModes || []).map(t => TEMP_LABELS[t] || t).join(', ') || '—'}</td>
                       <td>{fmtDay(row.logisticDate)}</td>
                       <td>{userName(row.responsibleUser)}</td>
                     </tr>
