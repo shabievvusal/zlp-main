@@ -228,25 +228,60 @@
     margin: 3mm;
   }
 
-  :global(body *) {
-    visibility: hidden !important;
+  :global(body.eo-printing) {
+    margin: 0 !important;
+    background: #fff !important;
   }
 
-  .printPanel,
-  .printPanel * {
-    visibility: visible !important;
+  :global(body.eo-printing aside),
+  :global(body.eo-printing header),
+  :global(body.eo-printing nav) {
+    display: none !important;
+  }
+
+  :global(body.eo-printing main) {
+    display: block !important;
+    width: auto !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  :global(body.eo-printing) .page {
+    display: block !important;
+    width: 52mm;
+    max-width: none;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+  }
+
+  :global(body.eo-printing) .header,
+  :global(body.eo-printing) .toolbar,
+  :global(body.eo-printing) .card,
+  :global(body.eo-printing) .empty {
+    display: none !important;
   }
 
   .printPanel {
-    position: fixed;
-    inset: 0 auto auto 0;
+    display: block !important;
+    position: static;
     width: 52mm;
     margin: 0;
     padding: 0;
     border: 0;
     box-shadow: none;
     background: #fff;
-    display: block;
+  }
+
+  .printInfo,
+  .barcodeSvg {
+    display: block !important;
+  }
+
+  .barcodeSvg * {
+    display: initial !important;
   }
 
   .printTitle,

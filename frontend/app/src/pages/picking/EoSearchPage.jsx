@@ -115,7 +115,18 @@ function Code128Barcode({ value }) {
 }
 
 function printBarcode() {
+  const body = document.body
+  const cleanup = () => body.classList.remove('eo-printing')
+  body.classList.add('eo-printing')
+  window.addEventListener('afterprint', cleanup, { once: true })
   window.print()
+  window.setTimeout(cleanup, 1500)
+}
+
+function schedulePrint() {
+  window.requestAnimationFrame(() => {
+    window.requestAnimationFrame(() => printBarcode())
+  })
 }
 
 function pickAcceptedUser(responsibleUsers = []) {
@@ -172,6 +183,12 @@ export default function EoSearchPage() {
   const [error, setError] = useState('')
   const [progress, setProgress] = useState('')
   const [printValue, setPrintValue] = useState('')
+
+  const openPrintPreview = useCallback((value) => {
+    if (!value) return
+    setPrintValue(value)
+    schedulePrint()
+  }, [])
 
   const search = useCallback(async () => {
     const clean = barcode.trim()
@@ -329,7 +346,7 @@ export default function EoSearchPage() {
                       <button
                         type="button"
                         className={s.eoButton}
-                        onClick={() => setPrintValue(row.match.eoBarcode)}
+                        onClick={() => openPrintPreview(row.match.eoBarcode)}
                         title="Печать barcode 128"
                       >
                         <span>{row.match.eoBarcode || '—'}</span>
