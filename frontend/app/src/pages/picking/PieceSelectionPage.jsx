@@ -6,7 +6,7 @@ import DatePicker from '../../components/ui/DatePicker.jsx'
 import s from './PieceSelectionPage.module.css'
 
 const PAGE_SIZE = 100
-const DEFAULT_STATUSES = ['PENDING', 'CREATED', 'IN_PROGRESS', 'COMPLETED']
+const DEFAULT_STATUSES = ['COMPLETED', 'CREATED', 'IN_PROGRESS', 'PENDING']
 
 const TEMP_LABELS = {
   LOW_COLD: 'Низкий холод',
@@ -100,6 +100,10 @@ function sortValue(row, key) {
   return Number(row?.[SORT_FIELDS[key]]) || 0
 }
 
+function selectedOrAll(selected, options, valueKey) {
+  return selected ? [selected] : options.map(option => option[valueKey])
+}
+
 export default function PieceSelectionPage() {
   const { getToken, isTokenValid, forceRefresh } = useAuth()
   const [dateFrom, setDateFrom] = useState(todayStr)
@@ -142,8 +146,8 @@ export default function PieceSelectionPage() {
         dateTo: dateToApiTo(dateTo),
         pageSize: PAGE_SIZE,
         status: status ? [status] : DEFAULT_STATUSES,
-        sourceZoneId: zoneId || null,
-        shipmentTemperatureMode: temperatureMode || null,
+        sourceZoneId: selectedOrAll(zoneId, ZONE_OPTIONS, 'id'),
+        shipmentTemperatureMode: selectedOrAll(temperatureMode, TEMP_OPTIONS, 'value'),
       }
       const first = await getPieceSelectionTasks(token, { ...base, pageNumber: 1 })
       const firstValue = first?.value ?? first
