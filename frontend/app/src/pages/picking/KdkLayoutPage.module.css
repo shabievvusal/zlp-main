@@ -56,10 +56,10 @@
 }
 
 .table {
-  width: 100%;
+  width: max-content;
   border-collapse: collapse;
-  table-layout: fixed;
-  min-width: 680px;
+  table-layout: auto;
+  min-width: 620px;
   font-size: 12px;
 }
 
@@ -105,28 +105,33 @@
 }
 
 .tdEo {
-  width: 132px;
+  width: 112px;
+  min-width: 112px;
   font-variant-numeric: tabular-nums;
 }
 
 .table th:nth-child(2),
 .table td:nth-child(2) {
-  width: 150px;
+  width: 110px;
+  min-width: 110px;
 }
 
 .table th:nth-child(3),
 .table td:nth-child(3) {
-  width: 170px;
+  width: 130px;
+  min-width: 130px;
 }
 
 .table th:nth-child(4),
 .table td:nth-child(4) {
-  width: 56px;
+  width: 54px;
+  min-width: 54px;
 }
 
 .table th:nth-child(5),
 .table td:nth-child(5) {
-  width: 150px;
+  width: 130px;
+  min-width: 130px;
 }
 
 .idleText {
