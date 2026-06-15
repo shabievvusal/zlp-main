@@ -104,6 +104,36 @@
   font-variant-numeric: tabular-nums;
 }
 
+.sortBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.num .sortBtn {
+  justify-content: flex-end;
+  width: 100%;
+}
+
+.sortBtn:hover {
+  color: var(--text);
+}
+
+.sortBtn span {
+  width: 12px;
+  color: var(--green);
+  text-align: center;
+  flex-shrink: 0;
+}
+
 .tdEo {
   width: 112px;
   min-width: 112px;

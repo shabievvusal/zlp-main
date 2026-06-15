@@ -90,6 +90,14 @@ export default function KdkLayoutPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [lastUpdated, setLastUpdated] = useState('')
+  const [sort, setSort] = useState({ key: 'company', dir: 'asc' })
+
+  const toggleSort = (key) => {
+    setSort(prev => prev.key === key
+      ? { key, dir: prev.dir === 'desc' ? 'asc' : 'desc' }
+      : { key, dir: 'desc' }
+    )
+  }
 
   const load = useCallback(async () => {
     let token = getToken()
@@ -130,12 +138,22 @@ export default function KdkLayoutPage() {
     }
   }, [emplIdMap, emplMap, forceRefresh, getToken, isTokenValid])
 
-  const sorted = useMemo(() => (
-    [...rows].sort((a, b) =>
-      (a.company || '').localeCompare(b.company || '', 'ru') ||
-      (a.executor || '').localeCompare(b.executor || '', 'ru')
-    )
-  ), [rows])
+  const sorted = useMemo(() => {
+    const direction = sort.dir === 'asc' ? 1 : -1
+    return [...rows].sort((a, b) => {
+      let diff = 0
+      if (sort.key === 'company') {
+        diff = (a.company || '').localeCompare(b.company || '', 'ru')
+      } else if (sort.key === 'pieces') {
+        diff = (Number(a.pieces) || 0) - (Number(b.pieces) || 0)
+      } else if (sort.key === 'lastPickAt') {
+        diff = (a.lastPickAt ? new Date(a.lastPickAt).getTime() : 0) - (b.lastPickAt ? new Date(b.lastPickAt).getTime() : 0)
+      }
+      return diff * direction || (a.executor || '').localeCompare(b.executor || '', 'ru')
+    })
+  }, [rows, sort])
+
+  const sortMark = key => sort.key === key ? (sort.dir === 'desc' ? '↓' : '↑') : '↕'
 
   return (
     <div className={s.page}>
@@ -166,10 +184,22 @@ export default function KdkLayoutPage() {
               <thead>
                 <tr>
                   <th className={s.tdEo}>ЕО</th>
-                  <th>Компания</th>
+                  <th>
+                    <button type="button" className={s.sortBtn} onClick={() => toggleSort('company')}>
+                      Компания <span>{sortMark('company')}</span>
+                    </button>
+                  </th>
                   <th>Исполнитель</th>
-                  <th className={s.num}>Шт</th>
-                  <th>Последний пик</th>
+                  <th className={s.num}>
+                    <button type="button" className={s.sortBtn} onClick={() => toggleSort('pieces')}>
+                      Шт <span>{sortMark('pieces')}</span>
+                    </button>
+                  </th>
+                  <th>
+                    <button type="button" className={s.sortBtn} onClick={() => toggleSort('lastPickAt')}>
+                      Последний пик <span>{sortMark('lastPickAt')}</span>
+                    </button>
+                  </th>
                 </tr>
               </thead>
               <tbody>

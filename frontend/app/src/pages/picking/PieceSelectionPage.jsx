@@ -1,8 +1,7 @@
-import { useCallback, useMemo, useState } from 'react'
-import { RefreshCw } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { ChevronDown, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { getPieceSelectionTasks } from '../../api/index.js'
-import DatePicker from '../../components/ui/DatePicker.jsx'
 import s from './PieceSelectionPage.module.css'
 
 const PAGE_SIZE = 100
@@ -33,32 +32,45 @@ const TEMP_OPTIONS = [
   { value: 'ORDINARY', label: TEMP_LABELS.ORDINARY },
 ]
 
+const RU_MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь']
+const RU_DAYS_SHORT = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс']
+
 const SORT_FIELDS = {
   cells: 'sourceCellsCount',
   weight: 'weightInGrams',
   volume: 'volumeInMilliliters',
 }
 
-function todayStr() {
-  return new Date().toISOString().slice(0, 10)
+function localDay(d) {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate())
 }
 
-function tomorrowStr() {
-  const d = new Date()
-  d.setDate(d.getDate() + 1)
-  return d.toISOString().slice(0, 10)
+function todayLocalDate() {
+  return localDay(new Date())
 }
 
-function dateToApiFrom(dateStr) {
-  if (!dateStr) return ''
-  const [y, m, d] = dateStr.split('-')
+function dateToApiFrom(date) {
+  if (!date) return ''
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
   return new Date(`${y}-${m}-${d}T00:00:00+03:00`).toISOString()
 }
 
-function dateToApiTo(dateStr) {
-  if (!dateStr) return ''
-  const [y, m, d] = dateStr.split('-')
+function dateToApiTo(date) {
+  if (!date) return ''
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
   return new Date(`${y}-${m}-${d}T23:59:59.999+03:00`).toISOString()
+}
+
+function fmtDateShort(date) {
+  if (!date) return '?'
+  const dd = String(date.getDate()).padStart(2, '0')
+  const mm = String(date.getMonth() + 1).padStart(2, '0')
+  const yy = String(date.getFullYear()).slice(2)
+  return `${dd}.${mm}.${yy}`
 }
 
 function fmtDay(dateStr) {
@@ -104,10 +116,140 @@ function selectedOrAll(selected, options, valueKey) {
   return selected ? [selected] : options.map(option => option[valueKey])
 }
 
+function DateRangeDropdown({ label, dateRange, onChange }) {
+  const [open, setOpen] = useState(false)
+  const [draft, setDraft] = useState(dateRange)
+  const [step, setStep] = useState('from')
+  const [viewYear, setViewYear] = useState(() => (dateRange?.fromDate || new Date()).getFullYear())
+  const [viewMonth, setViewMonth] = useState(() => (dateRange?.fromDate || new Date()).getMonth())
+  const ref = useRef(null)
+
+  useEffect(() => {
+    if (!open) return undefined
+    function onOut(e) {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onOut)
+    return () => document.removeEventListener('mousedown', onOut)
+  }, [open])
+
+  function openMenu() {
+    if (open) { setOpen(false); return }
+    setDraft(dateRange)
+    setStep('from')
+    const base = dateRange?.fromDate || new Date()
+    setViewYear(base.getFullYear())
+    setViewMonth(base.getMonth())
+    setOpen(true)
+  }
+
+  function clickDay(day) {
+    if (step === 'from') {
+      setDraft({ fromDate: day, toDate: day })
+      setStep('to')
+      return
+    }
+    const fd = draft.fromDate
+    setDraft(day < fd ? { fromDate: day, toDate: fd } : { fromDate: fd, toDate: day })
+    setStep('from')
+  }
+
+  function handleApply() {
+    if (draft?.fromDate) { onChange(draft); setOpen(false) }
+  }
+
+  function handleReset() {
+    const t = todayLocalDate()
+    const d = { fromDate: t, toDate: t }
+    setDraft(d)
+    onChange(d)
+    setOpen(false)
+  }
+
+  function prevMonth() {
+    if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1) }
+    else setViewMonth(m => m - 1)
+  }
+
+  function nextMonth() {
+    if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1) }
+    else setViewMonth(m => m + 1)
+  }
+
+  const firstDay = new Date(viewYear, viewMonth, 1)
+  const lastDay = new Date(viewYear, viewMonth + 1, 0)
+  let startDow = firstDay.getDay()
+  startDow = startDow === 0 ? 6 : startDow - 1
+  const cells = []
+  for (let i = 0; i < startDow; i += 1) cells.push(null)
+  for (let d = 1; d <= lastDay.getDate(); d += 1) cells.push(new Date(viewYear, viewMonth, d))
+
+  const dFrom = draft?.fromDate
+  const dTo = draft?.toDate
+  const isInRange = day => day && dFrom && dTo && day > dFrom && day < dTo
+  const isStart = day => day && dFrom && day.getTime() === dFrom.getTime()
+  const isEnd = day => day && dTo && day.getTime() === dTo.getTime()
+  const isToday = day => day && day.getTime() === todayLocalDate().getTime()
+  const chipLabel = `${label}: ${fmtDateShort(dateRange.fromDate)}-${fmtDateShort(dateRange.toDate)}`
+
+  return (
+    <div className={s.dropdownWrap} ref={ref}>
+      <button
+        type="button"
+        className={`${s.filterDropdown} ${open ? s.filterDropdownOpen : ''}`}
+        onClick={openMenu}
+      >
+        {chipLabel}<ChevronDown size={13} />
+      </button>
+      {open && (
+        <div className={`${s.dropdownMenu} ${s.calendarMenu}`}>
+          <div className={s.calHeader}>
+            <button type="button" className={s.calNavBtn} onClick={prevMonth}>
+              <ChevronLeft size={14} />
+            </button>
+            <span className={s.calMonthLabel}>{RU_MONTHS[viewMonth]} {viewYear}</span>
+            <button type="button" className={s.calNavBtn} onClick={nextMonth}>
+              <ChevronRight size={14} />
+            </button>
+          </div>
+          <div className={s.calGrid}>
+            {RU_DAYS_SHORT.map(d => <div key={d} className={s.calDayName}>{d}</div>)}
+            {cells.map((day, i) => (
+              <div
+                key={i}
+                onClick={() => day && clickDay(day)}
+                className={[
+                  s.calCell,
+                  !day ? s.calCellEmpty : '',
+                  day && isToday(day) ? s.calCellToday : '',
+                  day && isStart(day) ? s.calCellStart : '',
+                  day && isEnd(day) ? s.calCellEnd : '',
+                  day && isInRange(day) ? s.calCellRange : '',
+                ].filter(Boolean).join(' ')}
+              >
+                {day ? day.getDate() : ''}
+              </div>
+            ))}
+          </div>
+          {step === 'to' && <div className={s.calHint}>Выберите конец периода</div>}
+          <div className={s.dropdownActions}>
+            <button type="button" className={s.btnReset} onClick={handleReset}>Сбросить</button>
+            <button type="button" className={s.btnApply} onClick={handleApply} disabled={!draft?.fromDate}>
+              Применить
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function PieceSelectionPage() {
   const { getToken, isTokenValid, forceRefresh } = useAuth()
-  const [dateFrom, setDateFrom] = useState(todayStr)
-  const [dateTo, setDateTo] = useState(tomorrowStr)
+  const [dateRange, setDateRange] = useState(() => {
+    const t = todayLocalDate()
+    return { fromDate: t, toDate: t }
+  })
   const [status, setStatus] = useState('')
   const [zoneId, setZoneId] = useState('')
   const [temperatureMode, setTemperatureMode] = useState('')
@@ -142,8 +284,8 @@ export default function PieceSelectionPage() {
     setPage(1)
     try {
       const base = {
-        dateFrom: dateToApiFrom(dateFrom),
-        dateTo: dateToApiTo(dateTo),
+        dateFrom: dateToApiFrom(dateRange.fromDate),
+        dateTo: dateToApiTo(dateRange.toDate),
         pageSize: PAGE_SIZE,
         status: status ? [status] : DEFAULT_STATUSES,
         sourceZoneId: selectedOrAll(zoneId, ZONE_OPTIONS, 'id'),
@@ -170,7 +312,7 @@ export default function PieceSelectionPage() {
     } finally {
       setLoading(false)
     }
-  }, [dateFrom, dateTo, forceRefresh, getToken, isTokenValid, status, temperatureMode, zoneId])
+  }, [dateRange, forceRefresh, getToken, isTokenValid, status, temperatureMode, zoneId])
 
   const filtered = useMemo(() => {
     const list = rows || []
@@ -178,8 +320,6 @@ export default function PieceSelectionPage() {
     if (!q) return list
     return list.filter(row => [
       row.shipTo?.name,
-      row.sourceZone?.name,
-      ...(row.shipmentNumbers || []),
     ].some(v => String(v || '').toLowerCase().includes(q)))
   }, [rows, search])
 
@@ -198,7 +338,7 @@ export default function PieceSelectionPage() {
       <div className={s.header}>
         <div>
           <h1 className={s.title}>Штучный отбор</h1>
-          <div className={s.subtitle}>Задания комплектации по магазинам, зонам и отгрузкам</div>
+          <div className={s.subtitle}>Задания комплектации по штучному отбору</div>
         </div>
         <div className={s.meta}>
           {rows ? `Загружено: ${fmtNum(rows.length)} из ${fmtNum(total)}` : 'Данные не загружены'}
@@ -210,10 +350,9 @@ export default function PieceSelectionPage() {
           className={s.search}
           value={search}
           onChange={e => { setSearch(e.target.value); setPage(1) }}
-          placeholder="Поиск по ЦФЗ, зоне, отгрузке"
+          placeholder="Поиск по ЦФЗ"
         />
-        <DatePicker value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
-        <DatePicker value={dateTo} onChange={e => setDateTo(e.target.value)} />
+        <DateRangeDropdown label="Период" dateRange={dateRange} onChange={setDateRange} />
         <select className={s.select} value={status} onChange={e => setStatus(e.target.value)}>
           <option value="">Все статусы</option>
           {DEFAULT_STATUSES.map(value => (
@@ -223,7 +362,7 @@ export default function PieceSelectionPage() {
         <select className={s.select} value={zoneId} onChange={e => setZoneId(e.target.value)}>
           <option value="">Все зоны</option>
           {ZONE_OPTIONS.map(zone => (
-            <option key={zone.label} value={zone.id} disabled={zone.disabled}>{zone.label}</option>
+            <option key={zone.label} value={zone.id}>{zone.label}</option>
           ))}
         </select>
         <select className={s.select} value={temperatureMode} onChange={e => setTemperatureMode(e.target.value)}>
