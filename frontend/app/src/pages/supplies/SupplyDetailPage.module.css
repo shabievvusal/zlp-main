@@ -254,6 +254,13 @@
   margin-top: 2px;
 }
 
+.prodBarcode {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
 /* ── Diff colors ─────────────────────────────────────────────────────────── */
 
 .diffPos { color: #15803D; }

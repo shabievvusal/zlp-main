@@ -1393,6 +1393,34 @@ export async function getEoRemaining(token, sourceHandlingUnitBarcode) {
   return data?.value?.items?.[0]?.sourceQuantity?.newQuantity ?? null
 }
 
+export async function getEoChangeInfo(token, sourceHandlingUnitBarcode) {
+  const body = {
+    productId: null,
+    parts: [],
+    operationTypes: [],
+    sourceCellId: null,
+    targetCellId: null,
+    sourceHandlingUnitBarcode,
+    targetHandlingUnitBarcode: null,
+    operationStartedAtFrom: null,
+    operationStartedAtTo: null,
+    operationCompletedAtFrom: null,
+    operationCompletedAtTo: null,
+    executorId: null,
+    pageNumber: 1,
+    pageSize: 1,
+  }
+  const { items, total } = await _fetchOnePageFromBrowser(token, body)
+  const item = items[0] || null
+  return {
+    total: total ?? items.length,
+    item,
+    remaining: item?.sourceQuantity?.newQuantity ?? null,
+    completedAt: item?.operationCompletedAt || null,
+    executor: item?.responsibleUser || null,
+  }
+}
+
 
 // ─── Нарушения ───────────────────────────────────────────────────────────────
 

@@ -492,6 +492,7 @@ export default function SupplyDetailPage() {
         const q = search.toLowerCase()
         return (p.name || '').toLowerCase().includes(q)
           || (p.nomenclatureCode || '').toLowerCase().includes(q)
+          || (p.productBarcode || '').toLowerCase().includes(q)
       })
     : products
 
@@ -586,6 +587,9 @@ export default function SupplyDetailPage() {
                           <div className={s.prodName}>{prod.name || '—'}</div>
                           {prod.nomenclatureCode && (
                             <div className={s.prodArticle}>{prod.nomenclatureCode}</div>
+                          )}
+                          {prod.productBarcode && (
+                            <div className={s.prodBarcode}>ШК: {prod.productBarcode}</div>
                           )}
                         </td>
                         <td className={`${s.td} ${s.tdNum}`}>{fmtNum(qty(prod.plannedQuantity))}</td>

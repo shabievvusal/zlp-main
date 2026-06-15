@@ -6,7 +6,7 @@ import {
   BarChart2, Monitor, TrendingUp, Package, FileText,
   Truck, ClipboardList, Settings, LogOut, ChevronLeft,
   ChevronRight, UserCircle, PackageSearch, AlertTriangle,
-  ChevronDown, ListChecks, Boxes,
+  ChevronDown, ListChecks, Boxes, ScanBarcode,
 } from 'lucide-react'
 
 const NAV_ITEMS = [
@@ -23,6 +23,7 @@ const NAV_ITEMS = [
     children: [
       { to: '/picking/piece-selection', Icon: ListChecks, label: 'Штучный отбор', module: 'stats' },
       { to: '/picking/kdk-layout', Icon: Boxes, label: 'Раскладка КДК', module: 'stats' },
+      { to: '/picking/eo-search', Icon: ScanBarcode, label: 'Поиск ЕО', module: 'stats' },
     ],
   },
   { to: '/shipments',      Icon: Truck,          label: 'Отгрузка',     module: 'shipments' },

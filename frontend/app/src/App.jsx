@@ -20,6 +20,7 @@ import SupplyDetailPage from './pages/supplies/SupplyDetailPage.jsx'
 import ViolationsPage from './pages/violations/ViolationsPage.jsx'
 import PieceSelectionPage from './pages/picking/PieceSelectionPage.jsx'
 import KdkLayoutPage from './pages/picking/KdkLayoutPage.jsx'
+import EoSearchPage from './pages/picking/EoSearchPage.jsx'
 
 function ProtectedRoute({ children, module }) {
   const { user, loading } = useAuth()
@@ -67,6 +68,7 @@ function AppRoutes() {
             <Route path="/picking" element={<Navigate to="/picking/piece-selection" replace />} />
             <Route path="/picking/piece-selection" element={<ModuleRoute module="stats"><PieceSelectionPage /></ModuleRoute>} />
             <Route path="/picking/kdk-layout" element={<ModuleRoute module="stats"><KdkLayoutPage /></ModuleRoute>} />
+            <Route path="/picking/eo-search" element={<ModuleRoute module="stats"><EoSearchPage /></ModuleRoute>} />
             <Route path="/settings" element={<ModuleRoute module="settings"><SettingsPage /></ModuleRoute>} />
             <Route path="/reports" element={<ModuleRoute module="reports"><ReportsPage /></ModuleRoute>} />
             <Route path="/violations" element={<ModuleRoute module="violations"><ViolationsPage /></ModuleRoute>} />
