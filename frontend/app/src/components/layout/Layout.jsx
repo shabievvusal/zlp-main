@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect } from 'react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext.jsx'
 import styles from './Layout.module.css'
 import {
   BarChart2, Monitor, TrendingUp, Package, FileText,
   Truck, ClipboardList, Settings, LogOut, ChevronLeft,
   ChevronRight, UserCircle, PackageSearch, AlertTriangle,
+  ChevronDown, ListChecks, Boxes,
 } from 'lucide-react'
 
 const NAV_ITEMS = [
@@ -14,6 +15,16 @@ const NAV_ITEMS = [
   { to: '/analysis',       Icon: TrendingUp,     label: 'Анализ',       module: 'analysis' },
   { to: '/consolidation',  Icon: Package,        label: 'Консолидация', module: 'consolidation' },
   { to: '/docs',           Icon: FileText,       label: 'Документы',    module: 'docs' },
+  {
+    to: '/picking',
+    Icon: ClipboardList,
+    label: 'Комплектация',
+    module: 'stats',
+    children: [
+      { to: '/picking/piece-selection', Icon: ListChecks, label: 'Штучный отбор', module: 'stats' },
+      { to: '/picking/kdk-layout', Icon: Boxes, label: 'Раскладка КДК', module: 'stats' },
+    ],
+  },
   { to: '/shipments',      Icon: Truck,          label: 'Отгрузка',     module: 'shipments' },
   { to: '/supplies',       Icon: PackageSearch,  label: 'Поставки',     module: 'supplies' },
   { to: '/reports',        Icon: ClipboardList,  label: 'Отчёты',       module: 'reports' },
@@ -25,8 +36,10 @@ const LS_KEY = 'sidebar_collapsed'
 
 export default function Layout() {
   const { user, logout } = useAuth()
+  const location = useLocation()
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem(LS_KEY) === '1')
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [openGroups, setOpenGroups] = useState(() => ({ picking: true }))
   const userMenuRef = useRef(null)
 
   const toggle = () => setCollapsed(v => {
@@ -48,9 +61,13 @@ export default function Layout() {
   }, [userMenuOpen])
 
   const userModules = user?.modules || []
-  const visibleNav = NAV_ITEMS.filter(
-    item => !item.module || item.module === 'stats' || userModules.includes(item.module)
-  )
+  const hasModuleAccess = (module) => !module || module === 'stats' || userModules.includes(module)
+  const visibleNav = NAV_ITEMS
+    .filter(item => hasModuleAccess(item.module))
+    .map(item => item.children
+      ? { ...item, children: item.children.filter(child => hasModuleAccess(child.module)) }
+      : item
+    )
   const isDeveloper = user?.role === 'developer'
   const userName = user?.name || user?.role || ''
 
@@ -78,20 +95,55 @@ export default function Layout() {
 
         {/* Nav */}
         <nav className={styles.nav}>
-          {visibleNav.map(({ to, Icon, label }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={to === '/'}
-              className={({ isActive }) =>
-                `${styles.navBtn}${isActive ? ' ' + styles.navBtnActive : ''}${collapsed ? ' ' + styles.navBtnCollapsed : ''}`
-              }
-              title={collapsed ? label : undefined}
-            >
-              <Icon size={17} className={styles.navIcon} strokeWidth={1.75} />
-              {!collapsed && <span className={styles.navLabel}>{label}</span>}
-            </NavLink>
-          ))}
+          {visibleNav.map(({ to, Icon, label, children }) => {
+            const hasChildren = Array.isArray(children) && children.length > 0
+            const groupKey = to.replace(/^\//, '') || 'root'
+            const groupActive = hasChildren && children.some(child => location.pathname.startsWith(child.to))
+            const groupOpen = !!openGroups[groupKey] || groupActive
+            if (hasChildren) {
+              return (
+                <div key={to} className={styles.navGroup}>
+                  <button
+                    type="button"
+                    className={`${styles.navBtn}${groupActive ? ' ' + styles.navBtnActive : ''}${collapsed ? ' ' + styles.navBtnCollapsed : ''}`}
+                    onClick={() => setOpenGroups(prev => ({ ...prev, [groupKey]: !prev[groupKey] }))}
+                    title={collapsed ? label : undefined}
+                  >
+                    <Icon size={17} className={styles.navIcon} strokeWidth={1.75} />
+                    {!collapsed && <span className={styles.navLabel}>{label}</span>}
+                    {!collapsed && <ChevronDown size={14} className={`${styles.navGroupChevron} ${groupOpen ? styles.navGroupChevronOpen : ''}`} />}
+                  </button>
+                  {!collapsed && groupOpen && (
+                    <div className={styles.navSubmenu}>
+                      {children.map(child => (
+                        <NavLink
+                          key={child.to}
+                          to={child.to}
+                          className={({ isActive }) => `${styles.navSubBtn}${isActive ? ' ' + styles.navSubBtnActive : ''}`}
+                        >
+                          {child.label}
+                        </NavLink>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            }
+            return (
+              <NavLink
+                key={to}
+                to={to}
+                end={to === '/'}
+                className={({ isActive }) =>
+                  `${styles.navBtn}${isActive ? ' ' + styles.navBtnActive : ''}${collapsed ? ' ' + styles.navBtnCollapsed : ''}`
+                }
+                title={collapsed ? label : undefined}
+              >
+                <Icon size={17} className={styles.navIcon} strokeWidth={1.75} />
+                {!collapsed && <span className={styles.navLabel}>{label}</span>}
+              </NavLink>
+            )
+          })}
         </nav>
 
         {/* Footer: user menu + toggle */}
@@ -154,19 +206,22 @@ export default function Layout() {
 
       {/* ── Bottom nav (mobile) ── */}
       <nav className={styles.bottomNav}>
-        {visibleNav.map(({ to, Icon, label }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={to === '/'}
-            className={({ isActive }) =>
-              styles.bottomNavBtn + (isActive ? ' ' + styles.bottomNavBtnActive : '')
-            }
-          >
-            <Icon size={20} strokeWidth={1.75} className={styles.bottomNavIcon} />
-            <span className={styles.bottomNavLabel}>{label}</span>
-          </NavLink>
-        ))}
+        {visibleNav.flatMap(item => item.children || [item]).map(({ to, Icon, label }) => {
+          const ItemIcon = Icon || ClipboardList
+          return (
+            <NavLink
+              key={to}
+              to={to}
+              end={to === '/'}
+              className={({ isActive }) =>
+                styles.bottomNavBtn + (isActive ? ' ' + styles.bottomNavBtnActive : '')
+              }
+            >
+              <ItemIcon size={20} strokeWidth={1.75} className={styles.bottomNavIcon} />
+              <span className={styles.bottomNavLabel}>{label}</span>
+            </NavLink>
+          )
+        })}
       </nav>
     </div>
   )

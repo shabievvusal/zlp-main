@@ -108,6 +108,13 @@
   cursor: pointer;
   overflow: hidden;
   position: relative;
+  width: 100%;
+  background: transparent;
+  border-top: 0;
+  border-right: 0;
+  border-bottom: 0;
+  font-family: var(--font);
+  text-align: left;
 }
 
 .navBtn:hover {
@@ -141,6 +148,53 @@
 .navLabel {
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.navGroup {
+  display: flex;
+  flex-direction: column;
+}
+
+.navGroupChevron {
+  margin-left: auto;
+  flex-shrink: 0;
+  opacity: .7;
+  transition: transform 160ms var(--ease-out);
+}
+
+.navGroupChevronOpen {
+  transform: rotate(180deg);
+}
+
+.navSubmenu {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 2px 0 4px 34px;
+}
+
+.navSubBtn {
+  display: flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 5px 10px;
+  border-radius: 6px 0 0 6px;
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 500;
+  transition: color 0.15s, background 0.15s;
+}
+
+.navSubBtn:hover {
+  color: var(--text);
+  background: var(--bg);
+}
+
+.navSubBtnActive {
+  color: var(--green);
+  background: var(--green-light);
+  font-weight: 700;
 }
 
 /* ── Footer ───────────────────────────────────────────── */

@@ -1023,6 +1023,7 @@ export async function refreshStoreEos(routeId, storeId, eos) {
 const MONITORING_STATS_URL = 'https://api.samokat.ru/wmsops-wwh/activity-monitor/selection/stats'
 const INBOUND_TASKS_URL    = 'https://api.samokat.ru/wmsin-wwh/inbound/tasks'
 const MOVEMENTS_URL        = 'https://api-p01.samokat.ru/wmsout-wwh/movements/picking-refill/tasks'
+const PIECE_SELECTION_TASKS_URL = 'https://api-p01.samokat.ru/wmsout-wwh/picking-selection'
 
 /** Общий хелпер для прямых GET-запросов к api.samokat.ru */
 async function samokatGet(token, url, params) {
@@ -1048,9 +1049,65 @@ async function samokatGet(token, url, params) {
   return data
 }
 
+async function samokatPost(token, url, body) {
+  const r = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+      'Origin': 'https://wwh.samokat.ru',
+      'Referer': 'https://wwh.samokat.ru/',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36',
+    },
+    body: JSON.stringify(body),
+  })
+  const text = await r.text()
+  const trimmed = (text || '').trim().toLowerCase()
+  if (trimmed.startsWith('<!doctype') || trimmed.startsWith('<html')) {
+    throw new Error('Нет доступа к API. Проверьте VPN или войдите заново.')
+  }
+  let data
+  try { data = text ? JSON.parse(text) : null } catch {
+    throw new Error('Ответ не JSON: ' + (text || '').slice(0, 150))
+  }
+  if (!r.ok) throw new Error(`API ${r.status}: ${data?.message || data?.error || r.statusText}`)
+  return data
+}
+
 /** Статистика отборки (КДК + Хранение). createdAtFrom/To — ISO UTC. */
 export async function getReportMonitoringStats(token, createdAtFrom, createdAtTo) {
   return samokatGet(token, MONITORING_STATS_URL, new URLSearchParams({ createdAtFrom, createdAtTo }))
+}
+
+export async function getPieceSelectionTasks(token, {
+  pageNumber = 1,
+  pageSize = 100,
+  dateFrom,
+  dateTo,
+  status,
+  shipToId = null,
+  sourceZoneId = null,
+  shipmentTemperatureMode = null,
+  shipmentNumber = null,
+  routeNumber = null,
+  targetHandlingUnitBarcode = null,
+  responsibleUserId = null,
+} = {}) {
+  return samokatPost(token, PIECE_SELECTION_TASKS_URL, {
+    dateFrom,
+    dateTo,
+    status,
+    shipToId,
+    sourceZoneId,
+    shipmentTemperatureMode,
+    shipmentNumber,
+    routeNumber,
+    targetHandlingUnitBarcode,
+    responsibleUserId,
+    pageNumber,
+    pageSize,
+  })
 }
 
 /**
