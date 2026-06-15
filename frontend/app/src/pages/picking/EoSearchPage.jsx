@@ -11,6 +11,13 @@ import s from './EoSearchPage.module.css'
 
 const PAGE_SIZE = 100
 
+const TYPE_LABELS = {
+  IMPORT: 'Умный импорт',
+  CROSSDOCK: 'Кросс-докинг',
+  STORAGE: 'На хранение от поставщика',
+  STORAGE_DC: 'На хранение от РЦ',
+}
+
 function todayStr() {
   return new Date().toISOString().slice(0, 10)
 }
@@ -32,6 +39,10 @@ function qty(val) {
 function fullName(user) {
   if (!user) return '—'
   return [user.lastName, user.firstName, user.middleName].filter(Boolean).join(' ') || '—'
+}
+
+function typeLabel(type) {
+  return TYPE_LABELS[type] || type || '—'
 }
 
 function pickAcceptedUser(responsibleUsers = []) {
@@ -204,6 +215,7 @@ export default function EoSearchPage() {
             <table className={s.table}>
               <thead>
                 <tr>
+                  <th>Тип поставки</th>
                   <th>Поставка</th>
                   <th>ЕО</th>
                   <th>Статус ЕО</th>
@@ -218,6 +230,7 @@ export default function EoSearchPage() {
               <tbody>
                 {rows.map(row => (
                   <tr key={row.id}>
+                    <td>{typeLabel(row.supply.type)}</td>
                     <td>{row.supply.taskNumber || row.supply.id}</td>
                     <td>{row.match.eoBarcode || '—'}</td>
                     <td>{row.status}</td>
