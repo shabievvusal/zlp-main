@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react'
-import { Search, RefreshCw } from 'lucide-react'
+import { Printer, RefreshCw, Search, X } from 'lucide-react'
 import {
   getInboundTasks,
   getInboundTaskDetail,
@@ -17,6 +17,20 @@ const TYPE_LABELS = {
   STORAGE: 'На хранение от поставщика',
   STORAGE_DC: 'На хранение от РЦ',
 }
+
+const CODE128_PATTERNS = [
+  '212222', '222122', '222221', '121223', '121322', '131222', '122213', '122312', '132212', '221213',
+  '221312', '231212', '112232', '122132', '122231', '113222', '123122', '123221', '223211', '221132',
+  '221231', '213212', '223112', '312131', '311222', '321122', '321221', '312212', '322112', '322211',
+  '212123', '212321', '232121', '111323', '131123', '131321', '112313', '132113', '132311', '211313',
+  '231113', '231311', '112133', '112331', '132131', '113123', '113321', '133121', '313121', '211331',
+  '231131', '213113', '213311', '213131', '311123', '311321', '331121', '312113', '312311', '332111',
+  '314111', '221411', '431111', '111224', '111422', '121124', '121421', '141122', '141221', '112214',
+  '112412', '122114', '122411', '142112', '142211', '241211', '221114', '413111', '241112', '134111',
+  '111242', '121142', '121241', '114212', '124112', '124211', '411212', '421112', '421211', '212141',
+  '214121', '412121', '111143', '111341', '131141', '114113', '114311', '411113', '411311', '113141',
+  '114131', '311141', '411131', '211412', '211214', '211232', '2331112',
+]
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10)
@@ -43,6 +57,65 @@ function fullName(user) {
 
 function typeLabel(type) {
   return TYPE_LABELS[type] || type || '—'
+}
+
+function getCode128Codes(value) {
+  const text = String(value || '').trim()
+  if (!text) return []
+
+  if (/^\d+$/.test(text) && text.length % 2 === 0) {
+    const codes = [105]
+    for (let i = 0; i < text.length; i += 2) codes.push(Number(text.slice(i, i + 2)))
+    let checksum = codes[0]
+    for (let i = 1; i < codes.length; i += 1) checksum += codes[i] * i
+    return [...codes, checksum % 103, 106]
+  }
+
+  const codes = [104]
+  for (const ch of text) {
+    const code = ch.charCodeAt(0) - 32
+    if (code < 0 || code > 95) return []
+    codes.push(code)
+  }
+  let checksum = codes[0]
+  for (let i = 1; i < codes.length; i += 1) checksum += codes[i] * i
+  return [...codes, checksum % 103, 106]
+}
+
+function buildCode128Bars(value) {
+  const quiet = 10
+  let x = quiet
+  const bars = []
+  for (const code of getCode128Codes(value)) {
+    const pattern = CODE128_PATTERNS[code]
+    if (!pattern) continue
+    for (let i = 0; i < pattern.length; i += 1) {
+      const width = Number(pattern[i])
+      if (i % 2 === 0) bars.push({ x, width })
+      x += width
+    }
+  }
+  return { bars, width: x + quiet, height: 58 }
+}
+
+function Code128Barcode({ value }) {
+  const { bars, width, height } = buildCode128Bars(value)
+  if (!bars.length) return <div className={s.barcodeError}>Не удалось построить barcode</div>
+  return (
+    <svg className={s.barcodeSvg} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`Barcode ${value}`}>
+      <rect width={width} height={height} fill="#fff" />
+      {bars.map((bar, index) => (
+        <rect key={`${bar.x}-${index}`} x={bar.x} y="0" width={bar.width} height="42" fill="#111827" />
+      ))}
+      <text x={width / 2} y="55" textAnchor="middle" fontSize="8" fontFamily="Arial, sans-serif" fill="#111827">
+        {value}
+      </text>
+    </svg>
+  )
+}
+
+function printBarcode() {
+  window.print()
 }
 
 function pickAcceptedUser(responsibleUsers = []) {
@@ -98,6 +171,7 @@ export default function EoSearchPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [progress, setProgress] = useState('')
+  const [printValue, setPrintValue] = useState('')
 
   const search = useCallback(async () => {
     const clean = barcode.trim()
@@ -208,6 +282,25 @@ export default function EoSearchPage() {
 
       {error && <div className={s.empty}>{error}</div>}
 
+      {printValue && (
+        <div className={s.printPanel}>
+          <div className={s.printInfo}>
+            <div className={s.printTitle}>Печать ЕО {printValue}</div>
+            <Code128Barcode value={printValue} />
+          </div>
+          <div className={s.printActions}>
+            <button type="button" className="btn btn-primary" onClick={printBarcode}>
+              <Printer size={14} strokeWidth={2} style={{ marginRight: 6 }} />
+              Печать
+            </button>
+            <button type="button" className="btn btn-secondary" onClick={() => setPrintValue('')}>
+              <X size={14} strokeWidth={2} style={{ marginRight: 6 }} />
+              Закрыть
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className={s.card}>
         {!loading && rows.length === 0 && !error && <div className={s.empty}>Введите ШК продукта и нажмите «Найти»</div>}
         {rows.length > 0 && (
@@ -232,7 +325,17 @@ export default function EoSearchPage() {
                   <tr key={row.id}>
                     <td>{typeLabel(row.supply.type)}</td>
                     <td>{row.supply.taskNumber || row.supply.id}</td>
-                    <td>{row.match.eoBarcode || '—'}</td>
+                    <td>
+                      <button
+                        type="button"
+                        className={s.eoButton}
+                        onClick={() => setPrintValue(row.match.eoBarcode)}
+                        title="Печать barcode 128"
+                      >
+                        <span>{row.match.eoBarcode || '—'}</span>
+                        <Printer size={13} strokeWidth={2} />
+                      </button>
+                    </td>
                     <td>{row.status}</td>
                     <td className={s.num}>{row.receivedQty || '—'}</td>
                     <td className={s.num}>{row.remaining ?? '—'}</td>
