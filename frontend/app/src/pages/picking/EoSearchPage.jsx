@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react'
-import { Printer, RefreshCw, Search, X } from 'lucide-react'
+import { Printer, RefreshCw, Search } from 'lucide-react'
 import {
   getInboundTasks,
   getInboundTaskDetail,
@@ -301,20 +301,7 @@ export default function EoSearchPage() {
 
       {printValue && (
         <div className={s.printPanel}>
-          <div className={s.printInfo}>
-            <div className={s.printTitle}>Печать ЕО {printValue}</div>
-            <Code128Barcode value={printValue} />
-          </div>
-          <div className={s.printActions}>
-            <button type="button" className="btn btn-primary" onClick={printBarcode}>
-              <Printer size={14} strokeWidth={2} style={{ marginRight: 6 }} />
-              Печать
-            </button>
-            <button type="button" className="btn btn-secondary" onClick={() => setPrintValue('')}>
-              <X size={14} strokeWidth={2} style={{ marginRight: 6 }} />
-              Закрыть
-            </button>
-          </div>
+          <Code128Barcode value={printValue} />
         </div>
       )}
 

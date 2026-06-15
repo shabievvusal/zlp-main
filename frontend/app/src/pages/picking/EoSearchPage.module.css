@@ -80,37 +80,7 @@
 }
 
 .printPanel {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 12px;
-  margin-bottom: 14px;
-  box-shadow: var(--shadow-sm);
-}
-
-.printInfo {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  min-width: 0;
-}
-
-.printTitle {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text);
-  white-space: nowrap;
-}
-
-.printActions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
+  display: none;
 }
 
 .barcodeSvg {
@@ -211,12 +181,6 @@
 }
 
 @media (max-width: 760px) {
-  .printPanel,
-  .printInfo {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
   .barcodeSvg {
     max-width: 100%;
   }
@@ -275,18 +239,12 @@
     background: #fff;
   }
 
-  .printInfo,
   .barcodeSvg {
     display: block !important;
   }
 
   .barcodeSvg * {
     display: initial !important;
-  }
-
-  .printTitle,
-  .printActions {
-    display: none !important;
   }
 
   .barcodeSvg {
