@@ -59,13 +59,7 @@ function parseKdkRows(data, emplMap, emplIdMap) {
       'sourceHandlingUnitBarcode',
       'id',
     ]) || `КДК-${index + 1}`
-    const eo = firstValue(entry, [
-      'handlingUnitBarcode',
-      'sourceHandlingUnitBarcode',
-      'targetHandlingUnitBarcode',
-      'sourceAddress.handlingUnitBarcode',
-      'targetAddress.handlingUnitBarcode',
-    ])
+    const eo = task
     const pieces = firstValue(entry, [
       'itemsLeft',
       'piecesLeft',
@@ -76,8 +70,7 @@ function parseKdkRows(data, emplMap, emplIdMap) {
       'quantity',
     ])
     return {
-      key: `${executorId || executor}-${task}-${index}`,
-      task,
+      key: `${executorId || executor}-${eo}-${index}`,
       company,
       executor,
       executorId,
@@ -172,10 +165,9 @@ export default function KdkLayoutPage() {
             <table className={s.table}>
               <thead>
                 <tr>
-                  <th>Задача</th>
+                  <th className={s.tdEo}>ЕО</th>
                   <th>Компания</th>
                   <th>Исполнитель</th>
-                  <th className={s.num}>ЕО</th>
                   <th className={s.num}>Шт</th>
                   <th>Последний пик</th>
                 </tr>
@@ -183,10 +175,9 @@ export default function KdkLayoutPage() {
               <tbody>
                 {sorted.map(row => (
                   <tr key={row.key} className={row.idle ? s.rowIdle : ''}>
-                    <td>{row.task}</td>
+                    <td className={s.tdEo}>{row.eo || '—'}</td>
                     <td>{row.company}</td>
                     <td title={row.executor}>{shortFio(row.executor)}</td>
-                    <td className={s.num}>{fmtNum(row.eo)}</td>
                     <td className={s.num}>{fmtNum(row.pieces)}</td>
                     <td>
                       {row.lastPickAt ? (
