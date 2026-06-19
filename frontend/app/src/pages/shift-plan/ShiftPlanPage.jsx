@@ -1,12 +1,12 @@
-import { useCallback, useMemo, useState } from 'react'
-import { RefreshCw, Users } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { ChevronDown, ChevronLeft, ChevronRight, RefreshCw, Users } from 'lucide-react'
 import * as api from '../../api/index.js'
-import DatePicker from '../../components/ui/DatePicker.jsx'
 import { useApp } from '../../context/AppContext.jsx'
 import { getCompanyByFio, normalizeFio } from '../../utils/emplUtils.js'
 import s from './ShiftPlanPage.module.css'
 
-const DEFAULT_SHIFT_HOURS = 10.5
+const RU_MONTHS = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь']
+const RU_DAYS_SHORT = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс']
 
 function todayStr() {
   const d = new Date()
@@ -17,6 +17,23 @@ function daysAgoStr(days) {
   const d = new Date()
   d.setDate(d.getDate() - days)
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function parseLocalDate(dateStr) {
+  const [y, m, d] = String(dateStr || '').split('-').map(Number)
+  return y && m && d ? new Date(y, m - 1, d) : new Date()
+}
+
+function dateToStr(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+function fmtDateShort(date) {
+  if (!date) return '?'
+  const dd = String(date.getDate()).padStart(2, '0')
+  const mm = String(date.getMonth() + 1).padStart(2, '0')
+  const yy = String(date.getFullYear()).slice(2)
+  return `${dd}.${mm}.${yy}`
 }
 
 function fmtNum(value, digits = 0) {
@@ -32,56 +49,204 @@ function planStatus(projected, target) {
   return 'bad'
 }
 
+function DateRangeDropdown({ label, dateRange, onChange }) {
+  const [open, setOpen] = useState(false)
+  const [draft, setDraft] = useState(dateRange)
+  const [step, setStep] = useState('from')
+  const [viewYear, setViewYear] = useState(() => (dateRange?.fromDate || new Date()).getFullYear())
+  const [viewMonth, setViewMonth] = useState(() => (dateRange?.fromDate || new Date()).getMonth())
+  const ref = useRef(null)
+
+  useEffect(() => {
+    if (!open) return undefined
+    function onOut(e) {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onOut)
+    return () => document.removeEventListener('mousedown', onOut)
+  }, [open])
+
+  function openMenu() {
+    if (open) { setOpen(false); return }
+    setDraft(dateRange)
+    setStep('from')
+    const base = dateRange?.fromDate || new Date()
+    setViewYear(base.getFullYear())
+    setViewMonth(base.getMonth())
+    setOpen(true)
+  }
+
+  function clickDay(day) {
+    if (step === 'from') {
+      setDraft({ fromDate: day, toDate: day })
+      setStep('to')
+      return
+    }
+    const fd = draft.fromDate
+    setDraft(day < fd ? { fromDate: day, toDate: fd } : { fromDate: fd, toDate: day })
+    setStep('from')
+  }
+
+  function handleApply() {
+    if (draft?.fromDate) { onChange(draft); setOpen(false) }
+  }
+
+  function handleReset() {
+    const fromDate = parseLocalDate(daysAgoStr(14))
+    const toDate = parseLocalDate(todayStr())
+    const next = { fromDate, toDate }
+    setDraft(next)
+    onChange(next)
+    setOpen(false)
+  }
+
+  function prevMonth() {
+    if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1) }
+    else setViewMonth(m => m - 1)
+  }
+
+  function nextMonth() {
+    if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1) }
+    else setViewMonth(m => m + 1)
+  }
+
+  const firstDay = new Date(viewYear, viewMonth, 1)
+  const lastDay = new Date(viewYear, viewMonth + 1, 0)
+  let startDow = firstDay.getDay()
+  startDow = startDow === 0 ? 6 : startDow - 1
+  const cells = []
+  for (let i = 0; i < startDow; i += 1) cells.push(null)
+  for (let d = 1; d <= lastDay.getDate(); d += 1) cells.push(new Date(viewYear, viewMonth, d))
+
+  const dFrom = draft?.fromDate
+  const dTo = draft?.toDate
+  const today = parseLocalDate(todayStr())
+  const isInRange = day => day && dFrom && dTo && day > dFrom && day < dTo
+  const isStart = day => day && dFrom && day.getTime() === dFrom.getTime()
+  const isEnd = day => day && dTo && day.getTime() === dTo.getTime()
+  const isToday = day => day && day.getTime() === today.getTime()
+  const chipLabel = `${label}: ${fmtDateShort(dateRange.fromDate)}-${fmtDateShort(dateRange.toDate)}`
+
+  return (
+    <div className={s.dropdownWrap} ref={ref}>
+      <button
+        type="button"
+        className={`${s.filterDropdown} ${open ? s.filterDropdownOpen : ''}`}
+        onClick={openMenu}
+      >
+        {chipLabel}<ChevronDown size={13} />
+      </button>
+      {open && (
+        <div className={`${s.dropdownMenu} ${s.calendarMenu}`}>
+          <div className={s.calHeader}>
+            <button type="button" className={s.calNavBtn} onClick={prevMonth}>
+              <ChevronLeft size={14} />
+            </button>
+            <span className={s.calMonthLabel}>{RU_MONTHS[viewMonth]} {viewYear}</span>
+            <button type="button" className={s.calNavBtn} onClick={nextMonth}>
+              <ChevronRight size={14} />
+            </button>
+          </div>
+          <div className={s.calGrid}>
+            {RU_DAYS_SHORT.map(d => <div key={d} className={s.calDayName}>{d}</div>)}
+            {cells.map((day, i) => (
+              <div
+                key={i}
+                onClick={() => day && clickDay(day)}
+                className={[
+                  s.calCell,
+                  !day ? s.calCellEmpty : '',
+                  day && isToday(day) ? s.calCellToday : '',
+                  day && isStart(day) ? s.calCellStart : '',
+                  day && isEnd(day) ? s.calCellEnd : '',
+                  day && isInRange(day) ? s.calCellRange : '',
+                ].filter(Boolean).join(' ')}
+              >
+                {day ? day.getDate() : ''}
+              </div>
+            ))}
+          </div>
+          {step === 'to' && <div className={s.calHint}>Выберите конец периода</div>}
+          <div className={s.dropdownActions}>
+            <button type="button" className={s.btnReset} onClick={handleReset}>Сбросить</button>
+            <button type="button" className={s.btnApply} onClick={handleApply} disabled={!draft?.fromDate}>
+              Применить
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function ShiftPlanPage() {
-  const { emplMap, emplCompanies, idleThresholdMinutes } = useApp()
+  const { emplMap, emplCompanies } = useApp()
   const [company, setCompany] = useState('')
   const [shift, setShift] = useState('day')
-  const [dateFrom, setDateFrom] = useState(daysAgoStr(14))
-  const [dateTo, setDateTo] = useState(todayStr)
+  const [dateRange, setDateRange] = useState(() => ({
+    fromDate: parseLocalDate(daysAgoStr(14)),
+    toDate: parseLocalDate(todayStr()),
+  }))
   const [peopleCount, setPeopleCount] = useState(28)
   const [targetTasks, setTargetTasks] = useState(750)
-  const [shiftHours, setShiftHours] = useState(DEFAULT_SHIFT_HOURS)
-  const [rates, setRates] = useState([])
+  const [shiftRows, setShiftRows] = useState([])
   const [loadedRange, setLoadedRange] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const dateFrom = dateToStr(dateRange.fromDate)
+  const dateTo = dateToStr(dateRange.toDate)
 
   const load = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
-      const data = await api.getAnalysisEmployeeRates({
-        dateFrom,
-        dateTo,
-        shift,
-        idleThresholdMinutes,
-      })
+      const data = await api.getMonthlyEmployees(dateFrom, dateTo, shift)
       if (data?.error) throw new Error(data.error)
-      setRates(data?.employees || [])
+      setShiftRows(data?.rows || [])
       setLoadedRange({ dateFrom, dateTo, shift })
     } catch (err) {
       setError(err.message || 'Ошибка расчета')
-      setRates([])
+      setShiftRows([])
       setLoadedRange(null)
     } finally {
       setLoading(false)
     }
-  }, [dateFrom, dateTo, idleThresholdMinutes, shift])
+  }, [dateFrom, dateTo, shift])
 
   const companyRates = useMemo(() => {
-    return rates
-      .map(row => {
-        const rowCompany = getCompanyByFio(emplMap, normalizeFio(row.name)) || '—'
-        const projectedTasks = Number(row.szPerHour || 0) * Number(shiftHours || 0)
-        return { ...row, company: rowCompany, projectedTasks }
-      })
-      .filter(row => !company || row.company === company)
+    const byEmployee = new Map()
+    for (const row of shiftRows) {
+      const name = row.name || row.executor || ''
+      if (!name) continue
+      const rowCompany = row.company || getCompanyByFio(emplMap, normalizeFio(name)) || '—'
+      if (company && rowCompany !== company) continue
+      if (!byEmployee.has(name)) {
+        byEmployee.set(name, {
+          name,
+          company: rowCompany,
+          tasksCount: 0,
+          shiftsWorked: 0,
+          bestShift: 0,
+        })
+      }
+      const item = byEmployee.get(name)
+      const total = Number(row.total) || 0
+      item.tasksCount += total
+      item.shiftsWorked += 1
+      item.bestShift = Math.max(item.bestShift, total)
+    }
+    return [...byEmployee.values()]
+      .map(row => ({
+        ...row,
+        avgPerShift: row.shiftsWorked > 0 ? row.tasksCount / row.shiftsWorked : 0,
+        projectedTasks: row.shiftsWorked > 0 ? row.tasksCount / row.shiftsWorked : 0,
+      }))
       .sort((a, b) =>
-        (b.szPerHour - a.szPerHour) ||
+        (b.avgPerShift - a.avgPerShift) ||
         (b.tasksCount - a.tasksCount) ||
         a.name.localeCompare(b.name, 'ru')
       )
-  }, [company, emplMap, rates, shiftHours])
+  }, [company, emplMap, shiftRows])
 
   const plan = useMemo(() => {
     const requested = Math.max(0, Number(peopleCount) || 0)
@@ -112,7 +277,7 @@ export default function ShiftPlanPage() {
       <div className={s.header}>
         <div>
           <h1 className={s.title}>План смены</h1>
-          <div className={s.subtitle}>Рекомендованный состав по компании на основе исторической скорости СЗ/час</div>
+          <div className={s.subtitle}>Рекомендованный состав по компании на основе среднего результата за смену</div>
         </div>
         <div className={s.headerBadge}>
           <Users size={15} strokeWidth={2} />
@@ -135,14 +300,10 @@ export default function ShiftPlanPage() {
             <option value="night">Ночь</option>
           </select>
         </label>
-        <label className={s.field}>
-          <span>История с</span>
-          <DatePicker value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
-        </label>
-        <label className={s.field}>
-          <span>История по</span>
-          <DatePicker value={dateTo} onChange={e => setDateTo(e.target.value)} />
-        </label>
+        <div className={s.field}>
+          <span>Период истории</span>
+          <DateRangeDropdown label="Период" dateRange={dateRange} onChange={setDateRange} />
+        </div>
         <label className={s.field}>
           <span>Заявка, чел.</span>
           <input className={s.input} type="number" min="1" value={peopleCount} onChange={e => setPeopleCount(e.target.value)} />
@@ -150,10 +311,6 @@ export default function ShiftPlanPage() {
         <label className={s.field}>
           <span>План СЗ</span>
           <input className={s.input} type="number" min="0" value={targetTasks} onChange={e => setTargetTasks(e.target.value)} />
-        </label>
-        <label className={s.field}>
-          <span>Рабочих часов</span>
-          <input className={s.input} type="number" min="1" step="0.5" value={shiftHours} onChange={e => setShiftHours(e.target.value)} />
         </label>
         <button type="button" className="btn btn-primary" onClick={load} disabled={loading || !canLoad}>
           <RefreshCw size={14} strokeWidth={2} style={{ marginRight: 6 }} />
@@ -199,11 +356,11 @@ export default function ShiftPlanPage() {
                   <th>#</th>
                   <th>Роль</th>
                   <th>ФИО</th>
-                  <th className={s.num}>СЗ/час</th>
+                  <th className={s.num}>СЗ/смена</th>
                   <th className={s.num}>Прогноз СЗ</th>
-                  <th className={s.num}>Пик/час</th>
+                  <th className={s.num}>Лучший итог</th>
                   <th className={s.num}>СЗ в истории</th>
-                  <th className={s.num}>Часов</th>
+                  <th className={s.num}>Смен</th>
                 </tr>
               </thead>
               <tbody>
@@ -216,11 +373,11 @@ export default function ShiftPlanPage() {
                       </span>
                     </td>
                     <td>{row.name}</td>
-                    <td className={s.num}>{fmtNum(row.szPerHour, 2)}</td>
+                    <td className={s.num}>{fmtNum(row.avgPerShift, 1)}</td>
                     <td className={s.num}>{fmtNum(row.projectedTasks)}</td>
-                    <td className={s.num}>{fmtNum(row.peakPerHour, 1)}</td>
+                    <td className={s.num}>{fmtNum(row.bestShift)}</td>
                     <td className={s.num}>{fmtNum(row.tasksCount)}</td>
-                    <td className={s.num}>{fmtNum(row.hoursWorked)}</td>
+                    <td className={s.num}>{fmtNum(row.shiftsWorked)}</td>
                   </tr>
                 ))}
               </tbody>

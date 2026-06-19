@@ -81,6 +81,177 @@
   border-color: var(--green);
 }
 
+.dropdownWrap {
+  position: relative;
+}
+
+.filterDropdown {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 34px;
+  padding: 0 11px;
+  background: var(--bg-card);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.filterDropdown:hover {
+  background: var(--bg);
+}
+
+.filterDropdownOpen {
+  border-color: var(--green);
+  color: var(--green);
+}
+
+.dropdownMenu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 20;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+}
+
+.dropdownActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 8px 10px 10px;
+  border-top: 1px solid var(--border);
+}
+
+.btnReset,
+.btnApply {
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 6px;
+  font: 600 12px/1 var(--font);
+  cursor: pointer;
+}
+
+.btnReset {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+}
+
+.btnApply {
+  background: var(--green);
+  border: 1px solid var(--green);
+  color: #fff;
+}
+
+.btnApply:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.calendarMenu {
+  min-width: 260px;
+  padding: 0;
+}
+
+.calHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.calMonthLabel {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.calNavBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--text-muted);
+}
+
+.calNavBtn:hover {
+  background: var(--bg);
+  color: var(--text);
+}
+
+.calGrid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1px;
+  padding: 8px 10px 4px;
+}
+
+.calDayName {
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  padding: 2px 0 4px;
+  user-select: none;
+}
+
+.calCell {
+  text-align: center;
+  font-size: 12.5px;
+  line-height: 1;
+  padding: 6px 2px;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--text);
+  user-select: none;
+}
+
+.calCell:hover:not(.calCellEmpty) {
+  background: var(--bg);
+}
+
+.calCellEmpty {
+  cursor: default;
+}
+
+.calCellToday {
+  font-weight: 700;
+  color: var(--green);
+}
+
+.calCellStart,
+.calCellEnd {
+  background: var(--green) !important;
+  color: white !important;
+  font-weight: 700;
+}
+
+.calCellRange {
+  background: #dcfce7;
+  color: #166534;
+  border-radius: 0;
+}
+
+.calHint {
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 2px 0 6px;
+}
+
 .cards {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
