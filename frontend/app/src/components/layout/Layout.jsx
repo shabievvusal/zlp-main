@@ -6,13 +6,14 @@ import {
   BarChart2, Monitor, TrendingUp, Package, FileText,
   Truck, ClipboardList, Settings, LogOut, ChevronLeft,
   ChevronRight, UserCircle, PackageSearch, AlertTriangle,
-  ChevronDown, ListChecks, Boxes, ScanBarcode,
+  ChevronDown, ListChecks, Boxes, ScanBarcode, Users,
 } from 'lucide-react'
 
 const NAV_ITEMS = [
   { to: '/',               Icon: BarChart2,      label: 'Статистика',   module: 'stats' },
   { to: '/monitor',        Icon: Monitor,        label: 'Мониторинг',   module: 'monitor' },
   { to: '/analysis',       Icon: TrendingUp,     label: 'Анализ',       module: 'analysis' },
+  { to: '/shift-plan',     Icon: Users,          label: 'План смены',   module: 'stats' },
   { to: '/consolidation',  Icon: Package,        label: 'Консолидация', module: 'consolidation' },
   { to: '/docs',           Icon: FileText,       label: 'Документы',    module: 'docs' },
   {
