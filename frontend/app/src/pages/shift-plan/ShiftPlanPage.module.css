@@ -310,6 +310,7 @@
   width: 100%;
   border-collapse: collapse;
   min-width: 920px;
+  table-layout: fixed;
   font-size: 13px;
 }
 
@@ -341,6 +342,41 @@
   text-align: right;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
+}
+
+.table th.num {
+  text-align: right;
+}
+
+.table th:nth-child(1),
+.table td:nth-child(1) {
+  width: 48px;
+}
+
+.table th:nth-child(2),
+.table td:nth-child(2) {
+  width: 150px;
+}
+
+.table th:nth-child(3),
+.table td:nth-child(3) {
+  width: 280px;
+}
+
+.table th:nth-child(4),
+.table td:nth-child(4),
+.table th:nth-child(5),
+.table td:nth-child(5),
+.table th:nth-child(6),
+.table td:nth-child(6),
+.table th:nth-child(7),
+.table td:nth-child(7) {
+  width: 150px;
+}
+
+.table th:nth-child(8),
+.table td:nth-child(8) {
+  width: 90px;
 }
 
 .badgeMain,
