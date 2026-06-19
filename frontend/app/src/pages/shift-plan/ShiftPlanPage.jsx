@@ -188,7 +188,7 @@ export default function ShiftPlanPage() {
     toDate: parseLocalDate(todayStr()),
   }))
   const [peopleCount, setPeopleCount] = useState(28)
-  const [targetTasks, setTargetTasks] = useState(750)
+  const [targetTasksPerEmployee, setTargetTasksPerEmployee] = useState(750)
   const [shiftRows, setShiftRows] = useState([])
   const [loadedRange, setLoadedRange] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -250,24 +250,21 @@ export default function ShiftPlanPage() {
 
   const plan = useMemo(() => {
     const requested = Math.max(0, Number(peopleCount) || 0)
-    const target = Math.max(0, Number(targetTasks) || 0)
+    const targetPerEmployee = Math.max(0, Number(targetTasksPerEmployee) || 0)
+    const totalTarget = requested * targetPerEmployee
     const selected = companyRates.slice(0, requested)
-    let cumulative = 0
-    let required = 0
-    for (const row of selected) {
-      cumulative += row.projectedTasks
-      required += 1
-      if (target && cumulative >= target) break
-    }
     const projected = selected.reduce((sum, row) => sum + row.projectedTasks, 0)
+    const qualified = selected.filter(row => !targetPerEmployee || row.projectedTasks >= targetPerEmployee).length
     return {
       selected,
-      required: target ? required : selected.length,
+      qualified,
       projected,
-      gap: Math.max(0, target - projected),
-      status: planStatus(projected, target),
+      targetPerEmployee,
+      totalTarget,
+      gap: Math.max(0, totalTarget - projected),
+      status: planStatus(projected, totalTarget),
     }
-  }, [companyRates, peopleCount, targetTasks])
+  }, [companyRates, peopleCount, targetTasksPerEmployee])
 
   const canLoad = Boolean(company && dateFrom && dateTo)
   const loadedShiftLabel = loadedRange?.shift === 'night' ? 'Ночь' : 'День'
@@ -309,8 +306,8 @@ export default function ShiftPlanPage() {
           <input className={s.input} type="number" min="1" value={peopleCount} onChange={e => setPeopleCount(e.target.value)} />
         </label>
         <label className={s.field}>
-          <span>План СЗ</span>
-          <input className={s.input} type="number" min="0" value={targetTasks} onChange={e => setTargetTasks(e.target.value)} />
+          <span>План СЗ на сотрудника</span>
+          <input className={s.input} type="number" min="0" value={targetTasksPerEmployee} onChange={e => setTargetTasksPerEmployee(e.target.value)} />
         </label>
         <button type="button" className="btn btn-primary" onClick={load} disabled={loading || !canLoad}>
           <RefreshCw size={14} strokeWidth={2} style={{ marginRight: 6 }} />
@@ -328,13 +325,18 @@ export default function ShiftPlanPage() {
             <small>{loadedShiftLabel} · {loadedRange.dateFrom} — {loadedRange.dateTo}</small>
           </div>
           <div className={s.card}>
-            <span>План</span>
-            <strong>{fmtNum(targetTasks)} СЗ</strong>
+            <span>План на смену</span>
+            <strong>{fmtNum(plan.totalTarget)} СЗ</strong>
+            <small>{fmtNum(plan.targetPerEmployee)} СЗ на сотрудника × {fmtNum(peopleCount)} чел.</small>
+          </div>
+          <div className={s.card}>
+            <span>Прогноз к плану</span>
+            <strong>{plan.gap > 0 ? `-${fmtNum(plan.gap)} СЗ` : 'Закрывается'}</strong>
             <small>{plan.gap > 0 ? `Не хватает ${fmtNum(plan.gap)} СЗ` : 'План закрывается'}</small>
           </div>
           <div className={s.card}>
-            <span>Достаточно людей</span>
-            <strong>{plan.required || 0} из {fmtNum(peopleCount)}</strong>
+            <span>В нормативе</span>
+            <strong>{plan.qualified || 0} из {fmtNum(peopleCount)}</strong>
             <small>{companyRates.length ? `Есть статистика по ${companyRates.length} сотрудникам` : 'Нет сотрудников со статистикой'}</small>
           </div>
         </div>
@@ -368,8 +370,8 @@ export default function ShiftPlanPage() {
                   <tr key={row.name}>
                     <td>{index + 1}</td>
                     <td>
-                      <span className={index < plan.required ? s.badgeMain : s.badgeReserve}>
-                        {index < plan.required ? 'Основной' : 'Резерв'}
+                      <span className={row.projectedTasks >= plan.targetPerEmployee ? s.badgeMain : s.badgeReserve}>
+                        {row.projectedTasks >= plan.targetPerEmployee ? 'В нормативе' : 'Ниже плана'}
                       </span>
                     </td>
                     <td>{row.name}</td>
