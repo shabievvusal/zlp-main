@@ -298,18 +298,19 @@
 }
 
 @media print {
-  :global(body.tsd-printing) * {
-    visibility: hidden !important;
+  :global(body.tsd-printing) .page > :not(.printSheet) {
+    display: none !important;
   }
 
-  :global(body.tsd-printing) .printSheet,
-  :global(body.tsd-printing) .printSheet * {
-    visibility: visible !important;
+  :global(body.tsd-printing) .page {
+    width: 100mm;
+    min-width: 100mm;
+    max-width: 100mm;
+    margin: 0;
+    padding: 0;
   }
 
   :global(body.tsd-printing) .printSheet {
-    position: fixed;
-    inset: 0;
     display: grid;
     grid-template-columns: 100mm;
     align-content: start;
@@ -317,6 +318,16 @@
     gap: 0;
     padding: 0;
     background: #fff;
+  }
+
+  :global(body.tsd-printing) .printLabel {
+    break-after: page;
+    page-break-after: always;
+  }
+
+  :global(body.tsd-printing) .printLabel:last-child {
+    break-after: auto;
+    page-break-after: auto;
   }
 
   @page {

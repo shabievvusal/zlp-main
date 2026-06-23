@@ -49,6 +49,7 @@ export default function TsdIssuePage() {
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
   const [printItems, setPrintItems] = useState([])
+  const [printRequested, setPrintRequested] = useState(false)
   const scanRef = useRef(null)
 
   const load = useCallback(async () => {
@@ -68,6 +69,12 @@ export default function TsdIssuePage() {
   useEffect(() => {
     load()
   }, [load])
+
+  useEffect(() => {
+    if (!printRequested || !printItems.length) return
+    schedulePrint()
+    setPrintRequested(false)
+  }, [printItems, printRequested])
 
   const employeesById = useMemo(() => {
     const map = new Map()
@@ -173,7 +180,7 @@ export default function TsdIssuePage() {
       return
     }
     setPrintItems(prepared)
-    schedulePrint()
+    setPrintRequested(true)
   }
 
   const handleReturn = async (emp) => {
