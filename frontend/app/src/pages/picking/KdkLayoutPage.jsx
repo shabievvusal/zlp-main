@@ -1,14 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { RefreshCw, RotateCcw, ScanLine } from 'lucide-react'
-import Code128Barcode from '../../components/Code128Barcode.jsx'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { RefreshCw } from 'lucide-react'
 import {
-  assignTsd,
   fetchLastKdkCompletedForExecutor,
-  getEmployees,
   getLiveMonitorViaBrowser,
   getPieceSelectionTasks,
   getTsdAssignments,
-  returnTsd,
 } from '../../api/index.js'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { useApp } from '../../context/AppContext.jsx'
@@ -72,12 +68,6 @@ function fmtAgo(iso) {
   const min = Math.floor(diff / 60000)
   if (min < 1) return 'только что'
   return `${min} мин`
-}
-
-function extractEmployeeCode(raw) {
-  const value = String(raw || '').trim()
-  if (!value) return ''
-  return value.startsWith('EMP:') ? value.slice(4).trim() : value
 }
 
 function assignmentsToMap(list) {
@@ -155,23 +145,11 @@ export default function KdkLayoutPage() {
   const { getToken, isTokenValid, forceRefresh } = useAuth()
   const { emplMap, emplIdMap } = useApp()
   const [rows, setRows] = useState([])
-  const [employees, setEmployees] = useState([])
   const [assignments, setAssignments] = useState({})
-  const [pendingTsd, setPendingTsd] = useState('')
-  const [scanValue, setScanValue] = useState('')
-  const [scanMessage, setScanMessage] = useState('')
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [lastUpdated, setLastUpdated] = useState('')
   const [sort, setSort] = useState({ key: 'lastActionAt', dir: 'asc' })
-  const scanRef = useRef(null)
-
-  useEffect(() => {
-    getEmployees()
-      .then(data => setEmployees((data?.employees || []).filter(e => e.executorId)))
-      .catch(() => setEmployees([]))
-  }, [])
 
   const reloadAssignments = useCallback(async () => {
     const data = await getTsdAssignments()
@@ -180,75 +158,14 @@ export default function KdkLayoutPage() {
   }, [])
 
   useEffect(() => {
-    reloadAssignments().catch(err => setScanMessage(err.message || 'Не удалось загрузить выдачи ТСД'))
+    reloadAssignments().catch(() => {})
   }, [reloadAssignments])
-
-  const employeesById = useMemo(() => {
-    const map = new Map()
-    for (const emp of employees) map.set(emp.executorId, emp)
-    return map
-  }, [employees])
 
   const toggleSort = (key) => {
     setSort(prev => prev.key === key
       ? { key, dir: prev.dir === 'desc' ? 'asc' : 'desc' }
       : { key, dir: key === 'lastActionAt' ? 'asc' : 'desc' }
     )
-  }
-
-  const findEmployeeByScan = useCallback((raw) => {
-    const code = extractEmployeeCode(raw)
-    return employeesById.get(code) || null
-  }, [employeesById])
-
-  const processScan = useCallback(async (raw) => {
-    const code = String(raw || '').trim()
-    if (!code) return
-    const employee = findEmployeeByScan(code)
-
-    if (pendingTsd) {
-      if (!employee?.executorId) {
-        setScanMessage('После штрихкода ТСД нужно сканировать код сотрудника')
-        return
-      }
-      await assignTsd({
-        executorId: employee.executorId,
-        fio: employee.fio,
-        company: employee.company || '',
-        tsd: pendingTsd,
-      })
-      await reloadAssignments()
-      setScanMessage(`ТСД ${pendingTsd} выдан: ${employee.fio}`)
-      setPendingTsd('')
-      return
-    }
-
-    if (employee?.executorId) {
-      if (!assignments[employee.executorId]) {
-        setScanMessage('У сотрудника нет активной выдачи. Для выдачи сначала сканируйте ТСД')
-        return
-      }
-      const tsd = assignments[employee.executorId].tsd
-      await returnTsd(employee.executorId)
-      await reloadAssignments()
-      setScanMessage(`ТСД ${tsd} возвращен: ${employee.fio}`)
-      return
-    }
-
-    setPendingTsd(code)
-    setScanMessage(`ТСД ${code} считан. Теперь сканируйте код сотрудника`)
-  }, [assignments, findEmployeeByScan, pendingTsd, reloadAssignments])
-
-  const handleScanSubmit = async (event) => {
-    event.preventDefault()
-    try {
-      await processScan(scanValue)
-      setScanValue('')
-    } catch (err) {
-      setScanMessage(err.message || 'Ошибка операции с ТСД')
-    } finally {
-      scanRef.current?.focus()
-    }
   }
 
   const load = useCallback(async () => {
@@ -330,20 +247,7 @@ export default function KdkLayoutPage() {
     })
   }, [rowsWithTsd, sort])
 
-  const activeAssignments = Object.entries(assignments)
-  const selectedEmployee = selectedEmployeeId ? employeesById.get(selectedEmployeeId) : null
-  const employeeCode = selectedEmployee?.executorId ? `EMP:${selectedEmployee.executorId}` : ''
   const sortMark = key => sort.key === key ? (sort.dir === 'desc' ? '↓' : '↑') : '↕'
-
-  const handleManualReturn = async (executorId, rec) => {
-    try {
-      await returnTsd(executorId)
-      await reloadAssignments()
-      setScanMessage(`ТСД ${rec.tsd} возвращен: ${rec.fio || executorId}`)
-    } catch (err) {
-      setScanMessage(err.message || 'Не удалось вернуть ТСД')
-    }
-  }
 
   return (
     <div className={s.page}>
@@ -355,60 +259,13 @@ export default function KdkLayoutPage() {
         <div className={s.meta}>{lastUpdated ? `Обновлено: ${formatTime(lastUpdated)}` : 'Данные не загружены'}</div>
       </div>
 
-      <div className={s.scanPanel}>
-        <form className={s.scanForm} onSubmit={handleScanSubmit}>
-          <ScanLine size={16} />
-          <input
-            ref={scanRef}
-            className={s.scanInput}
-            value={scanValue}
-            onChange={e => setScanValue(e.target.value)}
-            placeholder={pendingTsd ? 'Сканируйте код сотрудника' : 'Сканируйте ТСД или код сотрудника'}
-            autoComplete="off"
-          />
-          <button type="submit" className="btn btn-primary btn-sm">ОК</button>
-        </form>
-        <div className={s.scanState}>
-          {pendingTsd ? <span className={s.badgeWarn}>ТСД {pendingTsd}: ждём сотрудника</span> : <span className={s.badgeOk}>Готов к сканированию</span>}
-          {scanMessage && <span className={s.meta}>{scanMessage}</span>}
-        </div>
-      </div>
-
       <div className={s.toolbar}>
         <button type="button" className="btn btn-primary" onClick={load} disabled={loading}>
           <RefreshCw size={14} strokeWidth={2} style={{ marginRight: 6 }} />
           {loading ? 'Загрузка...' : 'Обновить'}
         </button>
-        <select className={s.employeeSelect} value={selectedEmployeeId} onChange={e => setSelectedEmployeeId(e.target.value)}>
-          <option value="">Код сотрудника</option>
-          {employees.map(emp => (
-            <option key={emp.executorId} value={emp.executorId}>{emp.fio} · {emp.company || '—'}</option>
-          ))}
-        </select>
-        {selectedEmployee && employeeCode && (
-          <div className={s.employeeCode}>
-            <div className={s.employeeCodeInfo}>
-              <strong>{shortFio(selectedEmployee.fio)}</strong>
-              <span>{selectedEmployee.company || '—'}</span>
-            </div>
-            <Code128Barcode value={employeeCode} className={s.employeeBarcode} />
-          </div>
-        )}
-        <span className={s.meta}>Код сотрудника содержит EMP:UUID, его можно сканировать после ТСД</span>
+        <span className={s.meta}>Выдача и возврат ТСД вынесены в отдельный раздел</span>
       </div>
-
-      {activeAssignments.length > 0 && (
-        <div className={s.assignments}>
-          {activeAssignments.map(([executorId, rec]) => (
-            <span key={executorId} className={s.assignmentChip}>
-              {rec.tsd} · {shortFio(rec.fio || executorId)}
-              <button type="button" onClick={() => handleManualReturn(executorId, rec)} title="Вернуть ТСД">
-                <RotateCcw size={12} />
-              </button>
-            </span>
-          ))}
-        </div>
-      )}
 
       {error && <div className={s.empty}>{error}</div>}
 

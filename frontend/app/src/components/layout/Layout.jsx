@@ -14,6 +14,7 @@ const NAV_ITEMS = [
   { to: '/monitor',        Icon: Monitor,        label: 'Мониторинг',   module: 'monitor' },
   { to: '/analysis',       Icon: TrendingUp,     label: 'Анализ',       module: 'analysis' },
   { to: '/shift-plan',     Icon: Users,          label: 'План смены',   module: 'stats' },
+  { to: '/tsd',            Icon: ScanBarcode,    label: 'Выдача ТСД',   module: 'stats' },
   { to: '/consolidation',  Icon: Package,        label: 'Консолидация', module: 'consolidation' },
   { to: '/docs',           Icon: FileText,       label: 'Документы',    module: 'docs' },
   {
