@@ -51,6 +51,7 @@ export default function TsdIssuePage() {
   const [loading, setLoading] = useState(false)
   const [printItems, setPrintItems] = useState([])
   const [printRequested, setPrintRequested] = useState(false)
+  const [activeTab, setActiveTab] = useState('issue')
   const scanRef = useRef(null)
 
   const load = useCallback(async () => {
@@ -213,7 +214,6 @@ export default function TsdIssuePage() {
       <div className={s.header}>
         <div>
           <h1 className={s.title}>Выдача ТСД</h1>
-          <div className={s.subtitle}>QR сотрудников, выдача, возврат и печать</div>
         </div>
         <button type="button" className="btn btn-primary" onClick={load} disabled={loading}>
           <RefreshCw size={14} strokeWidth={2} style={{ marginRight: 6 }} />
@@ -221,91 +221,151 @@ export default function TsdIssuePage() {
         </button>
       </div>
 
-      <div className={s.scanPanel}>
-        <form className={s.scanForm} onSubmit={handleScanSubmit}>
-          <ScanLine size={16} />
-          <input
-            ref={scanRef}
-            className={s.scanInput}
-            value={scanValue}
-            onChange={e => setScanValue(e.target.value)}
-            placeholder={pendingTsd ? 'QR сотрудника' : 'ТСД или QR сотрудника'}
-            autoComplete="off"
-          />
-          <button type="submit" className="btn btn-primary btn-sm">ОК</button>
-        </form>
-        <span className={pendingTsd ? s.badgeWarn : s.badgeOk}>{pendingTsd ? `ТСД ${pendingTsd}` : 'Готово'}</span>
-        {message && <span className={s.meta}>{message}</span>}
+      <div className={s.tabs}>
+        <button type="button" className={`${s.tab} ${activeTab === 'issue' ? s.tabActive : ''}`} onClick={() => setActiveTab('issue')}>Выдача</button>
+        <button type="button" className={`${s.tab} ${activeTab === 'print' ? s.tabActive : ''}`} onClick={() => setActiveTab('print')}>Печать QR</button>
+        <button type="button" className={`${s.tab} ${activeTab === 'status' ? s.tabActive : ''}`} onClick={() => setActiveTab('status')}>Статусы</button>
       </div>
 
-      <div className={s.toolbar}>
-        <select className={s.input} value={company} onChange={e => setCompany(e.target.value)}>
-          <option value="">Все компании</option>
-          {companies.map(c => <option key={c} value={c}>{c}</option>)}
-        </select>
-        <input className={s.input} value={query} onChange={e => setQuery(e.target.value)} placeholder="ФИО" />
-        <button type="button" className="btn btn-secondary" onClick={toggleVisible}>
-          <span className={`${s.checkBox} ${visibleSelected ? s.checkBoxOn : ''}`} />
-          <span>Видимые</span>
-        </button>
-        <button type="button" className="btn btn-primary" onClick={() => printEmployees(selectedEmployees)}>
-          <Printer size={14} />
-          <span>Печать выбранных</span>
-        </button>
-        <button type="button" className="btn btn-secondary" onClick={() => printEmployees(filtered)}>
-          <Printer size={14} />
-          <span>{company ? 'Печать компании' : 'Печать списка'}</span>
-        </button>
-        <span className={s.meta}>Выбрано: {selectedIds.size}</span>
-      </div>
-
-      <div className={s.card}>
-        <div className={s.tableWrap}>
-          <table className={s.table}>
-            <thead>
-              <tr>
-                <th></th>
-                <th>Компания</th>
-                <th>Исполнитель</th>
-                <th>ТСД</th>
-                <th>Статус</th>
-                <th>Выдан</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map(emp => {
-                const active = assignments[emp.executorId]
-                return (
-                  <tr key={emp.executorId}>
-                    <td>
-                      <button type="button" className={s.iconBtn} onClick={() => toggleOne(emp.executorId)} aria-label="Выбрать">
-                        <span className={`${s.checkBox} ${selectedIds.has(emp.executorId) ? s.checkBoxOn : ''}`} />
-                      </button>
-                    </td>
-                    <td>{emp.company || '—'}</td>
-                    <td>{emp.fio}</td>
-                    <td>{active?.tsd || '—'}</td>
-                    <td><span className={active ? s.badgeWarn : s.badgeOk}>{active ? 'Не сдал' : 'Сдал'}</span></td>
-                    <td>{active?.assignedAt ? formatTime(active.assignedAt) : '—'}</td>
-                    <td className={s.actions}>
-                      <button type="button" className="btn btn-secondary btn-sm" onClick={() => printEmployees([emp])}>
-                        <Printer size={13} />
-                      </button>
-                      <button type="button" className="btn btn-secondary btn-sm" onClick={() => handleReturn(emp)} disabled={!active}>
-                        <RotateCcw size={13} />
-                      </button>
-                    </td>
-                  </tr>
-                )
-              })}
-              {!filtered.length && (
-                <tr><td colSpan="7" className={s.empty}>Нет сотрудников</td></tr>
-              )}
-            </tbody>
-          </table>
+      {activeTab === 'issue' && (
+        <div className={s.issueCard}>
+          <form className={s.scanForm} onSubmit={handleScanSubmit}>
+            <ScanLine size={18} />
+            <input
+              ref={scanRef}
+              className={s.scanInput}
+              value={scanValue}
+              onChange={e => setScanValue(e.target.value)}
+              placeholder={pendingTsd ? 'QR сотрудника' : 'ТСД или QR сотрудника'}
+              autoComplete="off"
+            />
+            <button type="submit" className="btn btn-primary">ОК</button>
+          </form>
+          <div className={s.issueState}>
+            <span className={pendingTsd ? s.badgeWarn : s.badgeOk}>{pendingTsd ? `ТСД ${pendingTsd}` : 'Готово'}</span>
+            {message && <span className={s.meta}>{message}</span>}
+          </div>
         </div>
-      </div>
+      )}
+
+      {activeTab === 'print' && (
+        <>
+          <div className={s.toolbar}>
+            <select className={s.input} value={company} onChange={e => setCompany(e.target.value)}>
+              <option value="">Все компании</option>
+              {companies.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <input className={s.input} value={query} onChange={e => setQuery(e.target.value)} placeholder="ФИО" />
+            <button type="button" className="btn btn-secondary" onClick={toggleVisible}>
+              <span className={`${s.checkBox} ${visibleSelected ? s.checkBoxOn : ''}`} />
+              <span>Видимые</span>
+            </button>
+            <button type="button" className="btn btn-primary" onClick={() => printEmployees(selectedEmployees)}>
+              <Printer size={14} />
+              <span>Печать выбранных</span>
+            </button>
+            <button type="button" className="btn btn-secondary" onClick={() => printEmployees(filtered)}>
+              <Printer size={14} />
+              <span>{company ? 'Печать компании' : 'Печать списка'}</span>
+            </button>
+            <span className={s.meta}>Выбрано: {selectedIds.size}</span>
+          </div>
+
+          <div className={s.card}>
+            <div className={s.tableWrap}>
+              <table className={s.table}>
+                <thead>
+                  <tr>
+                    <th></th>
+                    <th>Компания</th>
+                    <th>Исполнитель</th>
+                    <th>ТСД</th>
+                    <th>Статус</th>
+                    <th>Выдан</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map(emp => {
+                    const active = assignments[emp.executorId]
+                    return (
+                      <tr key={emp.executorId}>
+                        <td>
+                          <button type="button" className={s.iconBtn} onClick={() => toggleOne(emp.executorId)} aria-label="Выбрать">
+                            <span className={`${s.checkBox} ${selectedIds.has(emp.executorId) ? s.checkBoxOn : ''}`} />
+                          </button>
+                        </td>
+                        <td>{emp.company || '—'}</td>
+                        <td>{emp.fio}</td>
+                        <td>{active?.tsd || '—'}</td>
+                        <td><span className={active ? s.badgeWarn : s.badgeOk}>{active ? 'Не сдал' : 'Сдал'}</span></td>
+                        <td>{active?.assignedAt ? formatTime(active.assignedAt) : '—'}</td>
+                        <td className={s.actions}>
+                          <button type="button" className="btn btn-secondary btn-sm" onClick={() => printEmployees([emp])}>
+                            <Printer size={13} />
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                  {!filtered.length && (
+                    <tr><td colSpan="7" className={s.empty}>Нет сотрудников</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
+
+      {activeTab === 'status' && (
+        <>
+          <div className={s.toolbar}>
+            <select className={s.input} value={company} onChange={e => setCompany(e.target.value)}>
+              <option value="">Все компании</option>
+              {companies.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          <div className={s.card}>
+            <div className={s.tableWrap}>
+              <table className={s.table}>
+                <thead>
+                  <tr>
+                    <th>Компания</th>
+                    <th>Исполнитель</th>
+                    <th>ТСД</th>
+                    <th>Статус</th>
+                    <th>Выдан</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {employees
+                    .filter(emp => !company || emp.company === company)
+                    .sort((a, b) => (a.company || '').localeCompare(b.company || '', 'ru') || a.fio.localeCompare(b.fio, 'ru'))
+                    .map(emp => {
+                      const active = assignments[emp.executorId]
+                      return (
+                        <tr key={emp.executorId}>
+                          <td>{emp.company || '—'}</td>
+                          <td>{emp.fio}</td>
+                          <td>{active?.tsd || '—'}</td>
+                          <td><span className={active ? s.badgeWarn : s.badgeOk}>{active ? 'Не сдал' : 'Сдал'}</span></td>
+                          <td>{active?.assignedAt ? formatTime(active.assignedAt) : '—'}</td>
+                          <td className={s.actions}>
+                            <button type="button" className="btn btn-secondary btn-sm" onClick={() => handleReturn(emp)} disabled={!active}>
+                              <RotateCcw size={13} />
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
 
       {createPortal(printLayer, document.body)}
     </div>

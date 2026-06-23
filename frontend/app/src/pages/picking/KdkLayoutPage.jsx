@@ -264,7 +264,6 @@ export default function KdkLayoutPage() {
           <RefreshCw size={14} strokeWidth={2} style={{ marginRight: 6 }} />
           {loading ? 'Загрузка...' : 'Обновить'}
         </button>
-        <span className={s.meta}>Выдача и возврат ТСД вынесены в отдельный раздел</span>
       </div>
 
       {error && <div className={s.empty}>{error}</div>}
