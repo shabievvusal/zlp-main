@@ -184,6 +184,34 @@
   color: var(--text);
 }
 
+.checkBox {
+  position: relative;
+  display: inline-flex;
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+  border: 1.5px solid #9ca3af;
+  border-radius: 4px;
+  background: #fff;
+}
+
+.checkBoxOn {
+  border-color: var(--green);
+  background: var(--green);
+}
+
+.checkBoxOn::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 4px;
+  height: 8px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
 .badgeOk,
 .badgeWarn {
   display: inline-flex;
@@ -217,13 +245,13 @@
 }
 
 .printLabel {
-  width: 42mm;
-  height: 56mm;
+  width: 100mm;
+  height: 75mm;
   display: grid;
-  grid-template-rows: 38mm auto auto;
+  grid-template-rows: 52mm 9mm 9mm;
   align-items: center;
   justify-items: center;
-  padding: 3mm;
+  padding: 3mm 5mm;
   break-inside: avoid;
   page-break-inside: avoid;
   border: 1px solid #e5e7eb;
@@ -232,8 +260,8 @@
 }
 
 .printQr {
-  width: 36mm;
-  height: 36mm;
+  width: 50mm;
+  height: 50mm;
 }
 
 .printName {
@@ -241,7 +269,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font: 700 10pt/1.15 Arial, sans-serif;
+  font: 700 17pt/1.1 Arial, sans-serif;
 }
 
 .printCompany {
@@ -249,8 +277,8 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: #4b5563;
-  font: 8pt/1.1 Arial, sans-serif;
+  color: #111827;
+  font: 700 15pt/1.1 Arial, sans-serif;
 }
 
 @media (max-width: 760px) {
@@ -283,15 +311,16 @@
     position: fixed;
     inset: 0;
     display: grid;
-    grid-template-columns: repeat(4, 42mm);
+    grid-template-columns: 100mm;
     align-content: start;
     justify-content: start;
-    gap: 4mm;
-    padding: 4mm;
+    gap: 0;
+    padding: 0;
     background: #fff;
   }
 
   @page {
-    margin: 4mm;
+    size: 100mm 75mm;
+    margin: 0;
   }
 }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { CheckSquare, Printer, RefreshCw, RotateCcw, ScanLine, Square } from 'lucide-react'
+import { Printer, RefreshCw, RotateCcw, ScanLine } from 'lucide-react'
 import QrCodeSvg from '../../components/QrCodeSvg.jsx'
 import { assignTsd, getEmployees, getTsdAssignments, returnTsd } from '../../api/index.js'
 import { formatTime, shortFio } from '../../utils/format.js'
@@ -225,7 +225,7 @@ export default function TsdIssuePage() {
         </select>
         <input className={s.input} value={query} onChange={e => setQuery(e.target.value)} placeholder="ФИО" />
         <button type="button" className="btn btn-secondary" onClick={toggleVisible}>
-          {visibleSelected ? <CheckSquare size={14} /> : <Square size={14} />}
+          <span className={`${s.checkBox} ${visibleSelected ? s.checkBoxOn : ''}`} />
           <span>Видимые</span>
         </button>
         <button type="button" className="btn btn-primary" onClick={() => printEmployees(selectedEmployees)}>
@@ -260,7 +260,7 @@ export default function TsdIssuePage() {
                   <tr key={emp.executorId}>
                     <td>
                       <button type="button" className={s.iconBtn} onClick={() => toggleOne(emp.executorId)} aria-label="Выбрать">
-                        {selectedIds.has(emp.executorId) ? <CheckSquare size={16} /> : <Square size={16} />}
+                        <span className={`${s.checkBox} ${selectedIds.has(emp.executorId) ? s.checkBoxOn : ''}`} />
                       </button>
                     </td>
                     <td>{emp.company || '—'}</td>
@@ -291,8 +291,8 @@ export default function TsdIssuePage() {
         {printItems.map(emp => (
           <div key={emp.executorId} className={s.printLabel}>
             <QrCodeSvg value={employeeCode(emp.executorId)} className={s.printQr} title={emp.fio} />
-            <div className={s.printName}>{shortFio(emp.fio)}</div>
             <div className={s.printCompany}>{emp.company || '—'}</div>
+            <div className={s.printName}>{shortFio(emp.fio)}</div>
           </div>
         ))}
       </div>
