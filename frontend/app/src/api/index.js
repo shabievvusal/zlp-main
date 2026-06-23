@@ -340,6 +340,26 @@ export async function findUnregisteredEmployees() {
   return req('/api/empl/find-unregistered')
 }
 
+export async function getTsdAssignments() {
+  return req('/api/tsd-assignments')
+}
+
+export async function assignTsd({ executorId, fio, company, tsd }) {
+  return req('/api/tsd-assignments/assign', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ executorId, fio, company, tsd }),
+  })
+}
+
+export async function returnTsd(executorId) {
+  return req('/api/tsd-assignments/return', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ executorId }),
+  })
+}
+
 export async function getLiveMonitor() {
   const r = await fetch('/api/monitor/live', { credentials })
   const text = await r.text()

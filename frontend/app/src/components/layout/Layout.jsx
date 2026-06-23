@@ -23,7 +23,7 @@ const NAV_ITEMS = [
     module: 'stats',
     children: [
       { to: '/picking/piece-selection', Icon: ListChecks, label: 'Штучный отбор', module: 'stats' },
-      { to: '/picking/kdk-layout', Icon: Boxes, label: 'Раскладка КДК', module: 'stats' },
+      { to: '/picking/kdk-layout', Icon: Boxes, label: 'Зависшие задачи', module: 'stats' },
       { to: '/picking/eo-search', Icon: ScanBarcode, label: 'Поиск ЕО', module: 'stats' },
     ],
   },

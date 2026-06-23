@@ -16,6 +16,7 @@ const rkStorage = process.env.USE_PG === 'true'
   ? require('./route-rk-pg')
   : require('./route-rk-storage');
 const emplPg = process.env.USE_PG === 'true' ? require('./empl-pg') : null;
+const tsdPg = process.env.USE_PG === 'true' ? require('./tsd-pg') : null;
 const s3Storage = require('./s3');
 const excelReports = require('./excel-reports');
 const consolidationReports = require('./consolidation-reports');
@@ -1024,6 +1025,47 @@ app.post('/api/empl', async (req, res) => {
   } catch (err) {
     console.error('POST /api/empl', err);
     res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+function requireTsdPg(res) {
+  if (tsdPg) return true;
+  res.status(503).json({ ok: false, error: 'Выдача ТСД требует PostgreSQL и USE_PG=true' });
+  return false;
+}
+
+app.get('/api/tsd-assignments', vsSessionRequired, async (_req, res) => {
+  try {
+    if (!requireTsdPg(res)) return;
+    const assignments = await tsdPg.listActive();
+    res.json({ assignments });
+  } catch (err) {
+    console.error('GET /api/tsd-assignments', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/tsd-assignments/assign', vsSessionRequired, async (req, res) => {
+  try {
+    if (!requireTsdPg(res)) return;
+    const assignment = await tsdPg.assign(req.body || {});
+    const assignments = await tsdPg.listActive();
+    res.json({ ok: true, assignment, assignments });
+  } catch (err) {
+    console.error('POST /api/tsd-assignments/assign', err);
+    res.status(400).json({ ok: false, error: err.message });
+  }
+});
+
+app.post('/api/tsd-assignments/return', vsSessionRequired, async (req, res) => {
+  try {
+    if (!requireTsdPg(res)) return;
+    const assignment = await tsdPg.returnByExecutor(req.body?.executorId);
+    const assignments = await tsdPg.listActive();
+    res.json({ ok: true, assignment, assignments });
+  } catch (err) {
+    console.error('POST /api/tsd-assignments/return', err);
+    res.status(400).json({ ok: false, error: err.message });
   }
 });
 
@@ -3662,6 +3704,7 @@ async function startServer() {
     console.log('[pg] Инициализация PostgreSQL...');
     await rkStorage.init();
     await emplPg.init();
+    await tsdPg.init();
     console.log('[pg] PostgreSQL готов');
   }
   app.listen(PORT, '0.0.0.0', () => {
