@@ -45,6 +45,7 @@ export default function TsdIssuePage() {
   const [selectedIds, setSelectedIds] = useState(() => new Set())
   const [company, setCompany] = useState('')
   const [query, setQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
   const [scanValue, setScanValue] = useState('')
   const [pendingTsd, setPendingTsd] = useState('')
   const [message, setMessage] = useState('')
@@ -52,6 +53,7 @@ export default function TsdIssuePage() {
   const [printItems, setPrintItems] = useState([])
   const [printRequested, setPrintRequested] = useState(false)
   const [activeTab, setActiveTab] = useState('issue')
+  const [sort, setSort] = useState({ key: 'company', dir: 'asc' })
   const scanRef = useRef(null)
 
   const load = useCallback(async () => {
@@ -93,13 +95,50 @@ export default function TsdIssuePage() {
     return [...new Set(employees.map(e => e.company).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ru'))
   }, [employees])
 
+  const getEmployeeStatus = useCallback((emp) => assignments[emp.executorId] ? 'not_returned' : 'returned', [assignments])
+
+  const toggleSort = (key) => {
+    setSort(prev => prev.key === key
+      ? { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' }
+      : { key, dir: 'asc' }
+    )
+  }
+
+  const sortMark = key => sort.key === key ? (sort.dir === 'asc' ? '↑' : '↓') : '↕'
+
+  const sortEmployees = useCallback((list) => {
+    const direction = sort.dir === 'asc' ? 1 : -1
+    return [...list].sort((a, b) => {
+      const activeA = assignments[a.executorId]
+      const activeB = assignments[b.executorId]
+      let diff = 0
+      if (sort.key === 'company') diff = (a.company || '').localeCompare(b.company || '', 'ru')
+      else if (sort.key === 'fio') diff = (a.fio || '').localeCompare(b.fio || '', 'ru')
+      else if (sort.key === 'tsd') diff = (activeA?.tsd || '').localeCompare(activeB?.tsd || '', 'ru')
+      else if (sort.key === 'status') diff = getEmployeeStatus(a).localeCompare(getEmployeeStatus(b), 'ru')
+      else if (sort.key === 'assignedAt') {
+        diff = (activeA?.assignedAt ? new Date(activeA.assignedAt).getTime() : 0) -
+          (activeB?.assignedAt ? new Date(activeB.assignedAt).getTime() : 0)
+      }
+      return diff * direction || (a.company || '').localeCompare(b.company || '', 'ru') || (a.fio || '').localeCompare(b.fio || '', 'ru')
+    })
+  }, [assignments, getEmployeeStatus, sort])
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
-    return employees
+    const list = employees
       .filter(emp => !company || emp.company === company)
+      .filter(emp => statusFilter === 'all' || getEmployeeStatus(emp) === statusFilter)
       .filter(emp => !q || `${emp.fio} ${emp.company}`.toLowerCase().includes(q))
-      .sort((a, b) => (a.company || '').localeCompare(b.company || '', 'ru') || a.fio.localeCompare(b.fio, 'ru'))
-  }, [company, employees, query])
+    return sortEmployees(list)
+  }, [company, employees, getEmployeeStatus, query, sortEmployees, statusFilter])
+
+  const statusEmployees = useMemo(() => {
+    const list = employees
+      .filter(emp => !company || emp.company === company)
+      .filter(emp => statusFilter === 'all' || getEmployeeStatus(emp) === statusFilter)
+    return sortEmployees(list)
+  }, [company, employees, getEmployeeStatus, sortEmployees, statusFilter])
 
   const selectedEmployees = useMemo(() => {
     return [...selectedIds].map(id => employeesById.get(id)).filter(Boolean)
@@ -266,6 +305,11 @@ export default function TsdIssuePage() {
               <option value="">Все компании</option>
               {companies.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
+            <select className={s.input} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+              <option value="all">Все статусы</option>
+              <option value="not_returned">Не сдал</option>
+              <option value="returned">Сдал</option>
+            </select>
             <input className={s.input} value={query} onChange={e => setQuery(e.target.value)} placeholder="ФИО" />
             <button type="button" className="btn btn-secondary" onClick={toggleVisible}>
               <span className={`${s.checkBox} ${visibleSelected ? s.checkBoxOn : ''}`} />
@@ -284,15 +328,15 @@ export default function TsdIssuePage() {
 
           <div className={s.card}>
             <div className={s.tableWrap}>
-              <table className={s.table}>
+              <table className={`${s.table} ${s.printTable}`}>
                 <thead>
                   <tr>
                     <th></th>
-                    <th>Компания</th>
-                    <th>Исполнитель</th>
-                    <th>ТСД</th>
-                    <th>Статус</th>
-                    <th>Выдан</th>
+                    <th><button type="button" className={s.sortBtn} onClick={() => toggleSort('company')}>Компания <span>{sortMark('company')}</span></button></th>
+                    <th><button type="button" className={s.sortBtn} onClick={() => toggleSort('fio')}>Исполнитель <span>{sortMark('fio')}</span></button></th>
+                    <th><button type="button" className={s.sortBtn} onClick={() => toggleSort('tsd')}>ТСД <span>{sortMark('tsd')}</span></button></th>
+                    <th><button type="button" className={s.sortBtn} onClick={() => toggleSort('status')}>Статус <span>{sortMark('status')}</span></button></th>
+                    <th><button type="button" className={s.sortBtn} onClick={() => toggleSort('assignedAt')}>Выдан <span>{sortMark('assignedAt')}</span></button></th>
                     <th></th>
                   </tr>
                 </thead>
@@ -336,24 +380,27 @@ export default function TsdIssuePage() {
               <option value="">Все компании</option>
               {companies.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
+            <select className={s.input} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+              <option value="all">Все статусы</option>
+              <option value="not_returned">Не сдал</option>
+              <option value="returned">Сдал</option>
+            </select>
           </div>
           <div className={s.card}>
             <div className={s.tableWrap}>
-              <table className={s.table}>
+              <table className={`${s.table} ${s.statusTable}`}>
                 <thead>
                   <tr>
-                    <th>Компания</th>
-                    <th>Исполнитель</th>
-                    <th>ТСД</th>
-                    <th>Статус</th>
-                    <th>Выдан</th>
+                    <th><button type="button" className={s.sortBtn} onClick={() => toggleSort('company')}>Компания <span>{sortMark('company')}</span></button></th>
+                    <th><button type="button" className={s.sortBtn} onClick={() => toggleSort('fio')}>Исполнитель <span>{sortMark('fio')}</span></button></th>
+                    <th><button type="button" className={s.sortBtn} onClick={() => toggleSort('tsd')}>ТСД <span>{sortMark('tsd')}</span></button></th>
+                    <th><button type="button" className={s.sortBtn} onClick={() => toggleSort('status')}>Статус <span>{sortMark('status')}</span></button></th>
+                    <th><button type="button" className={s.sortBtn} onClick={() => toggleSort('assignedAt')}>Выдан <span>{sortMark('assignedAt')}</span></button></th>
                     <th></th>
                   </tr>
                 </thead>
                 <tbody>
-                  {employees
-                    .filter(emp => !company || emp.company === company)
-                    .sort((a, b) => (a.company || '').localeCompare(b.company || '', 'ru') || a.fio.localeCompare(b.fio, 'ru'))
+                  {statusEmployees
                     .map(emp => {
                       const active = assignments[emp.executorId]
                       return (
