@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Printer, RefreshCw, RotateCcw, ScanLine } from 'lucide-react'
 import QrCodeSvg from '../../components/QrCodeSvg.jsx'
 import { assignTsd, getEmployees, getTsdAssignments, returnTsd } from '../../api/index.js'
@@ -195,6 +196,18 @@ export default function TsdIssuePage() {
     }
   }
 
+  const printLayer = (
+    <div className={s.printPortal}>
+      {printItems.map(emp => (
+        <div key={emp.executorId} className={s.printLabel}>
+          <QrCodeSvg value={employeeCode(emp.executorId)} className={s.printQr} title={emp.fio} />
+          <div className={s.printCompany}>{emp.company || '—'}</div>
+          <div className={s.printName}>{shortFio(emp.fio)}</div>
+        </div>
+      ))}
+    </div>
+  )
+
   return (
     <div className={s.page}>
       <div className={s.header}>
@@ -294,15 +307,7 @@ export default function TsdIssuePage() {
         </div>
       </div>
 
-      <div className={s.printSheet}>
-        {printItems.map(emp => (
-          <div key={emp.executorId} className={s.printLabel}>
-            <QrCodeSvg value={employeeCode(emp.executorId)} className={s.printQr} title={emp.fio} />
-            <div className={s.printCompany}>{emp.company || '—'}</div>
-            <div className={s.printName}>{shortFio(emp.fio)}</div>
-          </div>
-        ))}
-      </div>
+      {createPortal(printLayer, document.body)}
     </div>
   )
 }

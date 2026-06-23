@@ -240,7 +240,7 @@
   text-align: center;
 }
 
-.printSheet {
+.printPortal {
   display: none;
 }
 
@@ -298,19 +298,17 @@
 }
 
 @media print {
-  :global(body.tsd-printing) .page > :not(.printSheet) {
+  :global(body.tsd-printing #root) {
     display: none !important;
   }
 
-  :global(body.tsd-printing) .page {
-    width: 100mm;
-    min-width: 100mm;
-    max-width: 100mm;
+  :global(body.tsd-printing) {
     margin: 0;
     padding: 0;
+    background: #fff;
   }
 
-  :global(body.tsd-printing) .printSheet {
+  :global(body.tsd-printing) .printPortal {
     display: grid;
     grid-template-columns: 100mm;
     align-content: start;
