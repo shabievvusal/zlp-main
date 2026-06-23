@@ -77,12 +77,14 @@
 }
 
 .issueCard {
+  position: relative;
   display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: center;
-  gap: 12px;
-  max-width: 900px;
+  justify-items: center;
+  gap: 14px;
+  max-width: 560px;
+  min-height: 320px;
   margin-bottom: 12px;
+  cursor: text;
 }
 
 .toolbar {
@@ -90,19 +92,55 @@
 }
 
 .scanForm {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 340px;
-  flex: 1;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
 }
 
-.issueState {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
+.scanVisual {
+  display: grid;
+  justify-items: center;
   gap: 8px;
-  flex-wrap: wrap;
+  padding-top: 28px;
+  text-align: center;
+}
+
+.scanIcon {
+  display: grid;
+  place-items: center;
+  width: 132px;
+  height: 132px;
+  border: 1.5px solid #bbf7d0;
+  border-radius: 28px;
+  background: #f0fdf4;
+  color: var(--green);
+}
+
+.scanTitle {
+  margin-top: 6px;
+  color: var(--text);
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.scanHint,
+.issueHint {
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.issueHint {
+  min-height: 22px;
+  max-width: 460px;
+  text-align: center;
+  font-weight: 600;
+}
+
+.hiddenSubmit {
+  display: none;
 }
 
 .scanInput,
@@ -347,15 +385,6 @@
     grid-template-columns: 1fr;
   }
 
-  .issueCard {
-    grid-template-columns: 1fr;
-  }
-
-  .issueState {
-    justify-content: flex-start;
-  }
-
-  .scanForm,
   .scanInput,
   .input {
     min-width: 100%;

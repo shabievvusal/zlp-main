@@ -73,6 +73,11 @@ export default function TsdIssuePage() {
   }, [load])
 
   useEffect(() => {
+    if (activeTab !== 'issue') return
+    scanRef.current?.focus()
+  }, [activeTab, pendingTsd])
+
+  useEffect(() => {
     if (!printRequested || !printItems.length) return
     schedulePrint()
     setPrintRequested(false)
@@ -228,22 +233,28 @@ export default function TsdIssuePage() {
       </div>
 
       {activeTab === 'issue' && (
-        <div className={s.issueCard}>
+        <div className={s.issueCard} onClick={() => scanRef.current?.focus()}>
           <form className={s.scanForm} onSubmit={handleScanSubmit}>
-            <ScanLine size={18} />
             <input
               ref={scanRef}
               className={s.scanInput}
               value={scanValue}
               onChange={e => setScanValue(e.target.value)}
-              placeholder={pendingTsd ? 'QR сотрудника' : 'ТСД или QR сотрудника'}
               autoComplete="off"
             />
-            <button type="submit" className="btn btn-primary">ОК</button>
+            <button type="submit" className={s.hiddenSubmit}>ОК</button>
           </form>
-          <div className={s.issueState}>
-            <span className={pendingTsd ? s.badgeWarn : s.badgeOk}>{pendingTsd ? `ТСД ${pendingTsd}` : 'Готово'}</span>
-            {message && <span className={s.meta}>{message}</span>}
+          <div className={s.scanVisual}>
+            <div className={s.scanIcon}>
+              <ScanLine size={72} strokeWidth={1.7} />
+            </div>
+            <div className={s.scanTitle}>{pendingTsd ? 'Сканируйте QR сотрудника' : 'Сканируйте ТСД'}</div>
+            <div className={s.scanHint}>
+              {pendingTsd ? `ТСД ${pendingTsd} считан` : 'Сканер готов к работе'}
+            </div>
+          </div>
+          <div className={s.issueHint}>
+            {message || (pendingTsd ? 'После QR сотрудника ТСД будет закреплён за ним' : 'Для возврата можно сразу сканировать QR сотрудника')}
           </div>
         </div>
       )}
