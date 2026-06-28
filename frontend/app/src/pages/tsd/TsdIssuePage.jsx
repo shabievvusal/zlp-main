@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Printer, RefreshCw, RotateCcw, ScanLine } from 'lucide-react'
+import { Printer, RotateCcw, ScanLine } from 'lucide-react'
 import QrCodeSvg from '../../components/QrCodeSvg.jsx'
 import { assignTsd, getEmployees, getTsdAssignments, returnTsdByBarcode } from '../../api/index.js'
 import { formatTime, shortFio } from '../../utils/format.js'
@@ -73,30 +73,42 @@ export default function TsdIssuePage() {
   const [scanValue, setScanValue] = useState('')
   const [pendingTsd, setPendingTsd] = useState(null)
   const [message, setMessage] = useState('')
-  const [loading, setLoading] = useState(false)
   const [printItems, setPrintItems] = useState([])
   const [printRequested, setPrintRequested] = useState(false)
   const [activeTab, setActiveTab] = useState('issue')
   const [sort, setSort] = useState({ key: 'company', dir: 'asc' })
   const scanRef = useRef(null)
 
-  const load = useCallback(async () => {
-    setLoading(true)
+  const load = useCallback(async ({ clearMessage = false } = {}) => {
     try {
       const [employeesData, assignmentsData] = await Promise.all([getEmployees(), getTsdAssignments()])
       setEmployees((employeesData?.employees || []).filter(e => e.executorId))
       setAssignments(assignmentsData?.assignments || [])
       setTsdSettings(assignmentsData?.settings || { totalCount: 0 })
-      setMessage('')
+      if (clearMessage) setMessage('')
     } catch (err) {
       setMessage(err.message || 'Ошибка загрузки')
-    } finally {
-      setLoading(false)
     }
   }, [])
 
   useEffect(() => {
-    load()
+    load({ clearMessage: true })
+  }, [load])
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      load().catch(() => {})
+    }, 10_000)
+    const refreshOnFocus = () => {
+      if (document.visibilityState === 'visible') load().catch(() => {})
+    }
+    document.addEventListener('visibilitychange', refreshOnFocus)
+    window.addEventListener('focus', refreshOnFocus)
+    return () => {
+      window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', refreshOnFocus)
+      window.removeEventListener('focus', refreshOnFocus)
+    }
   }, [load])
 
   useEffect(() => {
@@ -319,10 +331,6 @@ export default function TsdIssuePage() {
         <div>
           <h1 className={s.title}>Выдача ТСД</h1>
         </div>
-        <button type="button" className="btn btn-primary" onClick={load} disabled={loading}>
-          <RefreshCw size={14} strokeWidth={2} style={{ marginRight: 6 }} />
-          {loading ? 'Загрузка...' : 'Обновить'}
-        </button>
       </div>
 
       <div className={s.tabs}>
