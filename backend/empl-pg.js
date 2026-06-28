@@ -5,6 +5,8 @@
  *   executor_id  TEXT PRIMARY KEY  — UUID из WMS (executorId из часовых JSON)
  *   fio          TEXT NOT NULL     — ФИО сотрудника
  *   company      TEXT DEFAULT ''   — компания / подрядчик
+ *   phone        TEXT DEFAULT ''   — номер телефона
+ *   password     TEXT DEFAULT ''   — пароль/пин для учётки
  */
 
 const pg = require('pg');
@@ -51,9 +53,13 @@ async function init() {
     CREATE TABLE IF NOT EXISTS employees (
       executor_id  TEXT PRIMARY KEY,
       fio          TEXT NOT NULL,
-      company      TEXT NOT NULL DEFAULT ''
+      company      TEXT NOT NULL DEFAULT '',
+      phone        TEXT NOT NULL DEFAULT '',
+      password     TEXT NOT NULL DEFAULT ''
     )
   `);
+  await pool.query('ALTER TABLE employees ADD COLUMN IF NOT EXISTS phone TEXT NOT NULL DEFAULT \'\'');
+  await pool.query('ALTER TABLE employees ADD COLUMN IF NOT EXISTS password TEXT NOT NULL DEFAULT \'\'');
   await pool.query(`CREATE INDEX IF NOT EXISTS employees_fio_idx ON employees (lower(fio))`);
   await refreshCache();
 }
@@ -94,8 +100,14 @@ function getCompanyByFio(emplMap, executorFio) {
 
 /** Возвращает [{fio, company}] + [companies] */
 async function listEmployees() {
-  const { rows } = await pool.query('SELECT executor_id, fio, company FROM employees ORDER BY fio');
-  const employees = rows.map(r => ({ executorId: r.executor_id, fio: r.fio, company: r.company || '' }));
+  const { rows } = await pool.query('SELECT executor_id, fio, company, phone, password FROM employees ORDER BY fio');
+  const employees = rows.map(r => ({
+    executorId: r.executor_id,
+    fio: r.fio,
+    company: r.company || '',
+    phone: r.phone || '',
+    password: r.password || '',
+  }));
   const companySet = new Set(employees.map(e => e.company).filter(Boolean));
   return { employees, companies: [...companySet].sort() };
 }
@@ -106,17 +118,19 @@ async function listEmployees() {
  * Добавить или обновить сотрудника.
  * Сотрудники сохраняются только по реальному executor_id.
  */
-async function upsertEmployee({ executorId, fio, company }) {
+async function upsertEmployee({ executorId, fio, company, phone, password }) {
   const id = (executorId || '').trim();
   const f  = String(fio || '').trim();
   const c  = String(company != null ? company : '').trim();
+  const p  = String(phone != null ? phone : '').trim();
+  const pw = String(password != null ? password : '').trim();
   if (!id) throw new Error('executorId обязателен для сохранения сотрудника');
   if (!f) throw new Error('ФИО обязательно');
   await pool.query(
-    `INSERT INTO employees (executor_id, fio, company)
-     VALUES ($1, $2, $3)
-     ON CONFLICT (executor_id) DO UPDATE SET fio = $2, company = $3`,
-    [id, f, c]
+    `INSERT INTO employees (executor_id, fio, company, phone, password)
+     VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT (executor_id) DO UPDATE SET fio = $2, company = $3, phone = $4, password = $5`,
+    [id, f, c, p, pw]
   );
   await refreshCache();
 }
@@ -180,14 +194,16 @@ async function saveAll(employees) {
   try {
     await client.query('BEGIN');
     await client.query('TRUNCATE employees');
-    for (const { executorId, fio, company } of employees) {
+    for (const { executorId, fio, company, phone, password } of employees) {
       const id = (executorId || '').trim();
       const f  = String(fio || '').trim();
       const c  = String(company != null ? company : '').trim();
+      const p  = String(phone != null ? phone : '').trim();
+      const pw = String(password != null ? password : '').trim();
       if (!f || !id) continue;
       await client.query(
-        'INSERT INTO employees (executor_id, fio, company) VALUES ($1, $2, $3) ON CONFLICT (executor_id) DO UPDATE SET fio=$2, company=$3',
-        [id, f, c]
+        'INSERT INTO employees (executor_id, fio, company, phone, password) VALUES ($1, $2, $3, $4, $5) ON CONFLICT (executor_id) DO UPDATE SET fio=$2, company=$3, phone=$4, password=$5',
+        [id, f, c, p, pw]
       );
     }
     await client.query('COMMIT');

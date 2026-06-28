@@ -63,6 +63,36 @@
   box-shadow: var(--shadow-sm);
 }
 
+.counters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(120px, 1fr));
+  gap: 10px;
+  max-width: 560px;
+  margin-bottom: 14px;
+}
+
+.counter {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-card);
+  box-shadow: var(--shadow-sm);
+}
+
+.counter span {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.counter strong {
+  color: var(--text);
+  font-size: 22px;
+  line-height: 1;
+}
+
 .issueCard,
 .toolbar {
   display: flex;
@@ -412,12 +442,17 @@
   }
 
   .tabs,
+  .counters,
   .tab {
     width: 100%;
   }
 
   .tabs {
     display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .counters {
     grid-template-columns: 1fr;
   }
 

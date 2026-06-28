@@ -74,7 +74,8 @@ function assignmentsToMap(list) {
   const map = {}
   for (const rec of list || []) {
     if (!rec.executorId) continue
-    map[rec.executorId] = rec
+    if (!map[rec.executorId]) map[rec.executorId] = []
+    map[rec.executorId].push(rec)
   }
   return map
 }
@@ -150,6 +151,11 @@ export default function KdkLayoutPage() {
   const [error, setError] = useState('')
   const [lastUpdated, setLastUpdated] = useState('')
   const [sort, setSort] = useState({ key: 'lastActionAt', dir: 'asc' })
+  const [operationFilter, setOperationFilter] = useState('')
+  const [companyFilter, setCompanyFilter] = useState('')
+  const [tsdStatusFilter, setTsdStatusFilter] = useState('')
+  const [idleFilter, setIdleFilter] = useState('')
+  const [query, setQuery] = useState('')
 
   const reloadAssignments = useCallback(async () => {
     const data = await getTsdAssignments()
@@ -222,30 +228,55 @@ export default function KdkLayoutPage() {
   }, [emplIdMap, emplMap, forceRefresh, getToken, isTokenValid, reloadAssignments])
 
   const rowsWithTsd = useMemo(() => rows.map(row => {
-    const assignment = row.executorId ? assignments[row.executorId] : null
+    const activeList = row.executorId ? assignments[row.executorId] || [] : []
     const idleMs = row.lastActionAt ? Date.now() - new Date(row.lastActionAt).getTime() : null
     return {
       ...row,
-      tsd: assignment?.tsd || '',
-      tsdStatus: assignment ? 'Не сдал' : 'Сдал',
+      tsd: activeList.map(rec => rec.tsd).filter(Boolean).join(', '),
+      tsdStatus: activeList.length ? 'Не сдал' : 'Сдал',
       idle: idleMs == null ? false : idleMs > IDLE_LIMIT_MS,
       idleMs,
     }
   }), [assignments, rows])
 
+  const operations = useMemo(() => {
+    return [...new Set(rowsWithTsd.map(row => row.operation).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ru'))
+  }, [rowsWithTsd])
+
+  const companies = useMemo(() => {
+    return [...new Set(rowsWithTsd.map(row => row.company).filter(Boolean).filter(value => value !== '—'))].sort((a, b) => a.localeCompare(b, 'ru'))
+  }, [rowsWithTsd])
+
+  const filteredRows = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    return rowsWithTsd
+      .filter(row => !operationFilter || row.operation === operationFilter)
+      .filter(row => !companyFilter || row.company === companyFilter)
+      .filter(row => !tsdStatusFilter || row.tsdStatus === tsdStatusFilter)
+      .filter(row => !idleFilter || (idleFilter === 'idle' ? row.idle : !row.idle))
+      .filter(row => !q || `${row.operation} ${row.company} ${row.executor} ${row.tsd} ${row.task}`.toLowerCase().includes(q))
+  }, [companyFilter, idleFilter, operationFilter, query, rowsWithTsd, tsdStatusFilter])
+
   const sorted = useMemo(() => {
     const direction = sort.dir === 'asc' ? 1 : -1
-    return [...rowsWithTsd].sort((a, b) => {
+    return [...filteredRows].sort((a, b) => {
       let diff = 0
       if (sort.key === 'operation') diff = (a.operation || '').localeCompare(b.operation || '', 'ru')
       else if (sort.key === 'company') diff = (a.company || '').localeCompare(b.company || '', 'ru')
       else if (sort.key === 'executor') diff = (a.executor || '').localeCompare(b.executor || '', 'ru')
+      else if (sort.key === 'pieces') {
+        const aNum = Number(a.pieces)
+        const bNum = Number(b.pieces)
+        const aValue = Number.isFinite(aNum) ? aNum : -1
+        const bValue = Number.isFinite(bNum) ? bNum : -1
+        diff = aValue - bValue
+      }
       else if (sort.key === 'lastActionAt') {
         diff = (a.lastActionAt ? new Date(a.lastActionAt).getTime() : 0) - (b.lastActionAt ? new Date(b.lastActionAt).getTime() : 0)
       }
       return diff * direction || (a.company || '').localeCompare(b.company || '', 'ru') || (a.executor || '').localeCompare(b.executor || '', 'ru')
     })
-  }, [rowsWithTsd, sort])
+  }, [filteredRows, sort])
 
   const sortMark = key => sort.key === key ? (sort.dir === 'desc' ? '↓' : '↑') : '↕'
 
@@ -264,6 +295,30 @@ export default function KdkLayoutPage() {
           <RefreshCw size={14} strokeWidth={2} style={{ marginRight: 6 }} />
           {loading ? 'Загрузка...' : 'Обновить'}
         </button>
+        <select className={s.input} value={operationFilter} onChange={e => setOperationFilter(e.target.value)}>
+          <option value="">Все операции</option>
+          {operations.map(value => <option key={value} value={value}>{value}</option>)}
+        </select>
+        <select className={s.input} value={companyFilter} onChange={e => setCompanyFilter(e.target.value)}>
+          <option value="">Все компании</option>
+          {companies.map(value => <option key={value} value={value}>{value}</option>)}
+        </select>
+        <select className={s.input} value={tsdStatusFilter} onChange={e => setTsdStatusFilter(e.target.value)}>
+          <option value="">Все статусы ТСД</option>
+          <option value="Не сдал">Не сдал</option>
+          <option value="Сдал">Сдал</option>
+        </select>
+        <select className={s.input} value={idleFilter} onChange={e => setIdleFilter(e.target.value)}>
+          <option value="">Весь простой</option>
+          <option value="idle">Больше 5 минут</option>
+          <option value="active">До 5 минут</option>
+        </select>
+        <input
+          className={`${s.input} ${s.searchInput}`}
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          placeholder="Исполнитель, ТСД, ЕО"
+        />
       </div>
 
       {error && <div className={s.empty}>{error}</div>}
@@ -282,7 +337,7 @@ export default function KdkLayoutPage() {
                   <th>ТСД</th>
                   <th>Статус ТСД</th>
                   <th>Задача / ЕО</th>
-                  <th className={s.num}>Остаток</th>
+                  <th className={s.num}><button type="button" className={s.sortBtn} onClick={() => toggleSort('pieces')}>Остаток <span>{sortMark('pieces')}</span></button></th>
                   <th><button type="button" className={s.sortBtn} onClick={() => toggleSort('lastActionAt')}>Последнее действие <span>{sortMark('lastActionAt')}</span></button></th>
                   <th>Простой</th>
                 </tr>
@@ -307,6 +362,9 @@ export default function KdkLayoutPage() {
                     <td>{row.lastActionAt ? <span className={row.idle ? s.idleText : ''}>{fmtAgo(row.lastActionAt)}</span> : '—'}</td>
                   </tr>
                 ))}
+                {!sorted.length && (
+                  <tr><td colSpan="9" className={s.empty}>Нет задач</td></tr>
+                )}
               </tbody>
             </table>
           </div>

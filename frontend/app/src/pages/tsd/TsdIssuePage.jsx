@@ -2,14 +2,24 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Printer, RefreshCw, RotateCcw, ScanLine } from 'lucide-react'
 import QrCodeSvg from '../../components/QrCodeSvg.jsx'
-import { assignTsd, getEmployees, getTsdAssignments, returnTsd } from '../../api/index.js'
+import { assignTsd, getEmployees, getTsdAssignments, returnTsdByBarcode } from '../../api/index.js'
 import { formatTime, shortFio } from '../../utils/format.js'
 import s from './TsdIssuePage.module.css'
 
-function assignmentsToMap(list) {
+function assignmentsToEmployeeMap(list) {
   const map = {}
   for (const rec of list || []) {
-    if (rec.executorId) map[rec.executorId] = rec
+    if (!rec.executorId) continue
+    if (!map[rec.executorId]) map[rec.executorId] = []
+    map[rec.executorId].push(rec)
+  }
+  return map
+}
+
+function assignmentsToTsdMap(list) {
+  const map = {}
+  for (const rec of list || []) {
+    if (rec.tsd) map[rec.tsd] = rec
   }
   return map
 }
@@ -41,13 +51,14 @@ function schedulePrint() {
 
 export default function TsdIssuePage() {
   const [employees, setEmployees] = useState([])
-  const [assignments, setAssignments] = useState({})
+  const [assignments, setAssignments] = useState([])
+  const [tsdSettings, setTsdSettings] = useState({ totalCount: 0 })
   const [selectedIds, setSelectedIds] = useState(() => new Set())
   const [company, setCompany] = useState('')
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [scanValue, setScanValue] = useState('')
-  const [pendingTsd, setPendingTsd] = useState('')
+  const [pendingTsd, setPendingTsd] = useState(null)
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
   const [printItems, setPrintItems] = useState([])
@@ -61,7 +72,8 @@ export default function TsdIssuePage() {
     try {
       const [employeesData, assignmentsData] = await Promise.all([getEmployees(), getTsdAssignments()])
       setEmployees((employeesData?.employees || []).filter(e => e.executorId))
-      setAssignments(assignmentsToMap(assignmentsData?.assignments || []))
+      setAssignments(assignmentsData?.assignments || [])
+      setTsdSettings(assignmentsData?.settings || { totalCount: 0 })
       setMessage('')
     } catch (err) {
       setMessage(err.message || 'Ошибка загрузки')
@@ -95,7 +107,13 @@ export default function TsdIssuePage() {
     return [...new Set(employees.map(e => e.company).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ru'))
   }, [employees])
 
-  const getEmployeeStatus = useCallback((emp) => assignments[emp.executorId] ? 'not_returned' : 'returned', [assignments])
+  const assignmentsByEmployee = useMemo(() => assignmentsToEmployeeMap(assignments), [assignments])
+  const assignmentsByTsd = useMemo(() => assignmentsToTsdMap(assignments), [assignments])
+  const issuedCount = assignments.length
+  const totalTsdCount = Number(tsdSettings.totalCount) || 0
+  const remainingTsdCount = Math.max(0, totalTsdCount - issuedCount)
+
+  const getEmployeeStatus = useCallback((emp) => assignmentsByEmployee[emp.executorId]?.length ? 'not_returned' : 'returned', [assignmentsByEmployee])
 
   const toggleSort = (key) => {
     setSort(prev => prev.key === key
@@ -109,20 +127,20 @@ export default function TsdIssuePage() {
   const sortEmployees = useCallback((list) => {
     const direction = sort.dir === 'asc' ? 1 : -1
     return [...list].sort((a, b) => {
-      const activeA = assignments[a.executorId]
-      const activeB = assignments[b.executorId]
+      const listA = assignmentsByEmployee[a.executorId] || []
+      const listB = assignmentsByEmployee[b.executorId] || []
       let diff = 0
       if (sort.key === 'company') diff = (a.company || '').localeCompare(b.company || '', 'ru')
       else if (sort.key === 'fio') diff = (a.fio || '').localeCompare(b.fio || '', 'ru')
-      else if (sort.key === 'tsd') diff = (activeA?.tsd || '').localeCompare(activeB?.tsd || '', 'ru')
+      else if (sort.key === 'tsd') diff = (listA.map(x => x.tsd).join(', ') || '').localeCompare(listB.map(x => x.tsd).join(', ') || '', 'ru')
       else if (sort.key === 'status') diff = getEmployeeStatus(a).localeCompare(getEmployeeStatus(b), 'ru')
       else if (sort.key === 'assignedAt') {
-        diff = (activeA?.assignedAt ? new Date(activeA.assignedAt).getTime() : 0) -
-          (activeB?.assignedAt ? new Date(activeB.assignedAt).getTime() : 0)
+        diff = (listA[0]?.assignedAt ? new Date(listA[0].assignedAt).getTime() : 0) -
+          (listB[0]?.assignedAt ? new Date(listB[0].assignedAt).getTime() : 0)
       }
       return diff * direction || (a.company || '').localeCompare(b.company || '', 'ru') || (a.fio || '').localeCompare(b.fio || '', 'ru')
     })
-  }, [assignments, getEmployeeStatus, sort])
+  }, [assignmentsByEmployee, getEmployeeStatus, sort])
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -140,6 +158,14 @@ export default function TsdIssuePage() {
     return sortEmployees(list)
   }, [company, employees, getEmployeeStatus, sortEmployees, statusFilter])
 
+  const statusRows = useMemo(() => {
+    return statusEmployees.flatMap(emp => {
+      const activeList = assignmentsByEmployee[emp.executorId] || []
+      if (!activeList.length) return [{ key: emp.executorId, employee: emp, assignment: null }]
+      return activeList.map(rec => ({ key: `${emp.executorId}-${rec.tsd}`, employee: emp, assignment: rec }))
+    })
+  }, [assignmentsByEmployee, statusEmployees])
+
   const selectedEmployees = useMemo(() => {
     return [...selectedIds].map(id => employeesById.get(id)).filter(Boolean)
   }, [employeesById, selectedIds])
@@ -148,7 +174,8 @@ export default function TsdIssuePage() {
 
   const reloadAssignments = useCallback(async () => {
     const data = await getTsdAssignments()
-    setAssignments(assignmentsToMap(data?.assignments || []))
+    setAssignments(data?.assignments || [])
+    setTsdSettings(data?.settings || { totalCount: 0 })
   }, [])
 
   const processScan = useCallback(async (raw) => {
@@ -161,33 +188,49 @@ export default function TsdIssuePage() {
         setMessage('После ТСД нужен QR сотрудника')
         return
       }
+      if (pendingTsd.mode === 'return') {
+        const res = await returnTsdByBarcode({
+          tsd: pendingTsd.tsd,
+          returnedByExecutorId: employee.executorId,
+          returnedByFio: employee.fio,
+          returnedByCompany: employee.company || '',
+        })
+        await reloadAssignments()
+        if (res.foreignReturn) {
+          setMessage(`Внимание: ТСД ${pendingTsd.tsd} числился за ${pendingTsd.assignment?.fio || 'другим сотрудником'}, вернул ${employee.fio}`)
+        } else {
+          setMessage(`ТСД ${pendingTsd.tsd} возвращен: ${employee.fio}`)
+        }
+        setPendingTsd(null)
+        return
+      }
+
       await assignTsd({
         executorId: employee.executorId,
         fio: employee.fio,
         company: employee.company || '',
-        tsd: pendingTsd,
+        tsd: pendingTsd.tsd,
       })
       await reloadAssignments()
-      setMessage(`ТСД ${pendingTsd} выдан: ${employee.fio}`)
-      setPendingTsd('')
+      setMessage(`ТСД ${pendingTsd.tsd} выдан: ${employee.fio}`)
+      setPendingTsd(null)
       return
     }
 
     if (employee?.executorId) {
-      const active = assignments[employee.executorId]
-      if (!active) {
-        setMessage('Нет активной выдачи')
-        return
-      }
-      await returnTsd(employee.executorId)
-      await reloadAssignments()
-      setMessage(`ТСД ${active.tsd} возвращен: ${employee.fio}`)
+      setMessage('Для возврата сначала сканируйте ТСД')
       return
     }
 
-    setPendingTsd(code)
-    setMessage(`ТСД ${code}`)
-  }, [assignments, employeesById, pendingTsd, reloadAssignments])
+    const activeAssignment = assignmentsByTsd[code]
+    if (activeAssignment) {
+      setPendingTsd({ tsd: code, mode: 'return', assignment: activeAssignment })
+      setMessage(`ТСД ${code} числится за ${activeAssignment.fio}. Сканируйте QR того, кто вернул`)
+    } else {
+      setPendingTsd({ tsd: code, mode: 'assign' })
+      setMessage(`ТСД ${code}`)
+    }
+  }, [assignmentsByTsd, employeesById, pendingTsd, reloadAssignments])
 
   const handleScanSubmit = async (event) => {
     event.preventDefault()
@@ -229,11 +272,15 @@ export default function TsdIssuePage() {
     setPrintRequested(true)
   }
 
-  const handleReturn = async (emp) => {
-    const active = assignments[emp.executorId]
+  const handleReturn = async (emp, active) => {
     if (!active) return
     try {
-      await returnTsd(emp.executorId)
+      await returnTsdByBarcode({
+        tsd: active.tsd,
+        returnedByExecutorId: emp.executorId,
+        returnedByFio: emp.fio,
+        returnedByCompany: emp.company || '',
+      })
       await reloadAssignments()
       setMessage(`ТСД ${active.tsd} возвращен: ${emp.fio}`)
     } catch (err) {
@@ -271,6 +318,12 @@ export default function TsdIssuePage() {
         <button type="button" className={`${s.tab} ${activeTab === 'status' ? s.tabActive : ''}`} onClick={() => setActiveTab('status')}>Статусы</button>
       </div>
 
+      <div className={s.counters}>
+        <div className={s.counter}><span>Рабочих ТСД</span><strong>{totalTsdCount}</strong></div>
+        <div className={s.counter}><span>Выдано</span><strong>{issuedCount}</strong></div>
+        <div className={s.counter}><span>Остаток</span><strong>{remainingTsdCount}</strong></div>
+      </div>
+
       {activeTab === 'issue' && (
         <div className={s.issueCard} onClick={() => scanRef.current?.focus()}>
           <form className={s.scanForm} onSubmit={handleScanSubmit}>
@@ -289,11 +342,13 @@ export default function TsdIssuePage() {
             </div>
             <div className={s.scanTitle}>{pendingTsd ? 'Сканируйте QR сотрудника' : 'Сканируйте ТСД'}</div>
             <div className={s.scanHint}>
-              {pendingTsd ? `ТСД ${pendingTsd} считан` : 'Сканер готов к работе'}
+              {pendingTsd ? `ТСД ${pendingTsd.tsd} считан` : 'Сканер готов к работе'}
             </div>
           </div>
           <div className={s.issueHint}>
-            {message || (pendingTsd ? 'После QR сотрудника ТСД будет закреплён за ним' : 'Для возврата можно сразу сканировать QR сотрудника')}
+            {message || (pendingTsd
+              ? (pendingTsd.mode === 'return' ? 'После QR сотрудника ТСД будет возвращён' : 'После QR сотрудника ТСД будет закреплён за ним')
+              : 'Для возврата сначала сканируйте ТСД')}
           </div>
         </div>
       )}
@@ -342,7 +397,7 @@ export default function TsdIssuePage() {
                 </thead>
                 <tbody>
                   {filtered.map(emp => {
-                    const active = assignments[emp.executorId]
+                    const activeList = assignmentsByEmployee[emp.executorId] || []
                     return (
                       <tr key={emp.executorId}>
                         <td>
@@ -352,9 +407,9 @@ export default function TsdIssuePage() {
                         </td>
                         <td>{emp.company || '—'}</td>
                         <td>{emp.fio}</td>
-                        <td>{active?.tsd || '—'}</td>
-                        <td><span className={active ? s.badgeWarn : s.badgeOk}>{active ? 'Не сдал' : 'Сдал'}</span></td>
-                        <td>{active?.assignedAt ? formatTime(active.assignedAt) : '—'}</td>
+                        <td title={activeList.map(x => x.tsd).join(', ')}>{activeList.length ? activeList.map(x => x.tsd).join(', ') : '—'}</td>
+                        <td><span className={activeList.length ? s.badgeWarn : s.badgeOk}>{activeList.length ? 'Не сдал' : 'Сдал'}</span></td>
+                        <td>{activeList[0]?.assignedAt ? formatTime(activeList[0].assignedAt) : '—'}</td>
                         <td className={s.actions}>
                           <button type="button" className="btn btn-secondary btn-sm" onClick={() => printEmployees([emp])}>
                             <Printer size={13} />
@@ -400,18 +455,19 @@ export default function TsdIssuePage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {statusEmployees
-                    .map(emp => {
-                      const active = assignments[emp.executorId]
+                  {statusRows
+                    .map(row => {
+                      const emp = row.employee
+                      const active = row.assignment
                       return (
-                        <tr key={emp.executorId}>
+                        <tr key={row.key}>
                           <td>{emp.company || '—'}</td>
                           <td>{emp.fio}</td>
                           <td>{active?.tsd || '—'}</td>
                           <td><span className={active ? s.badgeWarn : s.badgeOk}>{active ? 'Не сдал' : 'Сдал'}</span></td>
                           <td>{active?.assignedAt ? formatTime(active.assignedAt) : '—'}</td>
                           <td className={s.actions}>
-                            <button type="button" className="btn btn-secondary btn-sm" onClick={() => handleReturn(emp)} disabled={!active}>
+                            <button type="button" className="btn btn-secondary btn-sm" onClick={() => handleReturn(emp, active)} disabled={!active}>
                               <RotateCcw size={13} />
                             </button>
                           </td>

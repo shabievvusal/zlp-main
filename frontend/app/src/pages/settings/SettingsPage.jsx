@@ -7,7 +7,7 @@ import { normalizeFio } from '../../utils/emplUtils.js'
 import { formatDateTime } from '../../utils/format.js'
 import {
   Users, Send, Lock, Settings, RefreshCw, Scale,
-  User, UserCircle, Trash2, X, Upload, Download, Clock, Theater, FileText,
+  User, UserCircle, Trash2, X, Upload, Download, Clock, Theater, FileText, ScanBarcode,
 } from 'lucide-react'
 import s from './SettingsPage.module.css'
 
@@ -560,6 +560,14 @@ function EmplRow({ row, onChange, onDelete }) {
           onChange={e => onChange('company', e.target.value)} />
       </td>
       <td>
+        <input className={s.emplInput} type="text" value={row.phone || ''}
+          onChange={e => onChange('phone', e.target.value)} placeholder="Телефон" />
+      </td>
+      <td>
+        <input className={s.emplInput} type="text" value={row.password || ''}
+          onChange={e => onChange('password', e.target.value)} placeholder="Пароль" />
+      </td>
+      <td>
         <button className={s.btnIconDel} onClick={onDelete} title="Удалить"><X size={13} strokeWidth={2}/></button>
       </td>
     </tr>
@@ -589,7 +597,14 @@ function EmployeesCard() {
       const employees = res.employees || []
       const companies = res.companies || emplCompanies
       setAllCompanies(companies)
-      const withIds = employees.map(e => ({ fio: titleCaseFio(e.fio), company: e.company || '', executorId: e.executorId || null, _id: e.executorId || nextId() }))
+      const withIds = employees.map(e => ({
+        fio: titleCaseFio(e.fio),
+        company: e.company || '',
+        phone: e.phone || '',
+        password: e.password || '',
+        executorId: e.executorId || null,
+        _id: e.executorId || nextId(),
+      }))
       baseRowsRef.current = withIds
       setRows(withIds)
       setInfo(employees.length
@@ -643,9 +658,9 @@ function EmployeesCard() {
     [noCompanyList, localSaved]
   )
 
-  const doSaveEmpl = useCallback(async (fio, company, executorId = null) => {
+  const doSaveEmpl = useCallback(async (fio, company, executorId = null, phone = '', password = '') => {
     try {
-      const data = await api.saveEmplOne(fio, company, executorId)
+      const data = await api.saveEmplOne(fio, company, executorId, phone, password)
       if (data.ok) {
         notify('Сохранено', 'success')
         if (executorId) setLocalSaved(prev => new Set([...prev, `id:${executorId}`]))
@@ -666,7 +681,7 @@ function EmployeesCard() {
   }
 
 const handleAddRow = () => {
-    const newRow = { fio: '', company: '', executorId: null, _id: nextId() }
+    const newRow = { fio: '', company: '', phone: '', password: '', executorId: null, _id: nextId() }
     setRows(prev => [newRow, ...prev])
     baseRowsRef.current = [newRow, ...baseRowsRef.current]
   }
@@ -692,7 +707,14 @@ const handleAddRow = () => {
         const trimmed = line.trim()
         if (!trimmed) continue
         const cols = trimmed.split(sep).map(c => c.trim().replace(/^"|"$/g, ''))
-        if (cols[0]) imported.push({ fio: titleCaseFio(cols[0]), company: cols[1] || '', executorId: null, _id: nextId() })
+        if (cols[0]) imported.push({
+          fio: titleCaseFio(cols[0]),
+          company: cols[1] || '',
+          phone: cols[2] || '',
+          password: cols[3] || '',
+          executorId: null,
+          _id: nextId(),
+        })
       }
       baseRowsRef.current = imported
       setRows(imported)
@@ -704,7 +726,8 @@ const handleAddRow = () => {
 
   const handleExportCsv = () => {
     if (!rows.length) { notify('Нет данных для экспорта', 'error'); return }
-    const csv = rows.map(r => r.fio + ';' + r.company).join('\r\n')
+    const clean = value => String(value || '').replace(/[\r\n;]/g, ' ')
+    const csv = rows.map(r => [clean(r.fio), clean(r.company), clean(r.phone), clean(r.password)].join(';')).join('\r\n')
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -721,7 +744,13 @@ const handleAddRow = () => {
       const k = `id:${r.executorId}`
       if (!seen.has(k)) {
         seen.add(k)
-        all.push({ fio: r.fio, company: r.company, executorId: r.executorId || null })
+        all.push({
+          fio: r.fio,
+          company: r.company,
+          phone: r.phone || '',
+          password: r.password || '',
+          executorId: r.executorId || null,
+        })
       }
     }
     try {
@@ -795,7 +824,10 @@ const handleAddRow = () => {
       }
       if (!search) return true
       const q = search.toLowerCase()
-      return r.fio.toLowerCase().includes(q) || r.company.toLowerCase().includes(q)
+      return r.fio.toLowerCase().includes(q) ||
+        r.company.toLowerCase().includes(q) ||
+        String(r.phone || '').toLowerCase().includes(q) ||
+        String(r.password || '').toLowerCase().includes(q)
     }).map(r => r._id)
   )
   const filteredRows = rows.filter(r => baseFiltered.has(r._id))
@@ -944,6 +976,8 @@ const handleAddRow = () => {
                 <tr>
                   <th style={{ minWidth: 240 }}>ФИО</th>
                   <th style={{ minWidth: 180 }}>Компания</th>
+                  <th style={{ minWidth: 150 }}>Телефон</th>
+                  <th style={{ minWidth: 130 }}>Пароль</th>
                   <th style={{ width: 40 }} />
                 </tr>
               </thead>
@@ -957,7 +991,7 @@ const handleAddRow = () => {
                   />
                 )) : (
                   <tr>
-                    <td colSpan={3} className={s.emptyRow}>
+                    <td colSpan={5} className={s.emptyRow}>
                       {rows.length ? 'Ничего не найдено' : 'Нет сотрудников — добавьте вручную или загрузите CSV'}
                     </td>
                   </tr>
@@ -1435,6 +1469,69 @@ function RolesCard({ roles, onChanged }) {
 
 // ─── Product weights card ────────────────────────────────────────────────────
 
+function TsdSettingsCard() {
+  const notify = useNotify()
+  const [totalCount, setTotalCount] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const load = useCallback(async () => {
+    try {
+      const data = await api.getTsdSettings()
+      setTotalCount(String(data?.totalCount ?? 0))
+    } catch {
+      setTotalCount('0')
+    }
+  }, [])
+
+  useEffect(() => { load() }, [load])
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      const data = await api.updateTsdSettings(totalCount)
+      setTotalCount(String(data?.totalCount ?? 0))
+      notify('Количество ТСД сохранено', 'success')
+    } catch (err) {
+      notify('Ошибка: ' + err.message, 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className={s.card}>
+      <div className={s.cardHeader}>
+        <div className={s.cardIcon}><ScanBarcode size={22} strokeWidth={1.5}/></div>
+        <div className={s.cardHeaderText}>
+          <div className={s.cardTitle}>ТСД</div>
+          <div className={s.cardSub}>Общее количество рабочих устройств</div>
+        </div>
+      </div>
+      <div className={s.settingsBody}>
+        <div className={s.settingRow} style={{ padding: '16px 20px', alignItems: 'center', gap: 16 }}>
+          <div className={s.settingInfo}>
+            <div className={s.settingLabel}>Рабочих ТСД</div>
+            <div className={s.settingDesc}>Используется для расчёта остатка в разделе выдачи ТСД</div>
+          </div>
+          <input
+            className="form-control"
+            style={{ width: 120 }}
+            type="number"
+            min="0"
+            value={totalCount}
+            onChange={e => setTotalCount(e.target.value)}
+          />
+        </div>
+        <div className={s.settingsActions}>
+          <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+            {saving ? 'Сохранение...' : 'Сохранить'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function ProductWeightsCard() {
   const notify = useNotify()
   const fileRef = useRef(null)
@@ -1753,6 +1850,7 @@ export default function SettingsPage() {
         {visitedTabs.has('system') && isNonManager && (
           <div style={hide('system')}>
             <AutoFetchCard />
+            <TsdSettingsCard />
             <ProductWeightsCard />
           </div>
         )}

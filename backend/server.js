@@ -819,13 +819,15 @@ function saveEmplIdRegistry(registry) {
   fs.writeFileSync(EMPL_IDS_PATH, JSON.stringify(registry || {}, null, 2), 'utf8');
 }
 
-function upsertEmplIdRegistry(executorId, fio, company) {
+function upsertEmplIdRegistry(executorId, fio, company, phone = '', password = '') {
   const id = String(executorId || '').trim();
   if (!id) return;
   const registry = loadEmplIdRegistry();
   registry[id] = {
     fio: String(fio || '').trim(),
     company: String(company || '').trim(),
+    phone: String(phone || '').trim(),
+    password: String(password || '').trim(),
   };
   saveEmplIdRegistry(registry);
 }
@@ -840,9 +842,12 @@ function parseEmplCsvEmployees() {
     if (!t) continue;
     const idx = t.indexOf(';');
     if (idx < 0) continue;
-    const fio = t.slice(0, idx).trim();
-    const company = t.slice(idx + 1).trim();
-    if (fio) employees.push({ fio, company });
+    const cols = t.split(';').map(value => value.trim());
+    const fio = cols[0] || '';
+    const company = cols[1] || '';
+    const phone = cols[2] || '';
+    const password = cols[3] || '';
+    if (fio) employees.push({ fio, company, phone, password });
   }
   return employees;
 }
@@ -851,7 +856,13 @@ function listCsvEmployeesWithIds() {
   const registry = loadEmplIdRegistry();
   return Object.entries(registry)
     .filter(([, rec]) => rec?.fio)
-    .map(([executorId, rec]) => ({ executorId, fio: rec.fio, company: rec.company || '' }))
+    .map(([executorId, rec]) => ({
+      executorId,
+      fio: rec.fio,
+      company: rec.company || '',
+      phone: rec.phone || '',
+      password: rec.password || '',
+    }))
     .sort((a, b) => a.fio.localeCompare(b.fio, 'ru'));
 }
 
@@ -864,8 +875,15 @@ function writeEmployeesCsvAndIds(employees) {
     const executorId = String(row?.executorId || '').trim();
     if (!fio || !executorId) continue;
     const company = String(row?.company || '').trim();
-    lines.push(fio.replace(/;/g, ',') + ';' + company.replace(/[\r\n]/g, ' '));
-    registry[executorId] = { fio, company };
+    const phone = String(row?.phone || '').trim();
+    const password = String(row?.password || '').trim();
+    lines.push([
+      fio.replace(/;/g, ','),
+      company.replace(/[\r\n;]/g, ' '),
+      phone.replace(/[\r\n;]/g, ' '),
+      password.replace(/[\r\n;]/g, ' '),
+    ].join(';'));
+    registry[executorId] = { fio, company, phone, password };
   }
   fs.writeFileSync(EMPL_CSV_PATH, Buffer.from('\uFEFF' + lines.join('\n'), 'utf8'));
   saveEmplIdRegistry(registry);
@@ -1006,7 +1024,7 @@ function appendToEmplCsv(fio, company) {
 
 app.post('/api/empl', async (req, res) => {
   try {
-    const { fio, company, executorId } = req.body || {};
+    const { fio, company, executorId, phone, password } = req.body || {};
     if (!fio || typeof fio !== 'string' || !fio.trim()) {
       return res.status(400).json({ ok: false, error: 'Укажите ФИО' });
     }
@@ -1014,12 +1032,20 @@ app.post('/api/empl', async (req, res) => {
       return res.status(400).json({ ok: false, error: 'executorId обязателен' });
     }
     if (emplPg) {
-      await emplPg.upsertEmployee({ executorId, fio: fio.trim(), company: (company != null ? String(company) : '').trim() });
+      await emplPg.upsertEmployee({
+        executorId,
+        fio: fio.trim(),
+        company: (company != null ? String(company) : '').trim(),
+        phone: (phone != null ? String(phone) : '').trim(),
+        password: (password != null ? String(password) : '').trim(),
+      });
     } else {
       const cleanFio = fio.trim();
       const cleanCompany = (company != null ? String(company) : '').trim();
+      const cleanPhone = (phone != null ? String(phone) : '').trim();
+      const cleanPassword = (password != null ? String(password) : '').trim();
       appendToEmplCsv(cleanFio, cleanCompany);
-      upsertEmplIdRegistry(executorId, cleanFio, cleanCompany);
+      upsertEmplIdRegistry(executorId, cleanFio, cleanCompany, cleanPhone, cleanPassword);
     }
     res.json({ ok: true });
   } catch (err) {
@@ -1038,7 +1064,8 @@ app.get('/api/tsd-assignments', vsSessionRequired, async (_req, res) => {
   try {
     if (!requireTsdPg(res)) return;
     const assignments = await tsdPg.listActive();
-    res.json({ assignments });
+    const settings = await tsdPg.getSettings();
+    res.json({ assignments, settings });
   } catch (err) {
     console.error('GET /api/tsd-assignments', err);
     res.status(500).json({ error: err.message });
@@ -1050,7 +1077,8 @@ app.post('/api/tsd-assignments/assign', vsSessionRequired, async (req, res) => {
     if (!requireTsdPg(res)) return;
     const assignment = await tsdPg.assign(req.body || {});
     const assignments = await tsdPg.listActive();
-    res.json({ ok: true, assignment, assignments });
+    const settings = await tsdPg.getSettings();
+    res.json({ ok: true, assignment, assignments, settings });
   } catch (err) {
     console.error('POST /api/tsd-assignments/assign', err);
     res.status(400).json({ ok: false, error: err.message });
@@ -1062,9 +1090,43 @@ app.post('/api/tsd-assignments/return', vsSessionRequired, async (req, res) => {
     if (!requireTsdPg(res)) return;
     const assignment = await tsdPg.returnByExecutor(req.body?.executorId);
     const assignments = await tsdPg.listActive();
-    res.json({ ok: true, assignment, assignments });
+    const settings = await tsdPg.getSettings();
+    res.json({ ok: true, assignment, assignments, settings });
   } catch (err) {
     console.error('POST /api/tsd-assignments/return', err);
+    res.status(400).json({ ok: false, error: err.message });
+  }
+});
+
+app.post('/api/tsd-assignments/return-tsd', vsSessionRequired, async (req, res) => {
+  try {
+    if (!requireTsdPg(res)) return;
+    const result = await tsdPg.returnByTsd(req.body || {});
+    const assignments = await tsdPg.listActive();
+    const settings = await tsdPg.getSettings();
+    res.json({ ok: true, ...result, assignments, settings });
+  } catch (err) {
+    console.error('POST /api/tsd-assignments/return-tsd', err);
+    res.status(400).json({ ok: false, error: err.message });
+  }
+});
+
+app.get('/api/tsd-settings', vsSessionRequired, async (_req, res) => {
+  try {
+    if (!requireTsdPg(res)) return;
+    res.json(await tsdPg.getSettings());
+  } catch (err) {
+    console.error('GET /api/tsd-settings', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.put('/api/tsd-settings', vsSessionRequired, async (req, res) => {
+  try {
+    if (!requireTsdPg(res)) return;
+    res.json({ ok: true, ...(await tsdPg.setSettings(req.body || {})) });
+  } catch (err) {
+    console.error('PUT /api/tsd-settings', err);
     res.status(400).json({ ok: false, error: err.message });
   }
 });
@@ -2256,10 +2318,12 @@ app.post('/api/employees', async (req, res) => {
         for (const line of csv.replace(/\r\n/g, '\n').split('\n')) {
           const t = line.trim();
           if (!t) continue;
-          const idx = t.indexOf(';');
-          const fio = idx >= 0 ? t.slice(0, idx).trim() : t.trim();
-          const company = idx >= 0 ? t.slice(idx + 1).trim() : '';
-          if (fio) parsed.push({ fio, company });
+          const cols = t.split(';').map(value => value.trim());
+          const fio = cols[0] || '';
+          const company = cols[1] || '';
+          const phone = cols[2] || '';
+          const password = cols[3] || '';
+          if (fio) parsed.push({ fio, company, phone, password });
         }
         await emplPg.saveAll(parsed);
         const data = await emplPg.listEmployees();

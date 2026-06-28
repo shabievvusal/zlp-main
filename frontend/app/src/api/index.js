@@ -312,11 +312,17 @@ export async function putRollcall(shiftKey, present) {
   })
 }
 
-export async function saveEmplOne(fio, company, executorId = null) {
+export async function saveEmplOne(fio, company, executorId = null, phone = '', password = '') {
   return req('/api/empl', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fio: (fio || '').trim(), company: (company != null ? String(company) : '').trim(), executorId: executorId || undefined }),
+    body: JSON.stringify({
+      fio: (fio || '').trim(),
+      company: (company != null ? String(company) : '').trim(),
+      executorId: executorId || undefined,
+      phone: (phone != null ? String(phone) : '').trim(),
+      password: (password != null ? String(password) : '').trim(),
+    }),
   })
 }
 
@@ -357,6 +363,26 @@ export async function returnTsd(executorId) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ executorId }),
+  })
+}
+
+export async function returnTsdByBarcode({ tsd, returnedByExecutorId, returnedByFio, returnedByCompany }) {
+  return req('/api/tsd-assignments/return-tsd', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tsd, returnedByExecutorId, returnedByFio, returnedByCompany }),
+  })
+}
+
+export async function getTsdSettings() {
+  return req('/api/tsd-settings')
+}
+
+export async function updateTsdSettings(totalCount) {
+  return req('/api/tsd-settings', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ totalCount }),
   })
 }
 
