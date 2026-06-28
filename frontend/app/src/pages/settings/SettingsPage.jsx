@@ -19,8 +19,10 @@ const VS_MODULE_LABELS = {
   settings: 'Настройки', shipments: 'Отгрузка',
   receive: 'Форма отгрузки', consolidation_form: 'Форма консолидации',
   reports: 'Отчёты', supplies: 'Поставки',
+  picking: 'Комплектация', shift_plan: 'План смены',
+  tsd: 'Выдача ТСД', violations: 'Нарушения',
 }
-const ALL_MODULES = ['stats', 'data', 'monitor', 'analysis', 'consolidation', 'docs', 'settings', 'shipments', 'receive', 'consolidation_form', 'reports', 'supplies']
+const ALL_MODULES = ['stats', 'data', 'monitor', 'analysis', 'consolidation', 'docs', 'settings', 'shipments', 'receive', 'consolidation_form', 'reports', 'supplies', 'picking', 'shift_plan', 'tsd', 'violations']
 
 const VS_ACTION_LABELS = {
   fetch_data:      'Обновить данные',

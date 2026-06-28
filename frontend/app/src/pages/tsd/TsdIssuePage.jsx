@@ -28,8 +28,21 @@ function employeeCode(executorId) {
   return executorId ? `EMP:${executorId}` : ''
 }
 
+const RU_TO_EN_KEYBOARD = {
+  й: 'q', ц: 'w', у: 'e', к: 'r', е: 't', н: 'y', г: 'u', ш: 'i', щ: 'o', з: 'p', х: '[', ъ: ']',
+  ф: 'a', ы: 's', в: 'd', а: 'f', п: 'g', р: 'h', о: 'j', л: 'k', д: 'l', ж: ';', э: "'",
+  я: 'z', ч: 'x', с: 'c', м: 'v', и: 'b', т: 'n', ь: 'm', б: ',', ю: '.', ё: '`',
+  Й: 'Q', Ц: 'W', У: 'E', К: 'R', Е: 'T', Н: 'Y', Г: 'U', Ш: 'I', Щ: 'O', З: 'P', Х: '{', Ъ: '}',
+  Ф: 'A', Ы: 'S', В: 'D', А: 'F', П: 'G', Р: 'H', О: 'J', Л: 'K', Д: 'L', Ж: ':', Э: '"',
+  Я: 'Z', Ч: 'X', С: 'C', М: 'V', И: 'B', Т: 'N', Ь: 'M', Б: '<', Ю: '>', Ё: '~',
+}
+
+function normalizeScannerCode(raw) {
+  return String(raw || '').trim().replace(/[а-яёА-ЯЁ]/g, ch => RU_TO_EN_KEYBOARD[ch] || ch)
+}
+
 function extractEmployeeCode(raw) {
-  const value = String(raw || '').trim()
+  const value = normalizeScannerCode(raw)
   if (!value) return ''
   return value.startsWith('EMP:') ? value.slice(4).trim() : value
 }
@@ -179,7 +192,7 @@ export default function TsdIssuePage() {
   }, [])
 
   const processScan = useCallback(async (raw) => {
-    const code = String(raw || '').trim()
+    const code = normalizeScannerCode(raw)
     if (!code) return
     const employee = employeesById.get(extractEmployeeCode(code))
 

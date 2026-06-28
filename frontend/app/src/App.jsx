@@ -68,11 +68,11 @@ function AppRoutes() {
             <Route path="/supplies" element={<ModuleRoute module="supplies"><SuppliesPage /></ModuleRoute>} />
             <Route path="/supplies/:taskType/:id" element={<ModuleRoute module="supplies"><SupplyDetailPage /></ModuleRoute>} />
             <Route path="/picking" element={<Navigate to="/picking/piece-selection" replace />} />
-            <Route path="/picking/piece-selection" element={<ModuleRoute module="stats"><PieceSelectionPage /></ModuleRoute>} />
-            <Route path="/picking/kdk-layout" element={<ModuleRoute module="stats"><KdkLayoutPage /></ModuleRoute>} />
-            <Route path="/picking/eo-search" element={<ModuleRoute module="stats"><EoSearchPage /></ModuleRoute>} />
-            <Route path="/shift-plan" element={<ModuleRoute module="stats"><ShiftPlanPage /></ModuleRoute>} />
-            <Route path="/tsd" element={<ModuleRoute module="stats"><TsdIssuePage /></ModuleRoute>} />
+            <Route path="/picking/piece-selection" element={<ModuleRoute module="picking"><PieceSelectionPage /></ModuleRoute>} />
+            <Route path="/picking/kdk-layout" element={<ModuleRoute module="picking"><KdkLayoutPage /></ModuleRoute>} />
+            <Route path="/picking/eo-search" element={<ModuleRoute module="picking"><EoSearchPage /></ModuleRoute>} />
+            <Route path="/shift-plan" element={<ModuleRoute module="shift_plan"><ShiftPlanPage /></ModuleRoute>} />
+            <Route path="/tsd" element={<ModuleRoute module="tsd"><TsdIssuePage /></ModuleRoute>} />
             <Route path="/settings" element={<ModuleRoute module="settings"><SettingsPage /></ModuleRoute>} />
             <Route path="/reports" element={<ModuleRoute module="reports"><ReportsPage /></ModuleRoute>} />
             <Route path="/violations" element={<ModuleRoute module="violations"><ViolationsPage /></ModuleRoute>} />

@@ -1603,7 +1603,7 @@ app.get('/api/node/sso/login', (req, res) => {
   }
   const sid = vsAuth.createSession({
     role: 'developer',
-    modules: ['stats', 'data', 'monitor', 'analysis', 'consolidation', 'docs', 'settings', 'shipments', 'reports'],
+    modules: ['stats', 'data', 'monitor', 'analysis', 'consolidation', 'docs', 'settings', 'shipments', 'receive', 'consolidation_form', 'reports', 'supplies', 'picking', 'shift_plan', 'tsd', 'violations'],
     allowWithoutToken: true,
   }, '__developer__');
   res.cookie(VS_SESSION_COOKIE, sid, {
