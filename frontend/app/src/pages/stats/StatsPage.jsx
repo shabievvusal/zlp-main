@@ -124,7 +124,7 @@ export default function StatsPage() {
     }
     const result = {}
     for (const [name, val] of Object.entries(raw)) {
-      const key = enrich(name)
+      const key = emplIdNameMap.get(name) || enrich(name)
       if (!result[key]) {
         result[key] = { ...val }
       } else {
@@ -134,7 +134,7 @@ export default function StatsPage() {
       }
     }
     return result
-  }, [isSummaryOnly, dateSummary, items, enrich])
+  }, [isSummaryOnly, dateSummary, items, enrich, emplIdNameMap])
 
   const idlesByEmployeeAll = useMemo(() => {
     let raw
@@ -342,7 +342,7 @@ export default function StatsPage() {
         const idleData  = idlesByEmployee[r.name] || {}
         const idleMin   = typeof idleData === 'object' ? (Number(idleData.totalMinutes)||0) : 0
         const workedMin = computeWorkedMinutesInShift(idleMin, allowedIdleMinutes, 12*60)
-        const w = weightByEmployee[r.name] || { storage:0, kdk:0, total:0 }
+        const w = weightByEmployee[r.name] || weightByEmployee[r.executorId] || { storage:0, kdk:0, total:0 }
         const fmt2 = n => String(Math.floor(n||0)).padStart(2,'0')
         const fmtT = iso => iso ? new Date(iso).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}) : '—'
 
@@ -444,7 +444,7 @@ export default function StatsPage() {
         const intervals = typeof idleData === 'object' ? (idleData.intervals || '') : String(idleData || '')
         const hasIdle   = r.name in idlesByEmployee
         const workedMin = hasIdle ? computeWorkedMinutesInShift(idleMin, allowedIdleMinutes, shiftMinutes) : null
-        const w = weightByEmployee[r.name] || { storage: 0, kdk: 0, total: 0 }
+        const w = weightByEmployee[r.name] || weightByEmployee[r.executorId] || { storage: 0, kdk: 0, total: 0 }
 
         const row = ws.addRow([
           r.company || '—',

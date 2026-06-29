@@ -173,9 +173,9 @@ export default function HourlyEmployeeTable({
     let av, bv
     if (sortCol === 'total') { av = a.total; bv = b.total }
     else if (sortCol === 'worked') { av = workedByName[a.name] || 0; bv = workedByName[b.name] || 0 }
-    else if (sortCol === 'weight') { av = (weightByEmployee[a.name]?.total || 0); bv = (weightByEmployee[b.name]?.total || 0) }
-    else if (sortCol === 'weightStorage') { av = (weightByEmployee[a.name]?.storage || 0); bv = (weightByEmployee[b.name]?.storage || 0) }
-    else if (sortCol === 'weightKdk') { av = (weightByEmployee[a.name]?.kdk || 0); bv = (weightByEmployee[b.name]?.kdk || 0) }
+    else if (sortCol === 'weight') { av = ((weightByEmployee[a.name] || weightByEmployee[a.executorId])?.total || 0); bv = ((weightByEmployee[b.name] || weightByEmployee[b.executorId])?.total || 0) }
+    else if (sortCol === 'weightStorage') { av = ((weightByEmployee[a.name] || weightByEmployee[a.executorId])?.storage || 0); bv = ((weightByEmployee[b.name] || weightByEmployee[b.executorId])?.storage || 0) }
+    else if (sortCol === 'weightKdk') { av = ((weightByEmployee[a.name] || weightByEmployee[a.executorId])?.kdk || 0); bv = ((weightByEmployee[b.name] || weightByEmployee[b.executorId])?.kdk || 0) }
     else if (sortCol === 'name') { return (sortDir === 'asc' ? 1 : -1) * a.name.localeCompare(b.name, 'ru') }
     else if (sortCol === 'company') { return (sortDir === 'asc' ? 1 : -1) * (a.company||'').localeCompare(b.company||'', 'ru') }
     else { av = a.total; bv = b.total }
@@ -237,7 +237,7 @@ export default function HourlyEmployeeTable({
               const idleData = idlesByEmployee[r.name] || {}
               const idleMin = typeof idleData === 'object' ? (Number(idleData.totalMinutes) || 0) : 0
               const workedMin = workedByName[r.name]
-              const w = weightByEmployee[r.name] || { storage: 0, kdk: 0, total: 0 }
+              const w = weightByEmployee[r.name] || weightByEmployee[r.executorId] || { storage: 0, kdk: 0, total: 0 }
               return (
                 <tr key={r.name}>
                   <td className={styles.heTdCompany}>{r.company || '—'}</td>
