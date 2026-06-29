@@ -1536,6 +1536,7 @@ function TsdSettingsCard() {
 
 function ProductWeightsCard() {
   const notify = useNotify()
+  const { loadProductWeights, loadDateSummary, selectedDate, shiftFilter } = useApp()
   const fileRef = useRef(null)
   const [info, setInfo] = useState(null)
   const [uploading, setUploading] = useState(false)
@@ -1554,6 +1555,8 @@ function ProductWeightsCard() {
     try {
       const res = await api.uploadProductWeightsExcel(file)
       notify(`Загружено ${res.count} артикулов`, 'success')
+      await loadProductWeights()
+      if (selectedDate && shiftFilter) await loadDateSummary(selectedDate, shiftFilter)
       await loadInfo()
     } catch (err) {
       notify('Ошибка: ' + err.message, 'error')

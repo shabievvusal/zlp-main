@@ -369,6 +369,17 @@ export function AppProvider({ children }) {
 
   const dismissNewEmployees = useCallback(() => setNewEmployeesFromFetch([]), [])
 
+  const loadProductWeights = useCallback(async () => {
+    try {
+      const weights = await api.getProductWeights()
+      setProductWeights(weights)
+      return weights
+    } catch {
+      setProductWeights({})
+      return {}
+    }
+  }, [])
+
   const addNewEmployees = useCallback(async (names) => {
     try {
       const data = await api.addNewEmployees(names)
@@ -382,10 +393,10 @@ export function AppProvider({ children }) {
   }, [loadEmployees, notify])
 
   useEffect(() => {
-    api.getProductWeights().then(setProductWeights)
+    loadProductWeights()
     loadEmployees()
     loadStatus()
-  }, [])
+  }, [loadProductWeights])
 
   useEffect(() => {
     loadDateSummary(selectedDate, shiftFilter)
@@ -468,6 +479,7 @@ export function AppProvider({ children }) {
       autoFetchEnabled,
       loadDateSummary,
       loadDateData,
+      loadProductWeights,
       runFetchData,
       doRequestFetch,
       loadEmployees,
