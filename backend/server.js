@@ -963,7 +963,7 @@ const uploadWeightsExcel = multer({
   },
 });
 
-const EXCEL_PATH = path.join(__dirname, 'data.xlsx');
+const EXCEL_PATH = productWeights.EXCEL_PATH;
 
 app.get('/api/vs/admin/product-weights/info', vsSessionRequired, vsAdminRequired, (req, res) => {
   try {
@@ -980,8 +980,7 @@ app.get('/api/vs/admin/product-weights/info', vsSessionRequired, vsAdminRequired
 app.post('/api/vs/admin/product-weights/upload', vsSessionRequired, vsAdminRequired, uploadWeightsExcel.single('file'), (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'Файл не получен' });
-    fs.writeFileSync(EXCEL_PATH, req.file.buffer);
-    const map = productWeights.reload();
+    const map = productWeights.saveExcelBuffer(req.file.buffer);
     res.json({ ok: true, count: map.size });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -990,8 +989,7 @@ app.post('/api/vs/admin/product-weights/upload', vsSessionRequired, vsAdminRequi
 
 app.delete('/api/vs/admin/product-weights', vsSessionRequired, vsAdminRequired, (_req, res) => {
   try {
-    if (fs.existsSync(EXCEL_PATH)) fs.unlinkSync(EXCEL_PATH);
-    productWeights.reload();
+    productWeights.deleteExcel();
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });

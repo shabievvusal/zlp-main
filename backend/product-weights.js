@@ -1,15 +1,33 @@
 /**
  * product-weights.js — таблица весов товаров из Excel (PowerBI выгрузка).
- * Excel: backend/data.xlsx, строка 3 (индекс 2) — заголовки, с строки 4 — данные.
+ * Excel: backend/data/product-weights.xlsx, строка 3 (индекс 2) — заголовки, с строки 4 — данные.
  * Ключ: "Артикул товара" (например "УТ-10579150"), значение: вес в граммах.
  */
 
 const path = require('path');
 const fs = require('fs');
 
-const EXCEL_PATH = path.join(__dirname, 'data.xlsx');
+const DATA_DIR = path.join(__dirname, 'data');
+const EXCEL_PATH = path.join(DATA_DIR, 'product-weights.xlsx');
+const LEGACY_EXCEL_PATH = path.join(__dirname, 'data.xlsx');
 
 let weightMap = null; // Map<article, grams>
+
+function ensureExcelDir() {
+  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+}
+
+function migrateLegacyExcel() {
+  try {
+    ensureExcelDir();
+    if (!fs.existsSync(EXCEL_PATH) && fs.existsSync(LEGACY_EXCEL_PATH)) {
+      fs.copyFileSync(LEGACY_EXCEL_PATH, EXCEL_PATH);
+      console.log('[product-weights] Migrated data.xlsx to', EXCEL_PATH);
+    }
+  } catch (err) {
+    console.warn('[product-weights] Legacy migration failed:', err.message);
+  }
+}
 
 function parseExcelWeight(val) {
   if (!val && val !== 0) return 0;
@@ -26,8 +44,9 @@ function parseExcelWeight(val) {
 }
 
 function loadWeightMap() {
+  migrateLegacyExcel();
   if (!fs.existsSync(EXCEL_PATH)) {
-    console.warn('[product-weights] data.xlsx not found at', EXCEL_PATH);
+    console.warn('[product-weights] product-weights.xlsx not found at', EXCEL_PATH);
     return new Map();
   }
   const xlsx = require('xlsx');
@@ -41,7 +60,7 @@ function loadWeightMap() {
     if (rows[i].includes('Артикул товара')) { headerRow = i; break; }
   }
   if (headerRow < 0) {
-    console.warn('[product-weights] Header row not found in data.xlsx');
+    console.warn('[product-weights] Header row not found in product-weights.xlsx');
     return new Map();
   }
 
@@ -63,7 +82,7 @@ function loadWeightMap() {
     if (grams > 0) map.set(art, grams);
   }
 
-  console.log(`[product-weights] Loaded ${map.size} articles from data.xlsx`);
+  console.log(`[product-weights] Loaded ${map.size} articles from product-weights.xlsx`);
   return map;
 }
 
@@ -78,10 +97,21 @@ function getWeightGrams(article) {
   return getMap().get(String(article).trim()) || 0;
 }
 
-/** Перезагрузить таблицу из файла (при замене data.xlsx). */
+/** Перезагрузить таблицу из файла (при замене Excel с ВГХ). */
 function reload() {
   weightMap = null;
   return getMap();
 }
 
-module.exports = { getWeightGrams, getMap, reload };
+function saveExcelBuffer(buffer) {
+  ensureExcelDir();
+  fs.writeFileSync(EXCEL_PATH, buffer);
+  return reload();
+}
+
+function deleteExcel() {
+  if (fs.existsSync(EXCEL_PATH)) fs.unlinkSync(EXCEL_PATH);
+  weightMap = null;
+}
+
+module.exports = { EXCEL_PATH, getWeightGrams, getMap, reload, saveExcelBuffer, deleteExcel };
