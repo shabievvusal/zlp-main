@@ -71,7 +71,7 @@ function Top10Grid({ top10, weightByEmployee }) {
   const rest = top10.slice(3)
 
   const card = (r, origIdx, isPodium) => {
-    const wTotal = weightByEmployee[r.name]?.total ?? 0
+    const wTotal = r.executorId ? (weightByEmployee[r.executorId]?.total ?? 0) : 0
     const wFmt = formatWeight(wTotal)
     const pct = top10[0]?.total > 0 ? (r.total / top10[0].total) * 100 : 0
     const rankCls = origIdx === 0 ? s.top10Gold : origIdx === 1 ? s.top10Silver : origIdx === 2 ? s.top10Bronze : ''
@@ -87,7 +87,7 @@ function Top10Grid({ top10, weightByEmployee }) {
     const zoneTotal = zones.reduce((acc, [, v]) => acc + v, 0)
     const baseClass = isPodium ? s.top10PodiumCard : s.top10RestCard
     return (
-      <div key={r.name} className={`${s.top10Card} ${baseClass} ${rankCls}`} style={{ '--i': origIdx }}>
+      <div key={r.executorId || r.name} className={`${s.top10Card} ${baseClass} ${rankCls}`} style={{ '--i': origIdx }}>
         <div className={s.top10Header}>
           <span className={s.top10Rank}>{origIdx < 3 ? ['🥇', '🥈', '🥉'][origIdx] : `#${origIdx + 1}`}</span>
           <span className={s.top10Time}>{fmtTime(r.firstAt)} – {fmtTime(r.lastAt)}</span>
@@ -237,14 +237,15 @@ export default function TvPage() {
   const heDataAll = useMemo(() => {
     if (isSummaryOnly && dateSummary?.hourlyByEmployee) {
       const { hours, rows } = dateSummary.hourlyByEmployee
-      const enrichedRows = (rows || []).map(r => ({ ...r, name: enrich(r.name) }))
+      const enrichedRows = (rows || []).map(r => ({ ...r, name: enrich(r.name, r.executorId), executorId: r.executorId || null }))
       const merged = new Map()
       for (const r of enrichedRows) {
-        if (!merged.has(r.name)) {
-          merged.set(r.name, { ...r, byHour: { ...r.byHour }, weightByHour: { ...r.weightByHour }, byHourZone: { ...r.byHourZone }, byZone: { ...r.byZone } })
+        const rowKey = r.executorId || `missing-id:${r.name}:${merged.size}`
+        if (!merged.has(rowKey)) {
+          merged.set(rowKey, { ...r, byHour: { ...r.byHour }, weightByHour: { ...r.weightByHour }, byHourZone: { ...r.byHourZone }, byZone: { ...r.byZone } })
           continue
         }
-        const m = merged.get(r.name)
+        const m = merged.get(rowKey)
         for (const col of Object.keys(r.byHour)) m.byHour[col] = (m.byHour[col] || 0) + (r.byHour[col] || 0)
         for (const col of Object.keys(r.weightByHour)) m.weightByHour[col] = (m.weightByHour[col] || 0) + (r.weightByHour[col] || 0)
         m.total += r.total
@@ -270,7 +271,10 @@ export default function TvPage() {
       raw = calcIdleTotalsByEmployee(items, thresholdMs, shiftFilter, startMs, endMs)
     }
     const result = {}
-    for (const [name, val] of Object.entries(raw)) result[enrich(name)] = val
+    for (const [executorId, val] of Object.entries(raw)) {
+      const key = String(executorId || '').trim()
+      if (key) result[key] = val
+    }
     return result
   }, [isSummaryOnly, dateSummary, items, selectedDate, shiftFilter, idleThresholdMinutes])
 
@@ -289,8 +293,9 @@ export default function TvPage() {
     else if (!items.length) return {}
     else raw = getWeightByEmployee(items)
     const result = {}
-    for (const [name, val] of Object.entries(raw)) {
-      const key = enrich(name)
+    for (const [executorId, val] of Object.entries(raw)) {
+      const key = String(executorId || '').trim()
+      if (!key) continue
       if (!result[key]) result[key] = { ...val }
       else { result[key].storage += val.storage; result[key].kdk += val.kdk; result[key].total += val.total }
     }

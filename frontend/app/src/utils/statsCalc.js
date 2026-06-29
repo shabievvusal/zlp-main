@@ -436,8 +436,8 @@ export function calcIdlesByEmployee(items, thresholdMs = 15 * 60 * 1000, shiftSt
     const d = new Date(iso)
     return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`
   }
-  for (const [, rec] of byExecutor) {
-    const { name, times } = rec
+  for (const [executorId, rec] of byExecutor) {
+    const { times } = rec
     times.sort((a, b) => a - b)
     const idles = []
     if (shiftStartMs > 0 && times[0] - shiftStartMs >= thresholdMs)
@@ -447,7 +447,7 @@ export function calcIdlesByEmployee(items, thresholdMs = 15 * 60 * 1000, shiftSt
         idles.push(fmt(times[i - 1]) + '–' + fmt(times[i]))
     if (shiftEndMs > 0 && shiftEndMs - times[times.length - 1] >= thresholdMs)
       idles.push(fmt(times[times.length - 1]) + '–' + fmt(shiftEndMs))
-    if (idles.length) out[name] = idles.join(', ')
+    if (idles.length) out[executorId] = idles.join(', ')
   }
   return out
 }
@@ -455,9 +455,9 @@ export function calcIdlesByEmployee(items, thresholdMs = 15 * 60 * 1000, shiftSt
 export function calcIdleTotalsByEmployee(items, thresholdMs, shiftFilter, shiftStartMs, shiftEndMs) {
   const idlesMap = calcIdlesByEmployee(items, thresholdMs, shiftStartMs, shiftEndMs)
   const out = {}
-  for (const [name, raw] of Object.entries(idlesMap)) {
+  for (const [executorId, raw] of Object.entries(idlesMap)) {
     const totalMinutes = parseIdleTotalMinutes(raw, shiftFilter)
-    out[name] = { intervals: raw, totalMinutes, totalMs: totalMinutes * 60 * 1000 }
+    out[executorId] = { intervals: raw, totalMinutes, totalMs: totalMinutes * 60 * 1000 }
   }
   return out
 }

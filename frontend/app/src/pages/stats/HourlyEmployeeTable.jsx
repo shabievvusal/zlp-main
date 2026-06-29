@@ -14,6 +14,42 @@ function hourlyBg(zoneKey) {
   return zone ? { background: zone.bg, color: zone.text } : { background: '#f3f4f6', color: '#374151' }
 }
 
+function isKdkZone(zoneKey) {
+  return String(zoneKey || '').toUpperCase().startsWith('KD')
+}
+
+function getRowWeightFallback(row) {
+  const out = { storage: 0, kdk: 0, total: 0 }
+
+  for (const [zoneKey, data] of Object.entries(row.byZone || {})) {
+    const grams = Number(data?.weightGrams) || 0
+    if (!grams) continue
+    if (isKdkZone(zoneKey)) out.kdk += grams
+    else out.storage += grams
+    out.total += grams
+  }
+
+  if (out.total > 0) return out
+
+  for (const [col, rawGrams] of Object.entries(row.weightByHour || {})) {
+    const grams = Number(rawGrams) || 0
+    if (!grams) continue
+    const zoneKey = row.byHourZone?.[col]
+    if (isKdkZone(zoneKey)) out.kdk += grams
+    else if (zoneKey) out.storage += grams
+    out.total += grams
+  }
+
+  return out
+}
+
+function resolveEmployeeWeight(row, weightByEmployee) {
+  if (!row.executorId) return { storage: 0, kdk: 0, total: 0 }
+  const direct = weightByEmployee[row.executorId]
+  if (direct && (direct.storage || direct.kdk || direct.total)) return direct
+  return getRowWeightFallback(row)
+}
+
 function IdleTimeline({ raw, shiftFilter }) {
   const intervalsRaw = raw && typeof raw === 'object' ? (raw.intervals || '') : (raw || '')
   const intervals = parseIdleIntervalsForTimeline(intervalsRaw, shiftFilter)
@@ -127,7 +163,7 @@ export default function HourlyEmployeeTable({
             {sorted.map(r => {
               const totalGrams = ZONES.reduce((s, z) => s + ((r.byZone?.[z.key]?.weightGrams) || 0), 0)
               return (
-                <tr key={r.name}>
+                <tr key={r.executorId || r.name}>
                   <td className={styles.zwTd}>{r.company || '—'}</td>
                   <td className={`${styles.zwTd} ${styles.zwTdName}`} title={r.name}>{shortFio(r.name)}</td>
                   {ZONES.map(z => {
@@ -161,21 +197,22 @@ export default function HourlyEmployeeTable({
   const isReceiving = operation === 'receiving'
 
   // Pre-compute worked minutes for sorting
-  const workedByName = {}
+  const workedByExecutor = {}
   for (const r of allRows) {
-    const hasIdleData = r.name in idlesByEmployee
-    const idleData = idlesByEmployee[r.name] || {}
+    const idleKey = r.executorId || ''
+    const hasIdleData = !!idleKey && idleKey in idlesByEmployee
+    const idleData = hasIdleData ? idlesByEmployee[idleKey] : {}
     const idleMin = typeof idleData === 'object' ? (Number(idleData.totalMinutes) || 0) : 0
-    workedByName[r.name] = hasIdleData ? computeWorkedMinutesInShift(idleMin, allowedIdleMinutes, shiftMinutes) : null
+    workedByExecutor[idleKey] = hasIdleData ? computeWorkedMinutesInShift(idleMin, allowedIdleMinutes, shiftMinutes) : null
   }
 
   const sortedRows = [...allRows].sort((a, b) => {
     let av, bv
     if (sortCol === 'total') { av = a.total; bv = b.total }
-    else if (sortCol === 'worked') { av = workedByName[a.name] || 0; bv = workedByName[b.name] || 0 }
-    else if (sortCol === 'weight') { av = ((weightByEmployee[a.name] || weightByEmployee[a.executorId])?.total || 0); bv = ((weightByEmployee[b.name] || weightByEmployee[b.executorId])?.total || 0) }
-    else if (sortCol === 'weightStorage') { av = ((weightByEmployee[a.name] || weightByEmployee[a.executorId])?.storage || 0); bv = ((weightByEmployee[b.name] || weightByEmployee[b.executorId])?.storage || 0) }
-    else if (sortCol === 'weightKdk') { av = ((weightByEmployee[a.name] || weightByEmployee[a.executorId])?.kdk || 0); bv = ((weightByEmployee[b.name] || weightByEmployee[b.executorId])?.kdk || 0) }
+    else if (sortCol === 'worked') { av = workedByExecutor[a.executorId || ''] || 0; bv = workedByExecutor[b.executorId || ''] || 0 }
+    else if (sortCol === 'weight') { av = resolveEmployeeWeight(a, weightByEmployee).total; bv = resolveEmployeeWeight(b, weightByEmployee).total }
+    else if (sortCol === 'weightStorage') { av = resolveEmployeeWeight(a, weightByEmployee).storage; bv = resolveEmployeeWeight(b, weightByEmployee).storage }
+    else if (sortCol === 'weightKdk') { av = resolveEmployeeWeight(a, weightByEmployee).kdk; bv = resolveEmployeeWeight(b, weightByEmployee).kdk }
     else if (sortCol === 'name') { return (sortDir === 'asc' ? 1 : -1) * a.name.localeCompare(b.name, 'ru') }
     else if (sortCol === 'company') { return (sortDir === 'asc' ? 1 : -1) * (a.company||'').localeCompare(b.company||'', 'ru') }
     else { av = a.total; bv = b.total }
@@ -234,12 +271,13 @@ export default function HourlyEmployeeTable({
           </thead>
           <tbody>
             {sortedRows.map(r => {
-              const idleData = idlesByEmployee[r.name] || {}
+              const idleKey = r.executorId || ''
+              const idleData = idleKey ? (idlesByEmployee[idleKey] || {}) : {}
               const idleMin = typeof idleData === 'object' ? (Number(idleData.totalMinutes) || 0) : 0
-              const workedMin = workedByName[r.name]
-              const w = weightByEmployee[r.name] || weightByEmployee[r.executorId] || { storage: 0, kdk: 0, total: 0 }
+              const workedMin = workedByExecutor[idleKey]
+              const w = resolveEmployeeWeight(r, weightByEmployee)
               return (
-                <tr key={r.name}>
+                <tr key={r.executorId || r.name}>
                   <td className={styles.heTdCompany}>{r.company || '—'}</td>
                   <td className={styles.heTdName} title={r.name}>{shortFio(r.name)}</td>
                   {!showIdlesCol && hours.map(col => {

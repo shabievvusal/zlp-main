@@ -416,8 +416,8 @@ function calcIdlesByEmployeeSummary(items, idleThresholdMs = IDLE_THRESHOLD_MS, 
     byExecutor.get(executorId).times.push(new Date(ts).getTime());
   }
   const out = {};
-  for (const [, rec] of byExecutor) {
-    const { name, times } = rec;
+  for (const [executorId, rec] of byExecutor) {
+    const { times } = rec;
     if (!times.length) continue;
     times.sort((a, b) => a - b);
     const idles = [];
@@ -437,7 +437,7 @@ function calcIdlesByEmployeeSummary(items, idleThresholdMs = IDLE_THRESHOLD_MS, 
       idles.push(formatTimeMoscow(times[times.length - 1]) + '–' + formatTimeMoscow(shiftEndMs));
       totalMs += shiftEndMs - times[times.length - 1];
     }
-    if (idles.length) out[name] = { intervals: idles.join(', '), totalMinutes: Math.round(totalMs / 60000) };
+    if (idles.length) out[executorId] = { intervals: idles.join(', '), totalMinutes: Math.round(totalMs / 60000) };
   }
   return out;
 }
@@ -657,7 +657,7 @@ function buildSummaryFromItems(items, opts = {}) {
         total += sz;
       }
       const execInfo = byExecutor.get(executorId) || {};
-      heRows.push({ name, company: resolveCompany(name, execInfo.executorId), byHour: byHourRow, weightByHour, byHourZone, byZone, total, firstAt: execInfo.firstAt || null, lastAt: execInfo.lastAt || null });
+      heRows.push({ name, executorId, company: resolveCompany(name, executorId), byHour: byHourRow, weightByHour, byHourZone, byZone, total, firstAt: execInfo.firstAt || null, lastAt: execInfo.lastAt || null });
     }
 
     hourlyByEmployee = { hours: order, rows: heRows };

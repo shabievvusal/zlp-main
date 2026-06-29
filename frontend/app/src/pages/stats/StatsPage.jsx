@@ -31,6 +31,42 @@ const HE_MODES = [
   { key: 'idles',   label: 'Простои' },
 ]
 
+function isKdkZoneKey(zoneKey) {
+  return String(zoneKey || '').toUpperCase().startsWith('KD')
+}
+
+function getRowWeightFallback(row) {
+  const out = { storage: 0, kdk: 0, total: 0 }
+
+  for (const [zoneKey, data] of Object.entries(row.byZone || {})) {
+    const grams = Number(data?.weightGrams) || 0
+    if (!grams) continue
+    if (isKdkZoneKey(zoneKey)) out.kdk += grams
+    else out.storage += grams
+    out.total += grams
+  }
+
+  if (out.total > 0) return out
+
+  for (const [col, rawGrams] of Object.entries(row.weightByHour || {})) {
+    const grams = Number(rawGrams) || 0
+    if (!grams) continue
+    const zoneKey = row.byHourZone?.[col]
+    if (isKdkZoneKey(zoneKey)) out.kdk += grams
+    else if (zoneKey) out.storage += grams
+    out.total += grams
+  }
+
+  return out
+}
+
+function getEmployeeWeight(row, weightByEmployee) {
+  if (!row.executorId) return { storage: 0, kdk: 0, total: 0 }
+  const direct = weightByEmployee[row.executorId]
+  if (direct && (direct.storage || direct.kdk || direct.total)) return direct
+  return getRowWeightFallback(row)
+}
+
 export default function StatsPage() {
   const {
     allItems, dateSummary, emplMap, emplIdMap, emplIdNameMap, emplCompanies,
@@ -79,14 +115,15 @@ export default function StatsPage() {
     if (isSummaryOnly && dateSummary?.hourlyByEmployee) {
       const { hours, rows } = dateSummary.hourlyByEmployee
       // Обогащаем имена и мёрджим дубли (короткое + полное имя → одна строка)
-      const enrichedRows = (rows || []).map(r => ({ ...r, name: enrich(r.name) }))
+      const enrichedRows = (rows || []).map(r => ({ ...r, name: enrich(r.name, r.executorId), executorId: r.executorId || null }))
       const merged = new Map()
       for (const r of enrichedRows) {
-        if (!merged.has(r.name)) {
-          merged.set(r.name, { ...r, byHour: { ...r.byHour }, weightByHour: { ...r.weightByHour }, byHourZone: { ...r.byHourZone }, byZone: { ...r.byZone } })
+        const rowKey = r.executorId || `missing-id:${r.name}:${merged.size}`
+        if (!merged.has(rowKey)) {
+          merged.set(rowKey, { ...r, byHour: { ...r.byHour }, weightByHour: { ...r.weightByHour }, byHourZone: { ...r.byHourZone }, byZone: { ...r.byZone } })
           continue
         }
-        const m = merged.get(r.name)
+        const m = merged.get(rowKey)
         for (const col of Object.keys(r.byHour)) m.byHour[col] = (m.byHour[col] || 0) + (r.byHour[col] || 0)
         for (const col of Object.keys(r.weightByHour)) m.weightByHour[col] = (m.weightByHour[col] || 0) + (r.weightByHour[col] || 0)
         for (const col of Object.keys(r.byHourZone || {})) if (!m.byHourZone[col] && r.byHourZone[col]) m.byHourZone[col] = r.byHourZone[col]
@@ -123,8 +160,9 @@ export default function StatsPage() {
       raw = getWeightByEmployee(items)
     }
     const result = {}
-    for (const [name, val] of Object.entries(raw)) {
-      const key = emplIdNameMap.get(name) || enrich(name)
+    for (const [executorId, val] of Object.entries(raw)) {
+      const key = String(executorId || '').trim()
+      if (!key) continue
       if (!result[key]) {
         result[key] = { ...val }
       } else {
@@ -134,7 +172,7 @@ export default function StatsPage() {
       }
     }
     return result
-  }, [isSummaryOnly, dateSummary, items, enrich, emplIdNameMap])
+  }, [isSummaryOnly, dateSummary, items])
 
   const idlesByEmployeeAll = useMemo(() => {
     let raw
@@ -148,11 +186,12 @@ export default function StatsPage() {
       raw = calcIdleTotalsByEmployee(items, thresholdMs, shiftFilter, startMs, endMs)
     }
     const result = {}
-    for (const [name, val] of Object.entries(raw)) {
-      result[enrich(name)] = val
+    for (const [executorId, val] of Object.entries(raw)) {
+      const key = String(executorId || '').trim()
+      if (key) result[key] = val
     }
     return result
-  }, [isSummaryOnly, dateSummary, items, selectedDate, shiftFilter, idleThresholdMinutes, enrich])
+  }, [isSummaryOnly, dateSummary, items, selectedDate, shiftFilter, idleThresholdMinutes])
 
   // ── Лёгкая фильтрация по уже агрегированным строкам (O(сотрудники)) ────────
   const hourlyByEmployee = useMemo(() => {
@@ -173,26 +212,26 @@ export default function StatsPage() {
     return { ...companySummaryAll, rows }
   }, [companySummaryAll, filterCompany])
 
-  const allowedNames = useMemo(() => {
+  const allowedExecutorIds = useMemo(() => {
     if (filterCompany === '__all__') return null
-    return new Set(hourlyByEmployee?.allRows.map(r => r.name) ?? [])
+    return new Set((hourlyByEmployee?.allRows || []).map(r => r.executorId).filter(Boolean))
   }, [hourlyByEmployee, filterCompany])
 
   const idlesByEmployee = useMemo(() => {
-    if (!allowedNames) return idlesByEmployeeAll
+    if (!allowedExecutorIds) return idlesByEmployeeAll
     const out = {}
-    for (const [n, v] of Object.entries(idlesByEmployeeAll))
-      if (allowedNames.has(n)) out[n] = v
+    for (const [executorId, v] of Object.entries(idlesByEmployeeAll))
+      if (allowedExecutorIds.has(executorId)) out[executorId] = v
     return out
-  }, [idlesByEmployeeAll, allowedNames])
+  }, [idlesByEmployeeAll, allowedExecutorIds])
 
   const weightByEmployee = useMemo(() => {
-    if (!allowedNames) return weightByEmployeeAll
+    if (!allowedExecutorIds) return weightByEmployeeAll
     const out = {}
-    for (const [n, w] of Object.entries(weightByEmployeeAll))
-      if (allowedNames.has(n)) out[n] = w
+    for (const [executorId, w] of Object.entries(weightByEmployeeAll))
+      if (allowedExecutorIds.has(executorId)) out[executorId] = w
     return out
-  }, [weightByEmployeeAll, allowedNames])
+  }, [weightByEmployeeAll, allowedExecutorIds])
 
   // ── Карточки: calcStats один раз по всем items ────────────────────────────
   const statsAll = useMemo(() => {
@@ -339,10 +378,10 @@ export default function StatsPage() {
 
       const sorted = [...allRows].sort((a, b) => (a.company||'').localeCompare(b.company||'','ru') || b.total - a.total)
       for (const r of sorted) {
-        const idleData  = idlesByEmployee[r.name] || {}
+        const idleData  = r.executorId ? (idlesByEmployee[r.executorId] || {}) : {}
         const idleMin   = typeof idleData === 'object' ? (Number(idleData.totalMinutes)||0) : 0
         const workedMin = computeWorkedMinutesInShift(idleMin, allowedIdleMinutes, 12*60)
-        const w = weightByEmployee[r.name] || weightByEmployee[r.executorId] || { storage:0, kdk:0, total:0 }
+        const w = getEmployeeWeight(r, weightByEmployee)
         const fmt2 = n => String(Math.floor(n||0)).padStart(2,'0')
         const fmtT = iso => iso ? new Date(iso).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}) : '—'
 
@@ -431,20 +470,20 @@ export default function StatsPage() {
       const wgKg  = g => { const v = Number(g) || 0; return v > 0 ? +(v/1000).toFixed(1) : '' }
 
       const sortedRows = [...hourlyByEmployee.allRows].sort((a, b) => {
-        const ia = idlesByEmployee[a.name]
-        const ib = idlesByEmployee[b.name]
+        const ia = a.executorId ? idlesByEmployee[a.executorId] : null
+        const ib = b.executorId ? idlesByEmployee[b.executorId] : null
         const ma = typeof ia === 'object' ? (Number(ia?.totalMinutes)||0) : 0
         const mb = typeof ib === 'object' ? (Number(ib?.totalMinutes)||0) : 0
         return mb - ma
       })
 
       for (const r of sortedRows) {
-        const idleData  = idlesByEmployee[r.name] || {}
+        const idleData  = r.executorId ? (idlesByEmployee[r.executorId] || {}) : {}
         const idleMin   = typeof idleData === 'object' ? (Number(idleData.totalMinutes)||0) : 0
         const intervals = typeof idleData === 'object' ? (idleData.intervals || '') : String(idleData || '')
-        const hasIdle   = r.name in idlesByEmployee
+        const hasIdle   = !!r.executorId && r.executorId in idlesByEmployee
         const workedMin = hasIdle ? computeWorkedMinutesInShift(idleMin, allowedIdleMinutes, shiftMinutes) : null
-        const w = weightByEmployee[r.name] || weightByEmployee[r.executorId] || { storage: 0, kdk: 0, total: 0 }
+        const w = getEmployeeWeight(r, weightByEmployee)
 
         const row = ws.addRow([
           r.company || '—',
