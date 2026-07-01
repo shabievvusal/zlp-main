@@ -579,8 +579,16 @@ export default function StatsPage() {
     setMissingWeightProgress('Формирую XLSX...')
     try {
       const items2 = await api.getMissingWeight()
+      if (!items2.length) {
+        if ((missingWeightStatus?.count || missingWeightTotal || 0) > 0) {
+          notify('Результат сверки не прочитался. Запустите сверку ВГХ ещё раз.', 'error')
+          return
+        }
+        setMissingWeightTotal(0)
+        notify('По последней сверке неучтённых товаров нет', 'info')
+        return
+      }
       setMissingWeightTotal(items2.length)
-      if (!items2.length) { notify('По последней сверке неучтённых товаров нет', 'info'); return }
       const ExcelJS = (await import('exceljs')).default
       const wb = new ExcelJS.Workbook()
       const ws = wb.addWorksheet('Неучтенный вес')
@@ -604,7 +612,7 @@ export default function StatsPage() {
       setMissingWeightLoading(false)
       setMissingWeightProgress('')
     }
-  }, [missingWeightLoading, missingWeightRunning, notify])
+  }, [missingWeightLoading, missingWeightRunning, missingWeightStatus?.count, missingWeightTotal, notify])
 
   // При активном фильтре выводим stats из уже готовых агрегированных строк — O(сотрудники)
   const stats = useMemo(() => {

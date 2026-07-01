@@ -154,13 +154,8 @@ export async function deleteProductWeightsExcel() {
 }
 
 export async function getMissingWeight() {
-  try {
-    const r = await fetch('/api/missing-weight', { credentials })
-    if (!r.ok) return []
-    return r.json()
-  } catch {
-    return []
-  }
+  const data = await req('/api/missing-weight')
+  return Array.isArray(data) ? data : []
 }
 
 export async function rebuildMissingWeight() {

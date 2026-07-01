@@ -422,9 +422,16 @@ function updateNamesRegistry(items) {
 
 function loadMissingWeight() {
   try {
-    if (fs.existsSync(MISSING_WEIGHT_PATH)) return JSON.parse(fs.readFileSync(MISSING_WEIGHT_PATH, 'utf8'));
+    return loadMissingWeightStrict();
   } catch (_) {}
   return [];
+}
+
+function loadMissingWeightStrict() {
+  if (!fs.existsSync(MISSING_WEIGHT_PATH)) return [];
+  const parsed = JSON.parse(fs.readFileSync(MISSING_WEIGHT_PATH, 'utf8'));
+  if (!Array.isArray(parsed)) throw new Error('missing_weight.json должен быть массивом');
+  return parsed;
 }
 
 function saveMissingWeight(list) {
@@ -538,14 +545,18 @@ function startMissingWeightRebuild(reason = 'manual') {
   rebuildMissingWeightDotnet({ allowJsFallback: false })
     .then(count => {
       if (count == null) throw new Error('.NET-инструмент MissingWeightRebuild недоступен');
+      const list = loadMissingWeightStrict();
+      if (count > 0 && list.length === 0) {
+        throw new Error(`.NET нашёл ${count} товаров, но файл результата пуст`);
+      }
       Object.assign(missingWeightRebuildStatus, {
         running: false,
         finishedAt: new Date().toISOString(),
-        count,
+        count: list.length,
         error: null,
         durationMs: Date.now() - startedMs,
       });
-      console.log(`[missing-weight] .NET rebuild done: ${count} товаров`);
+      console.log(`[missing-weight] .NET rebuild done: ${list.length} товаров`);
     })
     .catch(err => {
       const message = err?.message || String(err);
