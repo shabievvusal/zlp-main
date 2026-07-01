@@ -429,7 +429,8 @@ function loadMissingWeight() {
 
 function loadMissingWeightStrict() {
   if (!fs.existsSync(MISSING_WEIGHT_PATH)) return [];
-  const parsed = JSON.parse(fs.readFileSync(MISSING_WEIGHT_PATH, 'utf8'));
+  const text = fs.readFileSync(MISSING_WEIGHT_PATH, 'utf8').replace(/^\uFEFF/, '');
+  const parsed = JSON.parse(text);
   if (!Array.isArray(parsed)) throw new Error('missing_weight.json должен быть массивом');
   return parsed;
 }

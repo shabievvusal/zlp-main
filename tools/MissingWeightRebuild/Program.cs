@@ -76,7 +76,7 @@ var outList = sorted.Select(x => new { name = x.Name, article = x.Article });
 Directory.CreateDirectory(Path.GetDirectoryName(outPath) ?? dataDir);
 File.WriteAllText(outPath,
     JsonSerializer.Serialize(outList, new JsonSerializerOptions { WriteIndented = true }),
-    System.Text.Encoding.UTF8);
+    new System.Text.UTF8Encoding(false));
 
 Console.WriteLine(JsonSerializer.Serialize(new { ok = true, count = sorted.Count }));
 
