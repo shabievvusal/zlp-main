@@ -67,10 +67,6 @@ function getEmployeeWeight(row, weightByEmployee) {
   return getRowWeightFallback(row)
 }
 
-function delay(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms))
-}
-
 export default function StatsPage() {
   const {
     allItems, dateSummary, emplMap, emplIdMap, emplIdNameMap, emplCompanies,
@@ -91,6 +87,7 @@ export default function StatsPage() {
   const [missingWeightTotal, setMissingWeightTotal] = useState(null)
   const [missingWeightLoading, setMissingWeightLoading] = useState(false)
   const [missingWeightProgress, setMissingWeightProgress] = useState('')
+  const [missingWeightStatus, setMissingWeightStatus] = useState(null)
   const notify = useNotify()
   const monthlyExportRef = useRef(null)
   const [placementSummary, setPlacementSummary] = useState(null)
@@ -258,13 +255,47 @@ export default function StatsPage() {
   }, [items, dateSummary, emplMap, emplIdMap, isSummaryOnly])
 
   const missingWeightNames = statsAll?.missingWeightNames || []
+  const missingWeightRunning = Boolean(missingWeightStatus?.running)
+  const missingWeightReady = !missingWeightRunning && !missingWeightStatus?.error && missingWeightTotal != null
+  const canDownloadMissingWeight = missingWeightReady && missingWeightTotal > 0
 
   useEffect(() => {
     if (!statsAll) { setMissingWeightTotal(null); return }
-    api.getMissingWeight().then(all => {
+    let alive = true
+    Promise.all([
+      api.getMissingWeight(),
+      api.getMissingWeightStatus().catch(() => null),
+    ]).then(([all, rebuildStatus]) => {
+      if (!alive) return
       if (Array.isArray(all)) setMissingWeightTotal(all.length)
+      if (rebuildStatus) {
+        setMissingWeightStatus(rebuildStatus)
+        if (typeof rebuildStatus.count === 'number') setMissingWeightTotal(rebuildStatus.count)
+      }
     }).catch(() => {})
+    return () => { alive = false }
   }, [statsAll, status?.lastRun, statsRefreshSeq])
+
+  useEffect(() => {
+    if (!missingWeightRunning) return undefined
+    let alive = true
+    const tick = async () => {
+      try {
+        const rebuildStatus = await api.getMissingWeightStatus()
+        if (!alive) return
+        setMissingWeightStatus(rebuildStatus)
+        if (typeof rebuildStatus.count === 'number') setMissingWeightTotal(rebuildStatus.count)
+      } catch {
+        // статус обновится при следующем опросе
+      }
+    }
+    const timer = window.setInterval(tick, 3000)
+    tick()
+    return () => {
+      alive = false
+      window.clearInterval(timer)
+    }
+  }, [missingWeightRunning])
 
   const handleExportHourly = useCallback(async () => {
     if (!hourlyByEmployee?.allRows?.length) { notify('Нет данных для экспорта', 'info'); return }
@@ -524,28 +555,32 @@ export default function StatsPage() {
     } catch (err) { notify('Ошибка экспорта: ' + err.message, 'error') }
   }, [hourlyByEmployee, shiftFilter, selectedDate, idlesByEmployee, weightByEmployee, allowedIdleMinutes, notify])
 
-  const handleExportMissingWeight = useCallback(async () => {
-    if (missingWeightLoading) return
+  const handleStartMissingWeightRebuild = useCallback(async () => {
+    if (missingWeightLoading || missingWeightRunning) return
     setMissingWeightLoading(true)
     setMissingWeightProgress('Запускаю .NET-сверку...')
     try {
-      const started = await api.rebuildMissingWeight()
-      let rebuildStatus = started
-      const deadline = Date.now() + 5 * 60 * 1000
-
-      while (rebuildStatus?.running && Date.now() < deadline) {
-        setMissingWeightProgress('Сверяю сохранённые смены с ВГХ...')
-        await delay(1000)
-        rebuildStatus = await api.getMissingWeightStatus()
-      }
-
-      if (rebuildStatus?.running) throw new Error('Сверка не завершилась за 5 минут')
+      const rebuildStatus = await api.rebuildMissingWeight()
+      setMissingWeightStatus(rebuildStatus)
       if (rebuildStatus?.error) throw new Error(rebuildStatus.error)
+      if (typeof rebuildStatus?.count === 'number') setMissingWeightTotal(rebuildStatus.count)
+      notify(rebuildStatus?.running ? 'Сверка запущена в фоне' : 'Сверка уже выполнена', 'success')
+    } catch (err) {
+      notify('Ошибка запуска сверки: ' + err.message, 'error')
+    } finally {
+      setMissingWeightLoading(false)
+      setMissingWeightProgress('')
+    }
+  }, [missingWeightLoading, missingWeightRunning, notify])
 
-      setMissingWeightProgress('Формирую XLSX...')
+  const handleDownloadMissingWeight = useCallback(async () => {
+    if (missingWeightLoading || missingWeightRunning) return
+    setMissingWeightLoading(true)
+    setMissingWeightProgress('Формирую XLSX...')
+    try {
       const items2 = await api.getMissingWeight()
       setMissingWeightTotal(items2.length)
-      if (!items2.length) { notify('Список неучтённых товаров пуст', 'info'); return }
+      if (!items2.length) { notify('По последней сверке неучтённых товаров нет', 'info'); return }
       const ExcelJS = (await import('exceljs')).default
       const wb = new ExcelJS.Workbook()
       const ws = wb.addWorksheet('Неучтенный вес')
@@ -569,7 +604,7 @@ export default function StatsPage() {
       setMissingWeightLoading(false)
       setMissingWeightProgress('')
     }
-  }, [missingWeightLoading, notify])
+  }, [missingWeightLoading, missingWeightRunning, notify])
 
   // При активном фильтре выводим stats из уже готовых агрегированных строк — O(сотрудники)
   const stats = useMemo(() => {
@@ -702,7 +737,7 @@ export default function StatsPage() {
     <div className={styles.mainContent}>
       <StatsToolbar />
 
-      {(loading || placementLoading || receivingLoading || remainsLoading || missingWeightLoading) && <div className={styles.loadingBar} />}
+      {(loading || placementLoading || receivingLoading || remainsLoading || missingWeightLoading || missingWeightRunning) && <div className={styles.loadingBar} />}
 
       {newEmployeesFromFetch.length > 0 && (
         <div className={styles.newEmplBanner}>
@@ -731,7 +766,15 @@ export default function StatsPage() {
         <div className={styles.statsWeightRow}>
           <span className={styles.statsWeightNote}>
             {missingWeightLoading
-              ? (missingWeightProgress || 'Сверяю все сохранённые смены с ВГХ...')
+              ? (missingWeightProgress || 'Выполняю действие...')
+              : missingWeightRunning
+              ? 'Сверка идёт в фоне, вкладку можно закрыть'
+              : missingWeightStatus?.error
+              ? `Ошибка сверки: ${missingWeightStatus.error}`
+              : canDownloadMissingWeight
+              ? `Файл готов: ${missingWeightTotal} товаров без ВГХ`
+              : missingWeightReady
+              ? 'Последняя сверка завершена: неучтённых товаров нет'
               : missingWeightNames.length > 0
               ? `Не учтено в весе: ${missingWeightNames.length} (смена)${missingWeightTotal != null ? ` · ${missingWeightTotal} (всего)` : ''}`
               : `Не учтено в весе: 0 (смена)${missingWeightTotal != null ? ` · ${missingWeightTotal} (всего)` : ''}`}
@@ -739,15 +782,26 @@ export default function StatsPage() {
           <button
             type="button"
             className="btn btn-secondary btn-sm"
-            onClick={handleExportMissingWeight}
-            disabled={missingWeightLoading}
+            onClick={handleStartMissingWeightRebuild}
+            disabled={missingWeightLoading || missingWeightRunning}
           >
-            {missingWeightLoading
+            {missingWeightLoading || missingWeightRunning
               ? <Loader2 size={13} strokeWidth={2} className={styles.statsWeightSpin} />
-              : <Download size={13} strokeWidth={2} style={{marginRight:4}} />}
-            {missingWeightLoading ? 'Сверяю...' : 'XLSX: неучтённый вес'}
+              : null}
+            {missingWeightRunning ? 'Сверка идёт' : 'Сверить ВГХ'}
           </button>
-          {missingWeightLoading && <div className={styles.statsWeightProgress} />}
+          {canDownloadMissingWeight && (
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={handleDownloadMissingWeight}
+              disabled={missingWeightLoading || missingWeightRunning}
+            >
+              <Download size={13} strokeWidth={2} style={{marginRight:4}} />
+              Скачать XLSX
+            </button>
+          )}
+          {(missingWeightLoading || missingWeightRunning) && <div className={styles.statsWeightProgress} />}
         </div>
       )}
 

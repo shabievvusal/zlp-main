@@ -432,6 +432,25 @@ function saveMissingWeight(list) {
   fs.writeFileSync(MISSING_WEIGHT_PATH, JSON.stringify(list, null, 2), 'utf8');
 }
 
+function getMissingWeightProductName(item) {
+  const flat = String(item?.productName || item?.name || '').trim();
+  if (flat) return flat;
+  if (typeof item?.product === 'string') return item.product.trim();
+  if (item?.product && typeof item.product === 'object') {
+    return String(item.product.name || item.product.productName || '').trim();
+  }
+  return '';
+}
+
+function getMissingWeightArticle(item) {
+  const flat = String(item?.nomenclatureCode || item?.article || '').trim();
+  if (flat) return flat;
+  if (item?.product && typeof item.product === 'object') {
+    return String(item.product.nomenclatureCode || item.product.article || '').trim();
+  }
+  return '';
+}
+
 function rebuildMissingWeightFromData() {
   const weights = productWeights.getMap();
   const byKey = new Map();
@@ -457,10 +476,10 @@ function rebuildMissingWeightFromData() {
           const opType = String(item?.operationType || item?.type || '').toUpperCase();
           if (opType !== 'PICK_BY_LINE' && opType !== 'PIECE_SELECTION_PICKING') continue;
 
-          const name = String(item?.productName || item?.product || item?.name || '').trim();
+          const name = getMissingWeightProductName(item);
           if (!name) continue;
 
-          const article = String(item?.nomenclatureCode || item?.article || '').trim();
+          const article = getMissingWeightArticle(item);
           if (article && (weights.get(article) || 0) > 0) continue;
 
           const key = article || name;

@@ -49,10 +49,10 @@ if (Directory.Exists(dataDir))
                     var opType = (GetStr(item, "operationType", "type") ?? "").ToUpperInvariant();
                     if (opType != "PICK_BY_LINE" && opType != "PIECE_SELECTION_PICKING") continue;
 
-                    var name    = (GetStr(item, "productName", "product", "name") ?? "").Trim();
+                    var name    = (GetProductName(item) ?? "").Trim();
                     if (string.IsNullOrEmpty(name)) continue;
 
-                    var article = (GetStr(item, "nomenclatureCode", "article") ?? "").Trim();
+                    var article = (GetArticle(item) ?? "").Trim();
 
                     // Есть вес из Excel?
                     if (!string.IsNullOrEmpty(article) && weights.ContainsKey(article)) continue;
@@ -87,6 +87,26 @@ static string? GetStr(JsonElement el, params string[] props)
         if (el.TryGetProperty(p, out var v) && v.ValueKind == JsonValueKind.String)
             return v.GetString();
     return null;
+}
+
+static string? GetProductName(JsonElement item)
+{
+    var flat = GetStr(item, "productName", "name");
+    if (!string.IsNullOrWhiteSpace(flat)) return flat;
+
+    if (!item.TryGetProperty("product", out var product)) return null;
+    if (product.ValueKind == JsonValueKind.String) return product.GetString();
+    if (product.ValueKind == JsonValueKind.Object) return GetStr(product, "name", "productName");
+    return null;
+}
+
+static string? GetArticle(JsonElement item)
+{
+    var flat = GetStr(item, "nomenclatureCode", "article");
+    if (!string.IsNullOrWhiteSpace(flat)) return flat;
+
+    if (!item.TryGetProperty("product", out var product) || product.ValueKind != JsonValueKind.Object) return null;
+    return GetStr(product, "nomenclatureCode", "article");
 }
 
 string GetArg(string key, string defaultValue)
