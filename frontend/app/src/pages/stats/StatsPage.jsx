@@ -245,8 +245,6 @@ export default function StatsPage() {
         totalWeightKdkGrams: dateSummary.totalWeightKdkGrams || 0,
         totalWeightGrams: dateSummary.totalWeightGrams || 0,
         missingWeightNames: dateSummary.missingWeightNames || [],
-        missingWeightItems: dateSummary.missingWeightItems || (dateSummary.missingWeightNames || []).map(n => ({ name: n, article: '' })),
-        withWeightKeys: [],
       }
     }
     if (!items.length) return null
@@ -254,17 +252,13 @@ export default function StatsPage() {
   }, [items, dateSummary, emplMap, emplIdMap, isSummaryOnly])
 
   const missingWeightNames = statsAll?.missingWeightNames || []
-  const missingWeightItems = statsAll?.missingWeightItems || []
-  const withWeightKeys     = statsAll?.withWeightKeys || []
 
-  // Подгружаем общий счётчик по всем сменам с бэкенда (бэкенд пересобирает сам)
-  const missingNamesCount = missingWeightNames.length
   useEffect(() => {
-    if (missingNamesCount === 0) { setMissingWeightTotal(null); return }
+    if (!statsAll) { setMissingWeightTotal(null); return }
     api.getMissingWeight().then(all => {
       if (Array.isArray(all)) setMissingWeightTotal(all.length)
     }).catch(() => {})
-  }, [missingNamesCount])
+  }, [statsAll, status?.lastRun, statsRefreshSeq])
 
   const handleExportHourly = useCallback(async () => {
     if (!hourlyByEmployee?.allRows?.length) { notify('Нет данных для экспорта', 'info'); return }
@@ -526,9 +520,6 @@ export default function StatsPage() {
 
   const handleExportMissingWeight = useCallback(async () => {
     try {
-      if (missingWeightItems.length || withWeightKeys.length) {
-        await api.syncMissingWeight(missingWeightItems, withWeightKeys)
-      }
       const items2 = await api.getMissingWeight()
       if (!items2.length) { notify('Список неучтённых товаров пуст', 'info'); return }
       const ExcelJS = (await import('exceljs')).default
@@ -551,7 +542,7 @@ export default function StatsPage() {
     } catch (err) {
       notify('Ошибка экспорта: ' + err.message, 'error')
     }
-  }, [missingWeightItems, withWeightKeys, notify])
+  }, [notify])
 
   // При активном фильтре выводим stats из уже готовых агрегированных строк — O(сотрудники)
   const stats = useMemo(() => {
@@ -719,7 +710,6 @@ export default function StatsPage() {
           <button
             type="button"
             className="btn btn-secondary btn-sm"
-            disabled={missingWeightNames.length === 0}
             onClick={handleExportMissingWeight}
           >
             <Download size={13} strokeWidth={2} style={{marginRight:4}}/>XLSX: неучтённый вес

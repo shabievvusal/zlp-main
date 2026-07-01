@@ -241,24 +241,33 @@ app.put('/api/config', (req, res) => {
   }
 });
 
-// GET /api/missing-weight — пересобираем через .NET и возвращаем свежий список
+// GET /api/missing-weight — пересобираем по всем сохраненным сменам и возвращаем свежий список
 app.get('/api/missing-weight', async (req, res) => {
   try {
-    await rebuildMissingWeightDotnet();
+    const count = await rebuildMissingWeightDotnet();
+    if (count == null) rebuildMissingWeightFromData();
   } catch (err) {
     console.error('[missing-weight] rebuild failed:', err.message);
+    try { rebuildMissingWeightFromData(); } catch (fallbackErr) {
+      console.error('[missing-weight] fallback rebuild failed:', fallbackErr.message);
+    }
   }
   res.json(loadMissingWeight());
 });
 
-// POST /api/missing-weight/rebuild — пересборка через .NET-инструмент
+// POST /api/missing-weight/rebuild — принудительная пересборка по всем сохраненным сменам
 app.post('/api/missing-weight/rebuild', async (req, res) => {
   try {
-    const count = await rebuildMissingWeightDotnet();
-    if (count == null) return res.status(500).json({ ok: false, error: 'dotnet tool not available' });
+    let count = await rebuildMissingWeightDotnet();
+    if (count == null) count = rebuildMissingWeightFromData();
     res.json({ ok: true, count });
   } catch (err) {
-    res.status(500).json({ ok: false, error: err.message });
+    try {
+      const count = rebuildMissingWeightFromData();
+      res.json({ ok: true, count });
+    } catch (fallbackErr) {
+      res.status(500).json({ ok: false, error: fallbackErr.message || err.message });
+    }
   }
 });
 
@@ -437,6 +446,51 @@ function saveMissingWeight(list) {
   fs.writeFileSync(MISSING_WEIGHT_PATH, JSON.stringify(list, null, 2), 'utf8');
 }
 
+function rebuildMissingWeightFromData() {
+  const weights = productWeights.getMap();
+  const byKey = new Map();
+
+  if (!fs.existsSync(DATA_DIR)) {
+    saveMissingWeight([]);
+    return 0;
+  }
+
+  const dateDirs = fs.readdirSync(DATA_DIR, { withFileTypes: true })
+    .filter(e => e.isDirectory() && /^\d{4}-\d{2}-\d{2}$/.test(e.name));
+
+  for (const dirent of dateDirs) {
+    const dirPath = path.join(DATA_DIR, dirent.name);
+    const hourFiles = fs.readdirSync(dirPath)
+      .filter(f => /^\d{2}\.json$/.test(f));
+
+    for (const fileName of hourFiles) {
+      try {
+        const raw = JSON.parse(fs.readFileSync(path.join(dirPath, fileName), 'utf8'));
+        const items = Array.isArray(raw?.items) ? raw.items : [];
+        for (const item of items) {
+          const opType = String(item?.operationType || item?.type || '').toUpperCase();
+          if (opType !== 'PICK_BY_LINE' && opType !== 'PIECE_SELECTION_PICKING') continue;
+
+          const name = String(item?.productName || item?.product || item?.name || '').trim();
+          if (!name) continue;
+
+          const article = String(item?.nomenclatureCode || item?.article || '').trim();
+          if (article && (weights.get(article) || 0) > 0) continue;
+
+          const key = article || name;
+          if (key && !byKey.has(key)) byKey.set(key, { name, article });
+        }
+      } catch {
+        // пропускаем поврежденные почасовые файлы
+      }
+    }
+  }
+
+  const list = [...byKey.values()].sort((a, b) => String(a.name).localeCompare(String(b.name), 'ru'));
+  saveMissingWeight(list);
+  return list.length;
+}
+
 function getDotnetMissingWeightRebuildCmd() {
   const dll = path.join(__dirname, '..', 'tools', 'MissingWeightRebuild', 'bin', 'Release', 'net9.0', 'MissingWeightRebuild.dll');
   if (fs.existsSync(dll)) return { exe: 'dotnet', args: [dll] };
@@ -446,15 +500,18 @@ function getDotnetMissingWeightRebuildCmd() {
 }
 
 /**
- * Перестраивает missing_weight.json через .NET-инструмент.
- * Не требует участия фронта — инструмент сам обходит все data/YYYY-MM-DD/HH.json.
+ * Перестраивает missing_weight.json через .NET-инструмент или встроенный JS fallback.
+ * Не требует участия фронта — обходит все data/YYYY-MM-DD/HH.json.
  */
 let _rebuildInProgress = false;
 async function rebuildMissingWeightDotnet() {
   if (_rebuildInProgress) return null;
   _rebuildInProgress = true;
   const cmd = getDotnetMissingWeightRebuildCmd();
-  if (!cmd) { _rebuildInProgress = false; console.warn('[missing-weight] dotnet tool not found'); return null; }
+  if (!cmd) {
+    _rebuildInProgress = false;
+    return rebuildMissingWeightFromData();
+  }
 
   // Экспортируем таблицу весов во временный JSON { article: grams }
   const weightsObj = Object.fromEntries(productWeights.getMap());
