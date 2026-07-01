@@ -163,6 +163,14 @@ export async function getMissingWeight() {
   }
 }
 
+export async function rebuildMissingWeight() {
+  return req('/api/missing-weight/rebuild', { method: 'POST' })
+}
+
+export async function getMissingWeightStatus() {
+  return req('/api/missing-weight/status')
+}
+
 export async function syncMissingWeight(missing, withWeight) {
   try {
     const r = await fetch('/api/missing-weight/sync', {

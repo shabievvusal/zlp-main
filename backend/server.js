@@ -241,34 +241,20 @@ app.put('/api/config', (req, res) => {
   }
 });
 
-// GET /api/missing-weight — пересобираем по всем сохраненным сменам и возвращаем свежий список
-app.get('/api/missing-weight', async (req, res) => {
-  try {
-    const count = await rebuildMissingWeightDotnet();
-    if (count == null) rebuildMissingWeightFromData();
-  } catch (err) {
-    console.error('[missing-weight] rebuild failed:', err.message);
-    try { rebuildMissingWeightFromData(); } catch (fallbackErr) {
-      console.error('[missing-weight] fallback rebuild failed:', fallbackErr.message);
-    }
-  }
+// GET /api/missing-weight — только возвращаем последний готовый список.
+// Тяжелая сверка запускается отдельным async endpoint, чтобы не держать сайт.
+app.get('/api/missing-weight', (req, res) => {
   res.json(loadMissingWeight());
 });
 
-// POST /api/missing-weight/rebuild — принудительная пересборка по всем сохраненным сменам
-app.post('/api/missing-weight/rebuild', async (req, res) => {
-  try {
-    let count = await rebuildMissingWeightDotnet();
-    if (count == null) count = rebuildMissingWeightFromData();
-    res.json({ ok: true, count });
-  } catch (err) {
-    try {
-      const count = rebuildMissingWeightFromData();
-      res.json({ ok: true, count });
-    } catch (fallbackErr) {
-      res.status(500).json({ ok: false, error: fallbackErr.message || err.message });
-    }
-  }
+app.get('/api/missing-weight/status', (req, res) => {
+  res.json({ ok: true, ...getMissingWeightRebuildStatus() });
+});
+
+// POST /api/missing-weight/rebuild — запускает .NET-сверку в фоне
+app.post('/api/missing-weight/rebuild', (req, res) => {
+  const started = startMissingWeightRebuild('manual');
+  res.status(started ? 202 : 200).json({ ok: true, started, ...getMissingWeightRebuildStatus() });
 });
 
 // POST /api/missing-weight/sync — синхронизация: добавить новые, убрать получившие вес
@@ -499,18 +485,76 @@ function getDotnetMissingWeightRebuildCmd() {
   return null;
 }
 
+const missingWeightRebuildStatus = {
+  running: false,
+  startedAt: null,
+  finishedAt: null,
+  count: null,
+  error: null,
+  engine: null,
+  reason: null,
+  durationMs: null,
+};
+
+function getMissingWeightRebuildStatus() {
+  return { ...missingWeightRebuildStatus };
+}
+
+function startMissingWeightRebuild(reason = 'manual') {
+  if (missingWeightRebuildStatus.running) return false;
+
+  Object.assign(missingWeightRebuildStatus, {
+    running: true,
+    startedAt: new Date().toISOString(),
+    finishedAt: null,
+    count: null,
+    error: null,
+    engine: 'dotnet',
+    reason,
+    durationMs: null,
+  });
+
+  const startedMs = Date.now();
+
+  rebuildMissingWeightDotnet({ allowJsFallback: false })
+    .then(count => {
+      if (count == null) throw new Error('.NET-инструмент MissingWeightRebuild недоступен');
+      Object.assign(missingWeightRebuildStatus, {
+        running: false,
+        finishedAt: new Date().toISOString(),
+        count,
+        error: null,
+        durationMs: Date.now() - startedMs,
+      });
+      console.log(`[missing-weight] .NET rebuild done: ${count} товаров`);
+    })
+    .catch(err => {
+      const message = err?.message || String(err);
+      Object.assign(missingWeightRebuildStatus, {
+        running: false,
+        finishedAt: new Date().toISOString(),
+        error: message,
+        durationMs: Date.now() - startedMs,
+      });
+      console.error('[missing-weight] .NET rebuild failed:', message);
+    });
+
+  return true;
+}
+
 /**
- * Перестраивает missing_weight.json через .NET-инструмент или встроенный JS fallback.
+ * Перестраивает missing_weight.json через .NET-инструмент.
  * Не требует участия фронта — обходит все data/YYYY-MM-DD/HH.json.
  */
 let _rebuildInProgress = false;
-async function rebuildMissingWeightDotnet() {
+async function rebuildMissingWeightDotnet(options = {}) {
+  const { allowJsFallback = true } = options;
   if (_rebuildInProgress) return null;
   _rebuildInProgress = true;
   const cmd = getDotnetMissingWeightRebuildCmd();
   if (!cmd) {
     _rebuildInProgress = false;
-    return rebuildMissingWeightFromData();
+    return allowJsFallback ? rebuildMissingWeightFromData() : null;
   }
 
   // Экспортируем таблицу весов во временный JSON { article: grams }
@@ -526,7 +570,9 @@ async function rebuildMissingWeightDotnet() {
       cmd.args.concat(['--data-dir', DATA_DIR, '--weights', weightsPath, '--out', MISSING_WEIGHT_PATH]),
       { windowsHide: true, maxBuffer: 4 * 1024 * 1024 }
     );
-    const parsed = stdout ? JSON.parse(stdout.trim()) : null;
+    const out = String(stdout || '').trim();
+    const jsonLine = out.split(/\r?\n/).reverse().find(line => line.trim().startsWith('{'));
+    const parsed = jsonLine ? JSON.parse(jsonLine.trim()) : null;
     if (parsed?.ok) return parsed.count;
     return null;
   } finally {
@@ -790,10 +836,8 @@ app.post('/api/save-fetched-data', async (req, res) => {
     const shiftKeys = Object.keys(mergeResult.byShift || {});
     const savedTo = shiftKeys.length ? shiftKeys.join(', ') : 'hourly';
 
-    // Обновляем список неучтённых товаров в фоне после сохранения новых данных
-    rebuildMissingWeightDotnet()
-      .then(count => { if (count != null) console.log(`[missing-weight] Обновлено после fetch: ${count} товаров`); })
-      .catch(() => {});
+    // Обновляем список неучтённых товаров в фоне после сохранения новых данных.
+    startMissingWeightRebuild('save-fetched-data');
 
     res.json({
       ok: true,
