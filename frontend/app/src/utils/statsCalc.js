@@ -20,42 +20,12 @@ export function getZoneFromCell(cell) {
 let _productWeights = {}
 export function setProductWeights(w) { _productWeights = w || {} }
 
-function normalizeNameWeight(str) {
-  return String(str || '').replace(/\u00a0|\u202f/g, ' ').trim()
-}
-
-function parseNumber(val) {
-  const n = Number(String(val || '').replace(',', '.'))
-  return Number.isFinite(n) ? n : 0
-}
-
-function gramsFromUnit(value, unit) {
-  const v = parseNumber(value)
-  if (!v) return 0
-  const u = String(unit || '').toLowerCase()
-  if (u === 'кг' || u === 'kg') return v * 1000
-  if (u === 'г'  || u === 'g')  return v
-  if (u === 'л'  || u === 'l')  return v * 1000
-  if (u === 'мл' || u === 'ml') return v
-  return 0
-}
-
-function parseWeightGramsFromName(name) {
-  const s = normalizeNameWeight(name)
-  if (!s) return 0
-  const combo = s.match(/(\d+(?:[.,]\d+)?)\s*[xх×]\s*(\d+(?:[.,]\d+)?)\s*(кг|г|л|мл|kg|g|l|ml)/i)
-  if (combo) return parseNumber(combo[1]) * gramsFromUnit(combo[2], combo[3])
-  const simple = s.match(/(\d+(?:[.,]\d+)?)\s*(кг|г|л|мл|kg|g|l|ml)/i)
-  if (simple) return gramsFromUnit(simple[1], simple[2])
-  return 0
-}
-
-function resolveWeightGrams(article, name) {
+function resolveWeightGrams(article) {
   if (article) {
     const w = _productWeights[String(article).trim()]
     if (w > 0) return w
   }
-  return parseWeightGramsFromName(name)
+  return 0
 }
 
 function addWeight(map, key, grams, isKdk) {
@@ -148,7 +118,7 @@ export function calcStats(items, emplMap, filterCompany, emplIdMap = null) {
     const name = item.productName || item.product || item.name
     if (name) {
       const article = String(item.nomenclatureCode || item.article || '').trim()
-      const gramsPerUnit = resolveWeightGrams(article, name)
+      const gramsPerUnit = resolveWeightGrams(article)
       const qty = Math.max(1, Number(item.quantity) || 1)
       const weight = gramsPerUnit * qty
       const wkey = article || String(name).trim()
@@ -275,7 +245,7 @@ export function calcHourlyByEmployee(items, shiftFilter = 'day', enrichFn = null
       const productName = item.productName || item.product || item.name
       if (productName) {
         const itemArticle = String(item.nomenclatureCode || item.article || '').trim()
-        const gramsPerUnit = resolveWeightGrams(itemArticle, productName)
+        const gramsPerUnit = resolveWeightGrams(itemArticle)
         if (gramsPerUnit > 0) {
           const qty = Math.max(1, Number(item.quantity) || 1)
           const grams = gramsPerUnit * qty
@@ -363,7 +333,7 @@ export function getCompanySummaryTableData(items, shiftFilter, emplMap, selected
     const name = item.productName || item.product || item.name
     if (!name) continue
     const art = String(item.nomenclatureCode || item.article || '').trim()
-    const gramsPerUnit = resolveWeightGrams(art, name)
+    const gramsPerUnit = resolveWeightGrams(art)
     if (gramsPerUnit <= 0) continue
     const qty = Math.max(1, Number(item.quantity) || 1)
     addWeight(weightByCompany, company, gramsPerUnit * qty, isKdk)
@@ -378,7 +348,7 @@ export function getCompanySummaryTableData(items, shiftFilter, emplMap, selected
     const name = item.productName || item.product || item.name
     if (!name) continue
     const art = String(item.nomenclatureCode || item.article || '').trim()
-    const grams = resolveWeightGrams(art, name)
+    const grams = resolveWeightGrams(art)
     if (grams <= 0) continue
     const qty = Math.max(1, Number(item.quantity) || 1)
     const empName = item.executorId || ''
@@ -530,7 +500,7 @@ export function getWeightByEmployee(items) {
     const name = item.productName || item.product || item.name
     if (!name) continue
     const art = String(item.nomenclatureCode || item.article || '').trim()
-    const grams = resolveWeightGrams(art, name)
+    const grams = resolveWeightGrams(art)
     if (grams <= 0) continue
     const qty = Math.max(1, Number(item.quantity) || 1)
     const empName = item.executorId || ''

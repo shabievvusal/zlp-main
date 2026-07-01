@@ -21,12 +21,6 @@ if (!string.IsNullOrEmpty(weightsPath) && File.Exists(weightsPath))
     catch { /* если файл сломан — работаем без весов из Excel */ }
 }
 
-// ── Регулярки для определения веса по названию товара ────────────────────────
-var unitRe  = new Regex(@"\b\d+(?:[.,]\d+)?\s*(?:кг|г|л|мл|kg|g|l|ml)\b",
-    RegexOptions.IgnoreCase | RegexOptions.Compiled);
-var comboRe = new Regex(@"\b\d+(?:[.,]\d+)?\s*[xх×]\s*\d+(?:[.,]\d+)?\s*(?:кг|г|л|мл|kg|g|l|ml)\b",
-    RegexOptions.IgnoreCase | RegexOptions.Compiled);
-
 var byKey = new Dictionary<string, MissingItem>(StringComparer.Ordinal);
 
 // ── Обходим все data/YYYY-MM-DD/HH.json ──────────────────────────────────────
@@ -62,10 +56,6 @@ if (Directory.Exists(dataDir))
 
                     // Есть вес из Excel?
                     if (!string.IsNullOrEmpty(article) && weights.ContainsKey(article)) continue;
-
-                    // Вес вычисляется из названия?
-                    var norm = name.Replace("\u00a0", " ").Replace("\u202f", " ");
-                    if (comboRe.IsMatch(norm) || unitRe.IsMatch(norm)) continue;
 
                     var key = !string.IsNullOrEmpty(article) ? article : name;
                     byKey.TryAdd(key, new MissingItem(name, article));

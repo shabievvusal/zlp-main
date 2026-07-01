@@ -16,42 +16,6 @@ const REMAINS_DIR_NAME = 'remains';
 /** Часовой пояс смен: Москва (UTC+3), без перехода на летнее время */
 const MOSCOW_UTC_OFFSET_MS = 3 * 60 * 60 * 1000;
 
-function normalizeNameWeight(str) {
-  return String(str || '').replace(/\u00a0|\u202f/g, ' ').trim();
-}
-
-function parseNumber(val) {
-  const n = Number(String(val || '').replace(',', '.'));
-  return Number.isFinite(n) ? n : 0;
-}
-
-function gramsFromUnit(value, unit) {
-  const v = parseNumber(value);
-  if (!v) return 0;
-  const u = String(unit || '').toLowerCase();
-  if (u === 'кг' || u === 'kg') return v * 1000;
-  if (u === 'г' || u === 'g') return v;
-  if (u === 'л' || u === 'l') return v * 1000;
-  if (u === 'мл' || u === 'ml') return v;
-  return 0;
-}
-
-function parseWeightGramsFromName(name) {
-  const s = normalizeNameWeight(name);
-  if (!s) return 0;
-  const combo = s.match(/(\d+(?:[.,]\d+)?)\s*[xх×]\s*(\d+(?:[.,]\d+)?)\s*(кг|г|л|мл|kg|g|l|ml)/i);
-  if (combo) {
-    const count = parseNumber(combo[1]);
-    const per = gramsFromUnit(combo[2], combo[3]);
-    return count * per;
-  }
-  const simple = s.match(/(\d+(?:[.,]\d+)?)\s*(кг|г|л|мл|kg|g|l|ml)/i);
-  if (simple) {
-    return gramsFromUnit(simple[1], simple[2]);
-  }
-  return 0;
-}
-
 function addWeight(map, key, grams, isKdk) {
   if (!key || grams <= 0) return;
   const cur = map.get(key) || { storage: 0, kdk: 0, total: 0 };
@@ -461,7 +425,7 @@ function buildSummaryFromItems(items, opts = {}) {
     const name = item.productName || item.product || item.name;
     if (!name) continue;
     const article = String(item.nomenclatureCode || item.article || '').trim();
-    const gramsPerUnit = productWeights.getWeightGrams(article) || parseWeightGramsFromName(name);
+    const gramsPerUnit = productWeights.getWeightGrams(article);
     if (gramsPerUnit <= 0) {
       const key = article || String(name).trim();
       if (!missingWeightMap.has(key)) missingWeightMap.set(key, { name: String(name).trim(), article });
@@ -607,9 +571,9 @@ function buildSummaryFromItems(items, opts = {}) {
         const productName = item.productName || item.product || item.name;
         if (productName) {
           const itemArticle = String(item.nomenclatureCode || item.article || '').trim();
-          const gramsPerUnit = productWeights.getWeightGrams(itemArticle) || parseWeightGramsFromName(productName);
+          const gramsPerUnit = productWeights.getWeightGrams(itemArticle);
           if (gramsPerUnit > 0) {
-            const qty = Math.max(1, parseNumber(item.quantity) || 1);
+            const qty = Math.max(1, Number(item.quantity) || 1);
             const grams = gramsPerUnit * qty;
             cell.weightGrams += grams;
             if (zoneKey) cell.zoneWeights[zoneKey] = (cell.zoneWeights[zoneKey] || 0) + grams;

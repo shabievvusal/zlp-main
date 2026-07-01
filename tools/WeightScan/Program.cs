@@ -1,13 +1,9 @@
 using System.Text.Json;
-using System.Text.RegularExpressions;
 
 var rootDir = GetArg("--root", "backend/data");
 var mode = GetArg("--mode", "both").ToLowerInvariant();
 var outCounts = GetArg("--out-counts", "weight_missing_report.txt");
 var outUnique = GetArg("--out-unique", "weight_missing_report_unique.txt");
-
-var unitRe = new Regex(@"\b\d+(?:[.,]\d+)?\s*(?:кг|г|л|мл)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-var comboRe = new Regex(@"\b\d+\s*[xх×]\s*\d+(?:[.,]\d+)?\s*(?:кг|г|л|мл)\b", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
 var missingCounts = new Dictionary<string, int>(StringComparer.Ordinal);
 var missingExamples = new Dictionary<string, Example>(StringComparer.Ordinal);
@@ -45,14 +41,6 @@ foreach (var path in Directory.EnumerateFiles(rootDir, "*.json", SearchOption.Al
             if (string.IsNullOrWhiteSpace(name))
             {
                 nullName++;
-                continue;
-            }
-
-            var norm = NormalizeName(name);
-            var hasWeight = unitRe.IsMatch(norm) || comboRe.IsMatch(norm);
-            if (hasWeight)
-            {
-                withWeight++;
                 continue;
             }
 

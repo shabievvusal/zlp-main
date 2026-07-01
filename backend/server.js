@@ -2754,6 +2754,7 @@ app.post('/api/consolidation/telegram/send', async (req, res) => {
 // ─── Кэш дневной сводки по компаниям ─────────────────────────────────────────
 
 const COMPANY_DAY_CACHE_DIR = path.join(DATA_DIR, 'company-day-cache');
+const COMPANY_DAY_CACHE_VERSION = 3;
 
 function companyCachePath(dateStr, shift) {
   const suffix = shift ? `_${shift}` : '_all';
@@ -2764,38 +2765,20 @@ function loadCompanyDayCache(dateStr, shift) {
   const fp = companyCachePath(dateStr, shift);
   try {
     if (!fs.existsSync(fp)) return null;
-    return JSON.parse(fs.readFileSync(fp, 'utf8'));
+    const cached = JSON.parse(fs.readFileSync(fp, 'utf8'));
+    if (cached?.version !== COMPANY_DAY_CACHE_VERSION) return null;
+    return cached;
   } catch { return null; }
 }
 
 function saveCompanyDayCache(dateStr, shift, companies) {
   if (!fs.existsSync(COMPANY_DAY_CACHE_DIR)) fs.mkdirSync(COMPANY_DAY_CACHE_DIR, { recursive: true });
   const fp = companyCachePath(dateStr, shift);
-  fs.writeFileSync(fp, JSON.stringify({ dateStr, shift, cachedAt: new Date().toISOString(), companies }), 'utf8');
+  fs.writeFileSync(fp, JSON.stringify({ version: COMPANY_DAY_CACHE_VERSION, dateStr, shift, cachedAt: new Date().toISOString(), companies }), 'utf8');
 }
 
 /** Вычислить сводку по компаниям за один день и вернуть объект { companyName: { totalTasks, storageOps, kdkOps, weightStorageGrams, weightKdkGrams, employees: string[] } } */
 function computeCompanyDay(dateStr, shift, getComp) {
-  function parseWeightGramsFromName(name) {
-    const s = String(name || '').replace(/\u00a0|\u202f/g, ' ').trim();
-    if (!s) return 0;
-    const parseN = v => { const n = Number(String(v||'').replace(',','.')); return Number.isFinite(n) ? n : 0; };
-    const fromUnit = (val, unit) => {
-      const v = parseN(val); if (!v) return 0;
-      const u = String(unit||'').toLowerCase();
-      if (u==='кг'||u==='kg') return v*1000;
-      if (u==='г'||u==='g') return v;
-      if (u==='л'||u==='l') return v*1000;
-      if (u==='мл'||u==='ml') return v;
-      return 0;
-    };
-    const combo = s.match(/(\d+(?:[.,]\d+)?)\s*[xх×]\s*(\d+(?:[.,]\d+)?)\s*(кг|г|л|мл|kg|g|l|ml)/i);
-    if (combo) return parseN(combo[1]) * fromUnit(combo[2], combo[3]);
-    const simple = s.match(/(\d+(?:[.,]\d+)?)\s*(кг|г|л|мл|kg|g|l|ml)/i);
-    if (simple) return fromUnit(simple[1], simple[2]);
-    return 0;
-  }
-
   const items = storage.getDateItems(dateStr, { shift: shift || undefined });
   if (!items.length) return {};
 
@@ -2818,7 +2801,7 @@ function computeCompanyDay(dateStr, shift, getComp) {
       dc.taskKeys.add(taskKey);
       if (isKdk) dc.kdkOps++; else if (isPallet) dc.palletOps++; else dc.storageOps++;
     }
-    const grams = (productWeights.getWeightGrams(String(item.nomenclatureCode||'').trim()) || parseWeightGramsFromName(item.productName||'')) * Math.max(1, Number(item.quantity)||1);
+    const grams = productWeights.getWeightGrams(String(item.nomenclatureCode||'').trim()) * Math.max(1, Number(item.quantity)||1);
     if (grams > 0) { if (isKdk) dc.weightKdkGrams += grams; else dc.weightStorageGrams += grams; }
     dc.employees.add(normalizeFioForMatch(item.executor));
   }
